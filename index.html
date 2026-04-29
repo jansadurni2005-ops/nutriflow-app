@@ -942,16 +942,18 @@ CAPACIDADES QUE TIENES:
     return '<button id="'+id+'" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);height:36px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;'+extraStyle+'">'+html+'</button>';
   }
 
-  var obs=new MutationObserver(function(){
+  setInterval(function(){
     var root=el('_nf_agenda_root');
-    if(root&&!root.hasAttribute('data-ag-ready')){
-      root.setAttribute('data-ag-ready','1');
+    if(!root){S._agInit=false;return;}
+    if(!S._agInit){
+      S._agInit=true;
       root.style.cssText='padding:28px 28px 40px;max-width:860px;margin:0 auto;min-height:60vh';
       var tok=getToken();
       if(tok)loadEvents();else render();
+      return;
     }
-  });
-  obs.observe(document.documentElement,{childList:true,subtree:true});
+    if(!root.innerHTML.trim()){render();}
+  },150);
 })();
 </script>
 </body>
