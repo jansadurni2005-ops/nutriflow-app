@@ -1050,72 +1050,180 @@ CAPACIDADES QUE TIENES:
 </script>
 <script>
 (function(){
+  var MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   function getPre(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
-  function getClients(){try{return JSON.parse(localStorage.getItem(getPre()+'clients')||'[]');}catch(e){return[];}}
+  function getLS(suf){var pre=getPre();if(!pre)return[];try{return JSON.parse(localStorage.getItem(pre+suf)||'[]');}catch(e){return[];}}
+  function getCfg(){var pre=getPre();if(!pre)return{};try{return JSON.parse(localStorage.getItem(pre+'config')||'{}');}catch(e){return{};}}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  function monthsSince(ds){
-    if(!ds)return 0;
-    var d=new Date(ds),now=new Date();
-    return(now.getFullYear()-d.getFullYear())*12+(now.getMonth()-d.getMonth());
+  function fmt(v){if(v===0)return'0€';var a=Math.abs(v);return(v<0?'-':'')+(a>=1000?(a/1000).toFixed(1)+'k':Math.round(a))+'€';}
+  function monthsSince(ds){if(!ds)return 0;var d=new Date(ds),n=new Date();return(n.getFullYear()-d.getFullYear())*12+(n.getMonth()-d.getMonth());}
+  function th(price,source,sp,pct){return source===sp?pct*price:price;}
+
+  function monthRev(yr,mo,clients,antrop,sp,pct,confirmed){
+    var crv=clients.filter(function(c){
+      if(c.active===false||!c.startDate)return false;
+      var sd=new Date(c.startDate),sy=sd.getFullYear(),sm=sd.getMonth();
+      if(confirmed)return sy===yr&&sm===mo;
+      if(sy>yr||(sy===yr&&sm>mo))return false;
+      var di=(yr-sy)*12+(mo-sm);
+      return c.billing==='quarterly'?di%3===0:true;
+    }).reduce(function(s,c){
+      var g=c.price*(c.billing==='quarterly'?3:1);
+      return s+th(g,c.source,sp,pct);
+    },0);
+    var arv=antrop.filter(function(a){var d=new Date(a.date);return d.getFullYear()===yr&&d.getMonth()===mo;}).reduce(function(s,a){return s+(parseFloat(a.price)||0);},0);
+    return crv+arv;
   }
 
   function render(){
     var root=document.getElementById('_nf_retention_root');if(!root)return;
-    var clients=getClients().filter(function(c){return c.active!==false;});
-    if(!clients.length){root.innerHTML='';return;}
-    var list=clients.map(function(c){return Object.assign({},c,{months:monthsSince(c.startDate)});});
+    var clients=getLS('clients');
+    var antrop=getLS('antrop');
+    var cfg=getCfg();
+    var sp=cfg.partnerSource||cfg.splitPartner||'GEIEG';
+    var pct=(cfg.splitPercent||70)/100;
+    var active=clients.filter(function(c){return c.active!==false;});
+    if(!active.length){root.innerHTML='';return;}
+
+    var now=new Date(),cy=now.getFullYear(),cm=now.getMonth();
+    var py=cm===0?cy-1:cy,pm=cm===0?11:cm-1;
+
+    var thisMon=monthRev(cy,cm,clients,antrop,sp,pct,true);
+    var lastMon=monthRev(py,pm,clients,antrop,sp,pct,false);
+    var potential=active.reduce(function(s,c){return s+th(c.price,c.source,sp,pct);},0);
+    var goal=Math.max(Math.ceil((potential+1)/500)*500,500);
+    var mom=lastMon>0?Math.round((thisMon-lastMon)/lastMon*100):null;
+    var goalPct=Math.min(100,potential>0?thisMon/goal*100:0);
+    var potPct=Math.min(100,potential>0?potential/goal*100:0);
+
+    // 6-month bars
+    var bars=[];
+    for(var bi=5;bi>=0;bi--){
+      var bm=cm-bi,by=cy;if(bm<0){bm+=12;by--;}
+      var isCur=by===cy&&bm===cm;
+      bars.push({lbl:MES[bm],rev:monthRev(by,bm,clients,antrop,sp,pct,isCur),cur:isCur});
+    }
+    var maxB=Math.max.apply(null,bars.map(function(b){return b.rev;}).concat([potential||1]));
+
+    // Retention
+    var list=active.map(function(c){return Object.assign({},c,{months:monthsSince(c.startDate)});});
     list.sort(function(a,b){return b.months-a.months;});
     var retained=list.filter(function(c){return c.months>=3;}).length;
-    var retRate=Math.round(retained/list.length*100);
-    var avgMonths=list.length?(list.reduce(function(s,c){return s+c.months;},0)/list.length).toFixed(1):0;
+    var retRate=list.length?Math.round(retained/list.length*100):0;
+    var avgM=list.length?(list.reduce(function(s,c){return s+c.months;},0)/list.length).toFixed(1):'0';
     var rCol=retRate>=80?'#34d399':retRate>=50?'#f59e0b':'#f87171';
-    var CATS=[
-      {label:'Nuevo',col:'#4d9cf8',min:0,max:3},
-      {label:'En curso',col:'#a78bfa',min:3,max:6},
-      {label:'Fiel',col:'#34d399',min:6,max:12},
-      {label:'VIP',col:'#f59e0b',min:12,max:Infinity}
-    ];
-    function catFor(m){return CATS.find(function(c){return m>=c.min&&m<c.max;})||CATS[0];}
+    var CATS=[{l:'Nuevo',c:'#4d9cf8',min:0,max:3},{l:'En curso',c:'#a78bfa',min:3,max:6},{l:'Fiel',c:'#34d399',min:6,max:12},{l:'VIP',c:'#f59e0b',min:12,max:999}];
+    function catFor(m){for(var i=0;i<CATS.length;i++){if(m>=CATS[i].min&&m<CATS[i].max)return CATS[i];}return CATS[0];}
 
-    // Top row: title + stats + bucket chips — all horizontal
-    var statsHtml=
-      '<div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border-radius:8px;padding:6px 12px;flex-shrink:0">'+
-        '<span style="font-size:18px;font-weight:800;color:'+rCol+'">'+retRate+'%</span>'+
-        '<span style="font-size:10px;color:var(--muted);line-height:1.2">tasa<br>retención</span>'+
-      '</div>'+
-      '<div style="display:flex;align-items:center;gap:6px;background:var(--bg3);border-radius:8px;padding:6px 12px;flex-shrink:0">'+
-        '<span style="font-size:18px;font-weight:800;color:var(--text)">'+avgMonths+'</span>'+
-        '<span style="font-size:10px;color:var(--muted);line-height:1.2">meses<br>medio</span>'+
-      '</div>';
+    // MoM badge
+    var momHtml='';
+    if(mom!==null){var mc=mom>=0?'#34d399':'#f87171';momHtml='<span style="font-size:11px;font-weight:700;color:'+mc+';background:'+mc+'18;border:1px solid '+mc+'33;border-radius:20px;padding:3px 9px;flex-shrink:0">'+(mom>=0?'↑ +':'↓ ')+Math.abs(mom)+'% vs ant.</span>';}
 
-    var bucketChips=CATS.map(function(cat){
-      var count=list.filter(function(c){return c.months>=cat.min&&c.months<cat.max;}).length;
-      return '<div style="display:flex;align-items:center;gap:5px;background:'+cat.col+'15;border:1px solid '+cat.col+'33;border-radius:8px;padding:5px 10px;flex-shrink:0">'+
-        '<span style="font-size:16px;font-weight:800;color:'+cat.col+'">'+count+'</span>'+
-        '<span style="font-size:10px;color:'+cat.col+';font-weight:600">'+cat.label+'</span>'+
+    // Bar chart HTML
+    var barsHtml=bars.map(function(b){
+      var h=b.rev>0?Math.max(b.rev/maxB*96,4):2;
+      var col=b.cur?'#4d9cf8':'rgba(77,156,248,0.28)';
+      return'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px">'+
+        '<div style="font-size:9px;font-weight:600;color:'+(b.rev>0?'var(--text2)':'var(--muted)');+'">'+(b.rev>0?fmt(b.rev):'')+'</div>'+
+        '<div style="flex:1;width:100%;display:flex;align-items:flex-end;min-height:48px">'+
+          '<div style="width:100%;border-radius:4px 4px 0 0;background:'+col+';height:'+h+'%"></div>'+
+        '</div>'+
+        '<div style="font-size:10px;color:'+(b.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(b.cur?'700':'400')+'">'+b.lbl+'</div>'+
       '</div>';
     }).join('');
 
-    // Client chips — horizontal wrap, compact
+    // Category chips
+    var catHtml=CATS.map(function(cat){
+      var n=list.filter(function(c){return c.months>=cat.min&&c.months<cat.max;}).length;
+      return'<div style="display:flex;align-items:center;gap:4px;background:'+cat.c+'12;border:1px solid '+cat.c+'30;border-radius:20px;padding:4px 10px;flex-shrink:0">'+
+        '<span style="font-size:14px;font-weight:800;color:'+cat.c+'">'+n+'</span>'+
+        '<span style="font-size:9px;color:'+cat.c+';font-weight:700;text-transform:uppercase;letter-spacing:.04em">'+cat.l+'</span>'+
+      '</div>';
+    }).join('');
+
+    // Client chips
     var chipHtml=list.map(function(c){
-      var m=c.months;
-      var cat=catFor(m);
-      return '<div style="display:inline-flex;align-items:center;gap:7px;background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 12px 5px 6px;flex-shrink:0">'+
-        '<div style="width:22px;height:22px;border-radius:50%;background:'+cat.col+'22;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:800;color:'+cat.col+'">'+esc((c.name||'?')[0].toUpperCase())+'</div>'+
-        '<span style="font-size:12px;font-weight:600;color:var(--text);white-space:nowrap">'+esc(c.name.split(' ')[0])+'</span>'+
-        '<span style="font-size:11px;font-weight:700;color:'+cat.col+';white-space:nowrap">'+m+'m</span>'+
+      var cat=catFor(c.months);
+      return'<div style="display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:4px 10px 4px 4px;flex-shrink:0">'+
+        '<div style="width:20px;height:20px;border-radius:50%;background:'+cat.c+'22;display:flex;align-items:center;justify-content:center;font-size:9px;font-weight:800;color:'+cat.c+'">'+esc((c.name||'?')[0].toUpperCase())+'</div>'+
+        '<span style="font-size:11px;font-weight:600;color:var(--text);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis">'+esc(c.name.split(' ')[0])+'</span>'+
+        '<span style="font-size:10px;font-weight:700;color:'+cat.c+';white-space:nowrap">'+c.months+'m</span>'+
       '</div>';
     }).join('');
 
     root.innerHTML=
-      '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:16px 20px;margin-bottom:4px">'+
-        '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px">'+
-          '<span style="font-size:13px;font-weight:700;flex-shrink:0">Retención</span>'+
-          statsHtml+
-          '<div style="width:1px;height:24px;background:var(--bg4);flex-shrink:0"></div>'+
-          bucketChips+
+      '<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:4px">'+
+
+      // ── FACTURACIÓN PANEL ──
+      '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:18px 20px">'+
+
+        // Header
+        '<div style="display:flex;align-items:center;gap:10px;margin-bottom:16px;flex-wrap:wrap">'+
+          '<span style="font-size:13px;font-weight:700">Facturación</span>'+
+          momHtml+
         '</div>'+
-        '<div style="display:flex;gap:6px;flex-wrap:wrap">'+chipHtml+'</div>'+
+
+        // 3 KPI cards
+        '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:16px">'+
+          '<div style="background:rgba(77,156,248,.08);border:1px solid rgba(77,156,248,.22);border-radius:10px;padding:12px 14px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:6px">Este mes</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#4d9cf8;line-height:1">'+fmt(thisMon)+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">confirmado</div>'+
+          '</div>'+
+          '<div style="background:var(--bg3);border-radius:10px;padding:12px 14px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:6px">Mes anterior</div>'+
+            '<div style="font-size:22px;font-weight:800;color:var(--text);line-height:1">'+fmt(lastMon)+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">estimado</div>'+
+          '</div>'+
+          '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:12px 14px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:6px">Potencial</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#34d399;line-height:1">'+fmt(potential)+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">si todos pagan</div>'+
+          '</div>'+
+        '</div>'+
+
+        // Bar chart
+        '<div style="display:flex;gap:6px;align-items:flex-end;height:68px;margin-bottom:3px">'+barsHtml+'</div>'+
+
+        // Divider
+        '<div style="height:1px;background:rgba(255,255,255,.05);margin:12px 0"></div>'+
+
+        // Goal progress
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px">'+
+          '<span style="font-size:11px;color:var(--muted)">Objetivo <strong style="color:var(--text2)">'+fmt(goal)+'</strong>/mes</span>'+
+          '<span style="font-size:11px;font-weight:700;color:'+(thisMon>=goal?'#34d399':'var(--text2)')+'">'+
+            (thisMon>=goal?'✓ Alcanzado':'Faltan '+fmt(goal-thisMon))+
+          '</span>'+
+        '</div>'+
+        '<div style="height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">'+
+          '<div style="position:absolute;top:0;left:0;height:100%;width:'+potPct+'%;background:rgba(52,211,153,.2);border-radius:4px;transition:width .6s"></div>'+
+          '<div style="position:absolute;top:0;left:0;height:100%;width:'+goalPct+'%;background:#4d9cf8;border-radius:4px;transition:width .6s"></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;margin-top:5px">'+
+          '<span style="font-size:10px;color:#4d9cf8;font-weight:600">'+fmt(thisMon)+' confirmado</span>'+
+          '<span style="font-size:10px;color:rgba(52,211,153,.8);font-weight:600">'+fmt(potential)+' potencial</span>'+
+        '</div>'+
+
+      '</div>'+
+
+      // ── RETENCIÓN PANEL ──
+      '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px">'+
+        '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
+          '<span style="font-size:13px;font-weight:700;flex-shrink:0">Retención</span>'+
+          '<div style="display:flex;align-items:center;gap:5px;background:'+rCol+'12;border:1px solid '+rCol+'30;border-radius:8px;padding:5px 10px;flex-shrink:0">'+
+            '<span style="font-size:16px;font-weight:800;color:'+rCol+'">'+retRate+'%</span>'+
+            '<span style="font-size:9px;color:'+rCol+';font-weight:700;line-height:1.2;text-transform:uppercase;letter-spacing:.04em">tasa<br>ret.</span>'+
+          '</div>'+
+          '<div style="display:flex;align-items:center;gap:5px;background:var(--bg3);border-radius:8px;padding:5px 10px;flex-shrink:0">'+
+            '<span style="font-size:16px;font-weight:800;color:var(--text)">'+avgM+'m</span>'+
+            '<span style="font-size:9px;color:var(--muted);line-height:1.2;text-transform:uppercase;letter-spacing:.04em">media<br>tenure</span>'+
+          '</div>'+
+          '<div style="width:1px;height:20px;background:var(--bg4);flex-shrink:0"></div>'+
+          catHtml+
+        '</div>'+
+        '<div style="display:flex;gap:5px;flex-wrap:wrap">'+chipHtml+'</div>'+
+      '</div>'+
+
       '</div>';
   }
 
@@ -1124,7 +1232,7 @@ CAPACIDADES QUE TIENES:
     if(!root)return;
     if(!root.innerHTML.trim())render();
   },300);
-  window.addEventListener('storage',function(e){if(e.key&&e.key.indexOf('clients')>-1)render();});
+  window.addEventListener('storage',function(e){if(e.key&&(e.key.indexOf('clients')>-1||e.key.indexOf('antrop')>-1))render();});
 })();
 </script>
 </body>
