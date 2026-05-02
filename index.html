@@ -949,13 +949,14 @@ CAPACIDADES QUE TIENES:
   setInterval(function(){
     if(el('_nf_search_btn'))return;
     var hdr=document.querySelector('header');if(!hdr)return;
-    var right=hdr.querySelector('div:last-child');if(!right)return;
-    var btn=document.createElement('button');
-    btn.id='_nf_search_btn';btn.title='Buscar (Ctrl+K)';
-    btn.innerHTML='<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>';
-    btn.style.cssText='background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:34px;height:34px;border-radius:9px;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;margin-right:8px';
-    btn.onclick=renderSearch;
-    right.insertBefore(btn,right.firstChild);
+    var bar=document.createElement('div');
+    bar.id='_nf_search_btn';
+    bar.style.cssText='position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--bg4);border-radius:10px;padding:8px 16px;cursor:pointer;width:260px;box-sizing:border-box;transition:border-color .15s,box-shadow .15s;z-index:10';
+    bar.innerHTML='<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg><span style="flex:1;color:var(--muted);font-size:13px">Buscar…</span><kbd style="font-size:10px;background:var(--bg4);border-radius:5px;padding:2px 6px;color:var(--muted);white-space:nowrap;font-family:inherit;border:1px solid rgba(255,255,255,.08)">Ctrl+K</kbd>';
+    bar.onclick=renderSearch;
+    bar.onmouseover=function(){this.style.borderColor='var(--border2)';this.style.boxShadow='0 0 0 3px rgba(77,156,248,.12)';};
+    bar.onmouseout=function(){this.style.borderColor='var(--bg4)';this.style.boxShadow='none';};
+    hdr.appendChild(bar);
   },300);
 })();
 </script>
