@@ -696,11 +696,15 @@ CAPACIDADES QUE TIENES:
   var MES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var DS_F=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
   var ECOLS=['#4d9cf8','#34d399','#f59e0b','#f87171','#a78bfa','#06b6d4','#f97316','#ec4899'];
+  var NCOLS=['#fef08a','#fca5a5','#86efac','#93c5fd','#d8b4fe','#fdba74','#fde68a','#6ee7b7'];
 
   var S={off:0,events:[],creating:false,createDate:''};
 
+  var LS_N='_nf_notes';
   function load(){try{S.events=JSON.parse(localStorage.getItem(LS)||'[]');}catch(e){S.events=[];}}
   function save(){localStorage.setItem(LS,JSON.stringify(S.events));}
+  function loadNotes(){try{return JSON.parse(localStorage.getItem(LS_N)||'[]');}catch(e){return[];}}
+  function saveNotes(n){localStorage.setItem(LS_N,JSON.stringify(n));}
   function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function monday(d){var w=d.getDay(),n=new Date(d);n.setDate(d.getDate()-w+(w?1:-6));n.setHours(0,0,0,0);return n;}
   function addDays(d,n){var r=new Date(d);r.setDate(r.getDate()+n);return r;}
@@ -734,6 +738,53 @@ CAPACIDADES QUE TIENES:
 
   function navBtn(id,html,extra){
     return '<button id="'+id+'" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);height:36px;border-radius:9px;cursor:pointer;font-size:13px;font-weight:600;display:inline-flex;align-items:center;justify-content:center;'+extra+'">'+html+'</button>';
+  }
+
+  var _noteSaveTimer=null;
+  function renderNotes(){
+    var nr=el('_nf_notes_root');if(!nr)return;
+    var notes=loadNotes();
+    var chips=notes.map(function(n){
+      return '<div style="position:relative;background:'+n.col+';border-radius:12px;padding:14px 14px 12px;min-height:150px;display:flex;flex-direction:column;box-shadow:2px 5px 16px rgba(0,0,0,.22)">'+
+        '<button data-ndel="'+n.id+'" title="Eliminar nota" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.14);border:none;color:rgba(0,0,0,.55);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:14px;line-height:1;padding:0;display:flex;align-items:center;justify-content:center">&#215;</button>'+
+        '<textarea data-nid="'+n.id+'" placeholder="Escriu aquí..." style="flex:1;background:transparent;border:none;outline:none;resize:none;font-family:inherit;font-size:13px;line-height:1.55;color:rgba(0,0,0,.72);width:100%;min-height:110px;padding-right:22px;box-sizing:border-box">'+esc(n.text)+'</textarea>'+
+      '</div>';
+    }).join('');
+    nr.innerHTML=
+      '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:18px 20px">'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:'+(notes.length?'14':'8')+'px">'+
+          '<span style="font-size:14px;font-weight:700;color:var(--text)">📝 Notes</span>'+
+          '<button id="_nf_note_add" style="background:linear-gradient(135deg,#fef08a,#fbbf24);border:none;color:rgba(0,0,0,.68);padding:0 16px;height:32px;border-radius:8px;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 2px 8px rgba(251,191,36,.35)">+ Afegir nota</button>'+
+        '</div>'+
+        (notes.length
+          ?'<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(185px,1fr));gap:12px">'+chips+'</div>'
+          :'<div style="text-align:center;padding:20px 0;color:var(--muted);font-size:13px;opacity:.7">Sense notes — afegeix el teu primer post-it ↗</div>')+
+      '</div>';
+    var addBtn=el('_nf_note_add');
+    if(addBtn)addBtn.onclick=function(){
+      var ns=loadNotes();
+      ns.push({id:genId(),text:'',col:NCOLS[ns.length%NCOLS.length]});
+      saveNotes(ns);renderNotes();
+      setTimeout(function(){var ts=document.querySelectorAll('[data-nid]');if(ts.length)ts[ts.length-1].focus();},30);
+    };
+    nr.querySelectorAll('[data-ndel]').forEach(function(btn){
+      btn.onmouseenter=function(){this.style.background='rgba(0,0,0,.26)';};
+      btn.onmouseleave=function(){this.style.background='rgba(0,0,0,.14)';};
+      btn.onclick=function(){
+        var id=this.getAttribute('data-ndel');
+        saveNotes(loadNotes().filter(function(n){return n.id!==id;}));
+        renderNotes();
+      };
+    });
+    nr.querySelectorAll('[data-nid]').forEach(function(ta){
+      ta.oninput=function(){
+        var id=this.getAttribute('data-nid'),val=this.value;
+        clearTimeout(_noteSaveTimer);
+        _noteSaveTimer=setTimeout(function(){
+          var ns=loadNotes();ns.forEach(function(n){if(n.id===id)n.text=val;});saveNotes(ns);
+        },500);
+      };
+    });
   }
 
   function render(){
@@ -860,15 +911,27 @@ CAPACIDADES QUE TIENES:
     }
   }
 
+  function ensureNotesRoot(root){
+    if(!el('_nf_notes_root')){
+      var nr=document.createElement('div');
+      nr.id='_nf_notes_root';
+      nr.style.cssText='padding:0 28px 40px;max-width:860px;margin:0 auto';
+      root.parentNode.insertBefore(nr,root.nextSibling);
+    }
+  }
+
   setInterval(function(){
     var root=el('_nf_agenda_root');
     if(!root){S._agInit=false;return;}
     if(!S._agInit){
       S._agInit=true;
-      root.style.cssText='padding:28px 28px 40px;max-width:860px;margin:0 auto;min-height:60vh';
-      render();return;
+      root.style.cssText='padding:28px 28px 20px;max-width:860px;margin:0 auto';
+      ensureNotesRoot(root);
+      render();renderNotes();return;
     }
     if(!root.innerHTML.trim())render();
+    ensureNotesRoot(root);
+    if(!el('_nf_notes_root').innerHTML.trim())renderNotes();
   },150);
 })();
 </script>
