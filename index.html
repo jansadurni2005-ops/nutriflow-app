@@ -922,7 +922,12 @@ CAPACIDADES QUE TIENES:
 
   setInterval(function(){
     var root=el('_nf_agenda_root');
-    if(!root){S._agInit=false;return;}
+    if(!root){
+      S._agInit=false;
+      var orphan=el('_nf_notes_root');
+      if(orphan)orphan.remove();
+      return;
+    }
     if(!S._agInit){
       S._agInit=true;
       root.style.cssText='padding:28px 28px 20px;max-width:860px;margin:0 auto';
