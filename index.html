@@ -67,6 +67,22 @@ function getToken(){
     }).catch(function(){return null;});
 }
 
+// ── AUTO-BACKUP: keep last 3 snapshots of clients in localStorage ──
+function backupClients(){
+  try{
+    var active=[],lost=[];
+    try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+    try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+    var all=active.concat(lost);
+    if(!all.length)return; // never overwrite a good backup with empty
+    var bk=[];
+    try{bk=JSON.parse(localStorage.getItem(PRE+'clients_bk')||'[]');}catch(e){}
+    bk.unshift({ts:Date.now(),data:all});
+    bk=bk.slice(0,3); // keep last 3 backups
+    localStorage.setItem(PRE+'clients_bk',JSON.stringify(bk));
+  }catch(e){}
+}
+
 function restoreClientsToSupabase(token,all){
   if(!all.length)return Promise.resolve();
   console.log('[NF] RECOVERY: uploading',all.length,'clients back to Supabase...');
@@ -95,11 +111,35 @@ function syncRead(token){
     var active=fmtClients.filter(function(c){return c.active;});
     var lost=fmtClients.filter(function(c){return !c.active;});
 
-    // RECOVERY: if Supabase returned 0 clients but localStorage has data, restore to Supabase
+    // RECOVERY: if Supabase returned 0 clients, check localStorage AND backup
     if(clients.length===0){
       var localActive=[];var localLost=[];
       try{localActive=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
       try{localLost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+      // If localStorage is also empty, try the automatic backup
+      if(!localActive.length&&!localLost.length){
+        try{
+          var bk=JSON.parse(localStorage.getItem(PRE+'clients_bk')||'[]');
+          if(bk.length&&bk[0].data&&bk[0].data.length){
+            console.warn('[NF] RECOVERY from backup: found',bk[0].data.length,'clients from',new Date(bk[0].ts).toLocaleString());
+            var bkActive=bk[0].data.filter(function(c){return c.active!==false;});
+            var bkLost=bk[0].data.filter(function(c){return c.active===false;});
+            var fmtBk=bk[0].data.map(function(c){
+              return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
+                     source:c.source,start_date:c.startDate||c.start_date,
+                     renewal_date:c.renewalDate||c.renewal_date,active:c.active!==false};
+            });
+            restoreClientsToSupabase(token,fmtBk);
+            localStorage.setItem(PRE+'clients',JSON.stringify(bkActive.map(function(c){
+              return{id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,
+                     startDate:c.startDate||c.start_date,renewalDate:c.renewalDate||c.renewal_date,active:true};
+            })));
+            localStorage.setItem(PRE+'lostClients',JSON.stringify(bkLost));
+            localStorage.setItem(PRE+'seeded','1');
+            return;
+          }
+        }catch(ex){}
+      }
       if(localActive.length>0||localLost.length>0){
         console.warn('[NF] RECOVERY: Supabase empty but localStorage has',localActive.length,'active +',localLost.length,'lost clients. Restoring...');
         var allLocal=localActive.map(function(c){
@@ -154,8 +194,9 @@ function saveClients(token){
              source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};
     }));
     // SAFETY: only skip if initial sync hasn't completed yet (race condition protection)
-    // After _nf_sb_ok is set, empty means user intentionally deleted all clients → allow
-    if(!all.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveClients: empty before initial sync – skipping to prevent data loss');return;}
+    if(!all.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveClients: empty before initial sync – skipping');return;}
+    // AUTO-BACKUP before every write
+    backupClients();
     fetch(SB+'/rest/v1/clients?user_id=eq.'+UID,{
       method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
     }).then(function(){
