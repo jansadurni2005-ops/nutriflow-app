@@ -153,8 +153,9 @@ function saveClients(token){
       return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
              source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};
     }));
-    // SAFETY: never DELETE when we have no local data to restore
-    if(!all.length){console.warn('[NF] saveClients: no local data, skipping sync to prevent data loss');return;}
+    // SAFETY: only skip if initial sync hasn't completed yet (race condition protection)
+    // After _nf_sb_ok is set, empty means user intentionally deleted all clients → allow
+    if(!all.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveClients: empty before initial sync – skipping to prevent data loss');return;}
     fetch(SB+'/rest/v1/clients?user_id=eq.'+UID,{
       method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
     }).then(function(){
@@ -172,7 +173,8 @@ function saveLeads(val,token){
   clearTimeout(_syncLeadsTimer);
   _syncLeadsTimer=setTimeout(function(){
     var leads=[];
-    try{leads=JSON.parse(val||'[]');}catch(e){}
+    try{leads=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveLeads: JSON parse error, skipping sync');return;}
+    if(!leads.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveLeads: empty before initial sync – skipping');return;}
     var db=leads.map(function(l){
       return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
     });
@@ -194,7 +196,8 @@ function saveAntrop(val,token){
   clearTimeout(_syncAntropTimer);
   _syncAntropTimer=setTimeout(function(){
     var antrop=[];
-    try{antrop=JSON.parse(val||'[]');}catch(e){}
+    try{antrop=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveAntrop: JSON parse error, skipping sync');return;}
+    if(!antrop.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveAntrop: empty before initial sync – skipping');return;}
     var db=antrop.map(function(a){
       return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};
     });
@@ -226,7 +229,7 @@ function setupInterceptor(){
     try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
     var tok=tokData&&tokData.exp>Date.now()+5000?tokData.tok:null;
     if(tok){doSave(key,value,tok);return;}
-    getToken().then(function(newTok){if(newTok)doSave(key,value,newTok);});
+    getToken().then(function(newTok){if(newTok&&!window._nf_syncing)doSave(key,value,newTok);});
   };
 }
 
@@ -632,7 +635,7 @@ CAPACIDADES QUE TIENES:
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">'+
         '<div style="font-size:13px;font-weight:700">Fuentes de leads</div>'+
         '<div style="display:flex;align-items:center;gap:10px">'+
-          '<div style="font-size:11px;color:var(--muted)">'+total+' leads &middot; '+Math.round(totalC/total*100)+'% cierre</div>'+
+          '<div style="font-size:11px;color:var(--muted)">'+total+' leads &middot; '+(total?Math.round(totalC/total*100):0)+'% cierre</div>'+
           '<button onclick="window._nfKanbanToggle()" style="background:#4d9cf822;border:1px solid #4d9cf844;color:#4d9cf8;padding:4px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">&#9638; Kanban</button>'+
         '</div>'+
       '</div>'+
@@ -746,11 +749,11 @@ CAPACIDADES QUE TIENES:
 
   var S={off:0,events:[],creating:false,createDate:''};
 
-  var LS_N='_nf_notes';
+  function getNotesKey(){try{var e=JSON.parse(localStorage.getItem('nf_session')||'{}').email||'';return e?'nf_'+e+'_notes':'_nf_notes';}catch(ex){return'_nf_notes';}}
   function load(){try{S.events=JSON.parse(localStorage.getItem(LS)||'[]');}catch(e){S.events=[];}}
   function save(){localStorage.setItem(LS,JSON.stringify(S.events));}
-  function loadNotes(){try{return JSON.parse(localStorage.getItem(LS_N)||'[]');}catch(e){return[];}}
-  function saveNotes(n){localStorage.setItem(LS_N,JSON.stringify(n));}
+  function loadNotes(){try{return JSON.parse(localStorage.getItem(getNotesKey())||'[]');}catch(e){return[];}}
+  function saveNotes(n){localStorage.setItem(getNotesKey(),JSON.stringify(n));}
   function genId(){return Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function monday(d){var w=d.getDay(),n=new Date(d);n.setDate(d.getDate()-w+(w?1:-6));n.setHours(0,0,0,0);return n;}
   function addDays(d,n){var r=new Date(d);r.setDate(r.getDate()+n);return r;}
@@ -980,9 +983,9 @@ CAPACIDADES QUE TIENES:
       ensureNotesRoot(root);
       render();renderNotes();return;
     }
-    if(!root.innerHTML.trim())render();
+    if(!root.innerHTML.trim()){render();return;}
     ensureNotesRoot(root);
-    if(!el('_nf_notes_root').innerHTML.trim())renderNotes();
+    var nr=el('_nf_notes_root');if(nr&&!nr.innerHTML.trim())renderNotes();
   },150);
 })();
 </script>
