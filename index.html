@@ -67,6 +67,17 @@ function getToken(){
     }).catch(function(){return null;});
 }
 
+function restoreClientsToSupabase(token,all){
+  if(!all.length)return Promise.resolve();
+  console.log('[NF] RECOVERY: uploading',all.length,'clients back to Supabase...');
+  return fetch(SB+'/rest/v1/clients',{
+    method:'POST',
+    headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
+    body:JSON.stringify(all)
+  }).then(function(){console.log('[NF] RECOVERY: done.');})
+  .catch(function(e){console.error('[NF] RECOVERY failed:',e);});
+}
+
 function syncRead(token){
   return Promise.all([
     fetch2('/rest/v1/clients?user_id=eq.'+UID+'&select=*&order=start_date.desc','GET',token),
@@ -83,6 +94,35 @@ function syncRead(token){
     });
     var active=fmtClients.filter(function(c){return c.active;});
     var lost=fmtClients.filter(function(c){return !c.active;});
+
+    // RECOVERY: if Supabase returned 0 clients but localStorage has data, restore to Supabase
+    if(clients.length===0){
+      var localActive=[];var localLost=[];
+      try{localActive=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+      try{localLost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+      if(localActive.length>0||localLost.length>0){
+        console.warn('[NF] RECOVERY: Supabase empty but localStorage has',localActive.length,'active +',localLost.length,'lost clients. Restoring...');
+        var allLocal=localActive.map(function(c){
+          return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
+                 source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:true};
+        }).concat(localLost.map(function(c){
+          return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
+                 source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};
+        }));
+        restoreClientsToSupabase(token,allLocal);
+        // Keep localStorage as-is (already has the right data), skip overwriting
+        var fmtLeads=leads.map(function(l){
+          return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
+        });
+        var fmtAntrop=antrop.map(function(a){
+          return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};
+        });
+        if(leads.length>0)localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
+        if(antrop.length>0)localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
+        localStorage.setItem(PRE+'seeded','1');
+        return;
+      }
+    }
 
     var fmtLeads=leads.map(function(l){
       return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
@@ -113,10 +153,11 @@ function saveClients(token){
       return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
              source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};
     }));
+    // SAFETY: never DELETE when we have no local data to restore
+    if(!all.length){console.warn('[NF] saveClients: no local data, skipping sync to prevent data loss');return;}
     fetch(SB+'/rest/v1/clients?user_id=eq.'+UID,{
       method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
     }).then(function(){
-      if(!all.length)return;
       return fetch(SB+'/rest/v1/clients',{
         method:'POST',
         headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
@@ -171,6 +212,7 @@ function saveAntrop(val,token){
 }
 
 function doSave(key,value,tok){
+  if(window._nf_syncing)return;
   if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(tok);
   else if(key===PRE+'leads')saveLeads(value,tok);
   else if(key===PRE+'antrop')saveAntrop(value,tok);
@@ -197,11 +239,14 @@ if(!sessionStorage.getItem('_nf_sb_ok')){
   setupInterceptor();
   getToken().then(function(tok){
     if(!tok){sessionStorage.setItem('_nf_sb_ok','1');overlay.remove();return;}
+    window._nf_syncing=true; // Block interceptor writes during initial sync
     return syncRead(tok).then(function(){
+      window._nf_syncing=false;
       sessionStorage.setItem('_nf_sb_ok','1');
       window.location.reload();
     });
   }).catch(function(){
+    window._nf_syncing=false;
     sessionStorage.setItem('_nf_sb_ok','1');
     overlay.remove();
   });
