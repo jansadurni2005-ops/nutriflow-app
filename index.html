@@ -67,21 +67,35 @@ function getToken(){
     }).catch(function(){return null;});
 }
 
-// ── AUTO-BACKUP: keep last 3 snapshots of clients in localStorage ──
-function backupClients(){
+// ── AUTO-BACKUP: keep last 3 snapshots of each data type in localStorage ──
+function makeBackup(key,bkKey){
   try{
-    var active=[],lost=[];
-    try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
-    try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
-    var all=active.concat(lost);
-    if(!all.length)return; // never overwrite a good backup with empty
+    var data=[];
+    try{data=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){}
+    if(!data.length)return; // never overwrite a good backup with empty
+    var bk=[];
+    try{bk=JSON.parse(localStorage.getItem(bkKey)||'[]');}catch(e){}
+    bk.unshift({ts:Date.now(),data:data});
+    bk=bk.slice(0,3);
+    localStorage.setItem(bkKey,JSON.stringify(bk));
+  }catch(e){}
+}
+function backupClients(){
+  var active=[],lost=[];
+  try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+  try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+  var all=active.concat(lost);
+  if(!all.length)return;
+  try{
     var bk=[];
     try{bk=JSON.parse(localStorage.getItem(PRE+'clients_bk')||'[]');}catch(e){}
     bk.unshift({ts:Date.now(),data:all});
-    bk=bk.slice(0,3); // keep last 3 backups
+    bk=bk.slice(0,3);
     localStorage.setItem(PRE+'clients_bk',JSON.stringify(bk));
   }catch(e){}
 }
+function backupLeads(){makeBackup(PRE+'leads',PRE+'leads_bk');}
+function backupAntrop(){makeBackup(PRE+'antrop',PRE+'antrop_bk');}
 
 function restoreClientsToSupabase(token,all){
   if(!all.length)return Promise.resolve();
@@ -164,12 +178,50 @@ function syncRead(token){
       }
     }
 
+    // RECOVERY for leads: if Supabase returned 0 but backup exists, restore
     var fmtLeads=leads.map(function(l){
       return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
     });
+    if(!leads.length){
+      var localLeads=[];
+      try{localLeads=JSON.parse(localStorage.getItem(PRE+'leads')||'[]');}catch(e){}
+      if(!localLeads.length){
+        try{
+          var lbk=JSON.parse(localStorage.getItem(PRE+'leads_bk')||'[]');
+          if(lbk.length&&lbk[0].data&&lbk[0].data.length){
+            console.warn('[NF] RECOVERY leads from backup:',lbk[0].data.length,'leads from',new Date(lbk[0].ts).toLocaleString());
+            fmtLeads=lbk[0].data;
+            // Restore to Supabase
+            var dbLeads=fmtLeads.map(function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
+            fetch(SB+'/rest/v1/leads',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dbLeads)}).catch(function(){});
+          }
+        }catch(ex){}
+      } else {
+        fmtLeads=localLeads;
+      }
+    }
+
+    // RECOVERY for antrop: same pattern
     var fmtAntrop=antrop.map(function(a){
       return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};
     });
+    if(!antrop.length){
+      var localAntrop=[];
+      try{localAntrop=JSON.parse(localStorage.getItem(PRE+'antrop')||'[]');}catch(e){}
+      if(!localAntrop.length){
+        try{
+          var abk=JSON.parse(localStorage.getItem(PRE+'antrop_bk')||'[]');
+          if(abk.length&&abk[0].data&&abk[0].data.length){
+            console.warn('[NF] RECOVERY antrop from backup:',abk[0].data.length,'records');
+            fmtAntrop=abk[0].data;
+            var dbAntrop=fmtAntrop.map(function(a){return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};});
+            fetch(SB+'/rest/v1/antropometrias',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dbAntrop)}).catch(function(){});
+          }
+        }catch(ex){}
+      } else {
+        fmtAntrop=localAntrop;
+      }
+    }
 
     localStorage.setItem(PRE+'clients',JSON.stringify(active));
     localStorage.setItem(PRE+'lostClients',JSON.stringify(lost));
@@ -216,6 +268,7 @@ function saveLeads(val,token){
     var leads=[];
     try{leads=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveLeads: JSON parse error, skipping sync');return;}
     if(!leads.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveLeads: empty before initial sync – skipping');return;}
+    backupLeads();
     var db=leads.map(function(l){
       return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
     });
@@ -239,6 +292,7 @@ function saveAntrop(val,token){
     var antrop=[];
     try{antrop=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveAntrop: JSON parse error, skipping sync');return;}
     if(!antrop.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveAntrop: empty before initial sync – skipping');return;}
+    backupAntrop();
     var db=antrop.map(function(a){
       return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};
     });
