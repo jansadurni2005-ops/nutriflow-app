@@ -1264,25 +1264,31 @@ CAPACIDADES QUE TIENES:
 <script>
 (function(){
   var MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+  var MESLONG=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var _histOff=0; // 0=mes actual, -1=mes pasado, etc.
+
   function getPre(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
   function getLS(suf){var pre=getPre();if(!pre)return[];try{return JSON.parse(localStorage.getItem(pre+suf)||'[]');}catch(e){return[];}}
   function getCfg(){var pre=getPre();if(!pre)return{};try{return JSON.parse(localStorage.getItem(pre+'config')||'{}');}catch(e){return{};}}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
   function fmt(v){if(v===0)return'0€';var a=Math.abs(v);return(v<0?'-':'')+(a>=1000?(a/1000).toFixed(1)+'k':Math.round(a))+'€';}
   function monthsSince(ds){if(!ds)return 0;var d=new Date(ds),n=new Date();return(n.getFullYear()-d.getFullYear())*12+(n.getMonth()-d.getMonth());}
-  function th(price,billing,source,sp,pct){var g=price*(billing==='quarterly'?3:1);return source===sp?pct*g:g;}
+  function th(price,billing,source,sp,pct){var bm=billing==='quarterly'?3:billing==='semiannual'?6:billing==='annual'?12:1;var g=price*bm;return source===sp?pct*g:g;}
+  function offMo(off){var now=new Date();var tm=now.getFullYear()*12+now.getMonth()+off;return{yr:Math.floor(tm/12),mo:((tm%12)+12)%12};}
 
-  function monthRev(yr,mo,clients,antrop,sp,pct,confirmed){
-    var crv=clients.filter(function(c){
+  function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
+    var paid=clients.filter(function(c){
       if(c.active===false||!c.startDate)return false;
       var sd=new Date(c.startDate),sy=sd.getFullYear(),sm=sd.getMonth();
-      if(confirmed)return sy===yr&&sm===mo;
+      if(isCur)return sy===yr&&sm===mo;
       if(sy>yr||(sy===yr&&sm>mo))return false;
+      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
       var di=(yr-sy)*12+(mo-sm);
-      return c.billing==='quarterly'?di%3===0:true;
-    }).reduce(function(s,c){return s+th(c.price,c.billing,c.source,sp,pct);},0);
+      return di%bm===0;
+    });
+    var crv=paid.reduce(function(s,c){return s+th(c.price,c.billing,c.source,sp,pct);},0);
     var arv=antrop.filter(function(a){var d=new Date(a.date);return d.getFullYear()===yr&&d.getMonth()===mo;}).reduce(function(s,a){return s+(parseFloat(a.price)||0);},0);
-    return crv+arv;
+    return{total:crv+arv,clients:paid,antrop:arv};
   }
 
   function render(){
@@ -1293,25 +1299,27 @@ CAPACIDADES QUE TIENES:
     if(!active.length){root.innerHTML='';return;}
 
     var now=new Date(),cy=now.getFullYear(),cm=now.getMonth();
-    var py=cm===0?cy-1:cy,pm=cm===0?11:cm-1;
-    var thisMon=monthRev(cy,cm,clients,antrop,sp,pct,true);
-    var lastMon=monthRev(py,pm,clients,antrop,sp,pct,false);
+    var isCur=_histOff===0;
+    var sel=offMo(_histOff);
+    var prv=offMo(_histOff-1);
+    var selLbl=MESLONG[sel.mo]+' '+sel.yr;
+    var selData=monthRev(sel.yr,sel.mo,clients,antrop,sp,pct,isCur);
+    var prvData=monthRev(prv.yr,prv.mo,clients,antrop,sp,pct,(_histOff-1)===0);
     var potential=active.reduce(function(s,c){return s+th(c.price,c.billing,c.source,sp,pct);},0);
 
-    // Last 6 months bars (current month = confirmed, rest = estimated)
+    // 6 bars: months [_histOff-5 ... _histOff], selected is rightmost
     var bars=[];
-    for(var bi=5;bi>=0;bi--){
-      var bm=cm-bi,by=cy;if(bm<0){bm+=12;by--;}
-      var isCur=by===cy&&bm===cm;
-      bars.push({lbl:MES[bm],rev:monthRev(by,bm,clients,antrop,sp,pct,isCur),cur:isCur});
+    for(var bi=-5;bi<=0;bi++){
+      var bmo=offMo(_histOff+bi);
+      var isNow=bmo.yr===cy&&bmo.mo===cm;
+      var bd=monthRev(bmo.yr,bmo.mo,clients,antrop,sp,pct,isNow);
+      bars.push({lbl:MES[bmo.mo],rev:bd.total,sel:bi===0});
     }
-    // Average of last 5 completed months (exclude current)
-    var pastBars=bars.filter(function(b){return!b.cur;});
-    var avg6=pastBars.length?Math.round(pastBars.reduce(function(s,b){return s+b.rev;},0)/pastBars.length):0;
+    var avg6=Math.round(bars.slice(0,5).reduce(function(s,b){return s+b.rev;},0)/5);
     var maxB=Math.max.apply(null,bars.map(function(b){return b.rev;}).concat([avg6||1]));
     var goal=Math.max(Math.ceil((Math.max(avg6,potential)+1)/500)*500,500);
-    var mom=lastMon>0?Math.round((thisMon-lastMon)/lastMon*100):null;
-    var goalPct=Math.min(100,goal>0?thisMon/goal*100:0);
+    var mom=prvData.total>0?Math.round((selData.total-prvData.total)/prvData.total*100):null;
+    var goalPct=Math.min(100,goal>0?selData.total/goal*100:0);
     var potPct=Math.min(100,goal>0?potential/goal*100:0);
 
     // Retention
@@ -1324,26 +1332,35 @@ CAPACIDADES QUE TIENES:
     var CATS=[{l:'Nuevo',c:'#4d9cf8',min:0,max:3},{l:'En curso',c:'#a78bfa',min:3,max:6},{l:'Fiel',c:'#34d399',min:6,max:12},{l:'VIP',c:'#f59e0b',min:12,max:999}];
     function catFor(m){for(var i=0;i<CATS.length;i++){if(m>=CATS[i].min&&m<CATS[i].max)return CATS[i];}return CATS[0];}
 
-    // MoM badge
     var momHtml='';
     if(mom!==null){var mc=mom>=0?'#34d399':'#f87171';momHtml='<span style="font-size:11px;font-weight:700;color:'+mc+';background:'+mc+'18;border:1px solid '+mc+'33;border-radius:20px;padding:3px 10px;white-space:nowrap">'+(mom>=0?'↑ +':'↓ ')+Math.abs(mom)+'% vs mes ant.</span>';}
 
-    // Bar chart
-    var avgLine=maxB>0?Math.round(avg6/maxB*100):0;
     var barsHtml=bars.map(function(b){
       var h=b.rev>0?Math.max(Math.round(b.rev/maxB*100),4):0;
-      var isAvg=Math.abs(b.rev-avg6)<avg6*0.05&&!b.cur;
-      var col=b.cur?'#4d9cf8':b.rev>=avg6?'rgba(77,156,248,0.5)':'rgba(77,156,248,0.25)';
+      var col=b.sel?'#4d9cf8':b.rev>=avg6?'rgba(77,156,248,0.5)':'rgba(77,156,248,0.25)';
       return'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">'+
-        '<div style="font-size:9px;font-weight:700;color:'+(b.cur?'#4d9cf8':b.rev>0?'var(--text2)':'var(--muted)')+';white-space:nowrap">'+(b.rev>0?fmt(b.rev):'')+'</div>'+
-        '<div style="flex:1;width:100%;display:flex;align-items:flex-end;min-height:44px;position:relative">'+
+        '<div style="font-size:9px;font-weight:700;color:'+(b.sel?'#4d9cf8':b.rev>0?'var(--text2)':'var(--muted)')+';white-space:nowrap">'+(b.rev>0?fmt(b.rev):'')+'</div>'+
+        '<div style="flex:1;width:100%;display:flex;align-items:flex-end;min-height:44px">'+
           (h>0?'<div style="width:100%;border-radius:4px 4px 0 0;background:'+col+';height:'+h+'%;transition:height .4s ease"></div>':'<div style="width:100%;height:2px;background:rgba(255,255,255,.06);border-radius:2px;align-self:flex-end"></div>')+
         '</div>'+
-        '<div style="font-size:9px;color:'+(b.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(b.cur?'700':'500')+'">'+b.lbl+'</div>'+
+        '<div style="font-size:9px;color:'+(b.sel?'#4d9cf8':'var(--muted)')+';font-weight:'+(b.sel?'700':'500')+'">'+b.lbl+'</div>'+
       '</div>';
     }).join('');
 
-    // Category + client chips
+    var clientsHtml=selData.clients.length?
+      selData.clients.map(function(c){
+        var paid=th(c.price,c.billing,c.source,sp,pct);
+        var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
+        var tag=bm===1?'mens.':bm===3?'trim.':bm===6?'sem.':'anual';
+        return'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg3)">'+
+          '<span style="font-size:12px;color:var(--text2)">'+esc(c.name)+'</span>'+
+          '<span style="font-size:12px;font-weight:700;color:#4d9cf8">'+fmt(paid)+
+            '<span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:4px">'+tag+'</span>'+
+          '</span>'+
+        '</div>';
+      }).join(''):
+      '<div style="font-size:12px;color:var(--muted);padding:8px 0">Ninguno este periodo</div>';
+
     var catHtml=CATS.map(function(cat){
       var n=list.filter(function(c){return c.months>=cat.min&&c.months<cat.max;}).length;
       if(!n)return'';
@@ -1368,37 +1385,44 @@ CAPACIDADES QUE TIENES:
     // ── PANEL FACTURACIÓN ──
     '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:18px 20px">'+
 
+      // Header: title + month navigator
       '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">'+
         '<span style="font-size:13px;font-weight:700;color:var(--text)">Facturación mensual</span>'+
+        '<div style="display:flex;align-items:center;gap:4px;margin-left:auto">'+
+          '<button id="_nf_hp" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1">‹</button>'+
+          '<span style="font-size:12px;font-weight:700;color:var(--text2);min-width:112px;text-align:center">'+selLbl+'</span>'+
+          '<button id="_nf_hn" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;opacity:'+(isCur?'0.3':'1')+'">›</button>'+
+        '</div>'+
         momHtml+
       '</div>'+
 
-      // 4 KPI cards
+      // KPI cards
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">'+
 
         '<div style="background:rgba(77,156,248,.08);border:1px solid rgba(77,156,248,.2);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#4d9cf8;font-weight:700;margin-bottom:7px">Este mes</div>'+
-          '<div style="font-size:24px;font-weight:800;color:#4d9cf8;line-height:1;letter-spacing:-0.5px">'+fmt(thisMon)+'</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-top:5px">confirmado</div>'+
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#4d9cf8;font-weight:700;margin-bottom:7px">'+selLbl+'</div>'+
+          '<div style="font-size:24px;font-weight:800;color:#4d9cf8;line-height:1;letter-spacing:-0.5px">'+fmt(selData.total)+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:5px">'+(isCur?'confirmado':'estimado')+'</div>'+
         '</div>'+
 
         '<div style="background:var(--bg3);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:7px">Mes anterior</div>'+
-          '<div style="font-size:24px;font-weight:800;color:var(--text);line-height:1;letter-spacing:-0.5px">'+fmt(lastMon)+'</div>'+
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:7px">'+MESLONG[prv.mo]+' '+prv.yr+'</div>'+
+          '<div style="font-size:24px;font-weight:800;color:var(--text);line-height:1;letter-spacing:-0.5px">'+fmt(prvData.total)+'</div>'+
           '<div style="font-size:10px;color:var(--muted);margin-top:5px">estimado</div>'+
         '</div>'+
 
         '<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#a78bfa;font-weight:700;margin-bottom:7px">Media 6 meses</div>'+
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#a78bfa;font-weight:700;margin-bottom:7px">Media 5 meses</div>'+
           '<div style="font-size:24px;font-weight:800;color:#a78bfa;line-height:1;letter-spacing:-0.5px">'+fmt(avg6)+'</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-top:5px">prom. mensual</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:5px">prom. anterior</div>'+
         '</div>'+
 
-        '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:7px">Potencial</div>'+
-          '<div style="font-size:24px;font-weight:800;color:#34d399;line-height:1;letter-spacing:-0.5px">'+fmt(potential)+'</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-top:5px">si todos pagan</div>'+
-        '</div>'+
+        (isCur?
+          '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:12px 14px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:7px">Potencial</div>'+
+            '<div style="font-size:24px;font-weight:800;color:#34d399;line-height:1;letter-spacing:-0.5px">'+fmt(potential)+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:5px">si todos pagan</div>'+
+          '</div>':'')+
 
       '</div>'+
 
@@ -1406,22 +1430,34 @@ CAPACIDADES QUE TIENES:
       '<div style="display:flex;gap:5px;align-items:flex-end;height:72px">'+barsHtml+'</div>'+
       '<div style="height:1px;background:rgba(255,255,255,.05);margin:14px 0 12px"></div>'+
 
-      // Goal progress
-      '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
-        '<span style="font-size:11px;color:var(--muted)">Objetivo <b style="color:var(--text2);font-weight:700">'+fmt(goal)+'</b>/mes</span>'+
-        '<span style="font-size:11px;font-weight:700;color:'+(thisMon>=goal?'#34d399':'var(--text2)')+'">'+
-          (thisMon>=goal?'✓ Objetivo alcanzado':'Faltan '+fmt(goal-thisMon))+
-        '</span>'+
-      '</div>'+
-      '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">'+
-        '<div style="position:absolute;inset:0;width:'+potPct+'%;background:rgba(52,211,153,.18);border-radius:4px"></div>'+
-        '<div style="position:absolute;inset:0;width:'+goalPct+'%;background:linear-gradient(90deg,#4d9cf8,#60a5fa);border-radius:4px;transition:width .6s ease"></div>'+
-      '</div>'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+
-        '<span style="font-size:10px;color:#4d9cf8;font-weight:600">'+fmt(thisMon)+' confirmado</span>'+
-        '<span style="font-size:10px;color:var(--muted)">media '+fmt(avg6)+'/mes</span>'+
-        '<span style="font-size:10px;color:rgba(52,211,153,.8);font-weight:600">'+fmt(potential)+' potencial</span>'+
-      '</div>'+
+      // Who paid (collapsible)
+      '<details'+(selData.clients.length?' open':'')+'>'+
+        '<summary style="list-style:none;-webkit-appearance:none;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;user-select:none;display:flex;align-items:center;gap:6px;cursor:pointer">'+
+          'Quién pagó '+
+          '<span style="background:var(--bg3);border-radius:10px;padding:1px 7px;font-size:10px;color:var(--text2)">'+selData.clients.length+'</span>'+
+          (selData.antrop>0?'<span style="font-size:10px;color:var(--muted);font-weight:400;margin-left:auto">+'+fmt(selData.antrop)+' antrop.</span>':'')+
+        '</summary>'+
+        '<div style="margin-top:8px">'+clientsHtml+'</div>'+
+      '</details>'+
+
+      // Goal progress (current month only)
+      (isCur?
+        '<div style="height:1px;background:rgba(255,255,255,.05);margin:14px 0 12px"></div>'+
+        '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">'+
+          '<span style="font-size:11px;color:var(--muted)">Objetivo <b style="color:var(--text2);font-weight:700">'+fmt(goal)+'</b>/mes</span>'+
+          '<span style="font-size:11px;font-weight:700;color:'+(selData.total>=goal?'#34d399':'var(--text2)')+'">'+
+            (selData.total>=goal?'✓ Objetivo alcanzado':'Faltan '+fmt(goal-selData.total))+
+          '</span>'+
+        '</div>'+
+        '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">'+
+          '<div style="position:absolute;inset:0;width:'+potPct+'%;background:rgba(52,211,153,.18);border-radius:4px"></div>'+
+          '<div style="position:absolute;inset:0;width:'+goalPct+'%;background:linear-gradient(90deg,#4d9cf8,#60a5fa);border-radius:4px;transition:width .6s ease"></div>'+
+        '</div>'+
+        '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+
+          '<span style="font-size:10px;color:#4d9cf8;font-weight:600">'+fmt(selData.total)+' confirmado</span>'+
+          '<span style="font-size:10px;color:var(--muted)">media '+fmt(avg6)+'/mes</span>'+
+          '<span style="font-size:10px;color:rgba(52,211,153,.8);font-weight:600">'+fmt(potential)+' potencial</span>'+
+        '</div>':'') +
 
     '</div>'+
 
@@ -1442,6 +1478,11 @@ CAPACIDADES QUE TIENES:
       '</div>'+
       '<div style="display:flex;flex-wrap:wrap;gap:5px;align-items:center">'+chipHtml+'</div>'+
     '</div>';
+
+    // Bind nav buttons
+    var hp=document.getElementById('_nf_hp'),hn=document.getElementById('_nf_hn');
+    if(hp)hp.onclick=function(){_histOff--;render();};
+    if(hn)hn.onclick=function(){if(_histOff<0){_histOff++;render();}};
   }
 
   setInterval(function(){
