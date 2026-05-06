@@ -2020,13 +2020,43 @@ CAPACIDADES QUE TIENES:
       dots+'</svg>';
   }
 
-  var CUR_CLIENT=null;
+  // ── Find the existing React "Perfil" modal ──
+  function findNotasEl(){
+    // Look for "NOTAS DEL CLIENTE" text node (the React profile modal anchor)
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
+    var node;
+    while((node=walker.nextNode())){
+      var t=(node.textContent||'').trim().toUpperCase();
+      if(t==='NOTAS DEL CLIENTE')return node.parentElement;
+    }
+    return null;
+  }
 
-  function openProfile(client){CUR_CLIENT=client;renderModal();}
+  function findClientName(){
+    // The React modal title is "Perfil — [Name]"
+    // Search element text content for this pattern
+    var all=document.body.querySelectorAll('div,h1,h2,h3,p,span');
+    for(var i=0;i<all.length;i++){
+      var el=all[i];
+      if(el.children.length>5)continue; // skip big containers
+      var t=(el.textContent||'').trim();
+      var m=t.match(/^Perfils*[—–-]s*(.+)/);
+      if(m){
+        // strip any trailing button text like ×
+        var name=m[1].replace(/s*[×✕✖❌].*$/,'').trim();
+        if(name&&name.length>1)return name;
+      }
+    }
+    return null;
+  }
 
-  function renderModal(){
-    var client=CUR_CLIENT;
-    if(!client){closeModal();return;}
+  function getClients(){
+    if(window._nf_clients_ref&&window._nf_clients_ref.length)return window._nf_clients_ref;
+    try{var p=getPre();return JSON.parse(localStorage.getItem(p+'clients')||'[]');}catch(e){return[];}
+  }
+
+  // ── Render weight section inside the existing React modal ──
+  function renderWeightSection(notasEl,client){
     var weights=loadWeights().filter(function(w){return w.clientId===client.id;});
     weights.sort(function(a,b){return a.date.localeCompare(b.date);});
     var ov=loadOv(),cov=ov[client.id]||{};
@@ -2035,218 +2065,153 @@ CAPACIDADES QUE TIENES:
     var lastW=weights.length?weights[weights.length-1].weight:null;
     var today=ymd(new Date());
 
-    var wrap=el('_nf_profile_modal');
-    if(!wrap){wrap=document.createElement('div');wrap.id='_nf_profile_modal';document.body.appendChild(wrap);}
-
-    var initials=(client.name||'?').split(' ').map(function(w){return(w[0]||'');}).slice(0,2).join('').toUpperCase();
-    var statusCol=client.active===false?'#f87171':'#34d399';
-    var statusLbl=client.active===false?'Inactiu':'Actiu';
+    // Find or create the injected div
+    var wEl=document.getElementById('_nf_wt_section');
+    if(!wEl){
+      wEl=document.createElement('div');
+      wEl.id='_nf_wt_section';
+      // Insert before the section containing "NOTAS DEL CLIENTE"
+      var notasSection=notasEl.parentElement;
+      if(!notasSection||!notasSection.parentElement)return;
+      notasSection.parentElement.insertBefore(wEl,notasSection);
+    }
 
     var wRows=weights.slice().reverse().map(function(w){
-      return '<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
+      return '<div style="display:flex;align-items:center;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.05)">'+
         '<span style="font-size:12px;color:var(--muted);flex:1">'+esc(fmtDate(w.date))+'</span>'+
-        '<span style="font-size:14px;font-weight:700;color:var(--text)">'+esc(String(w.weight))+' kg</span>'+
-        '<button data-wdel="'+esc(w.id)+'" style="background:none;border:none;color:var(--muted);font-size:17px;cursor:pointer;padding:0 4px;line-height:1;transition:color .15s">×</button>'+
+        '<span style="font-size:13px;font-weight:700;color:var(--text)">'+esc(String(w.weight))+' kg</span>'+
+        '<button data-nfwdel="'+esc(w.id)+'" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;padding:0 0 0 10px;line-height:1">×</button>'+
       '</div>';
     }).join('');
 
-    wrap.innerHTML=
-      '<div id="_nf_prof_bg" style="position:fixed;inset:0;z-index:2000;background:rgba(0,0,0,.82);display:flex;align-items:flex-start;justify-content:center;padding:20px 14px 40px;overflow-y:auto;backdrop-filter:blur(8px)">'+
-        '<div style="background:var(--bg2);border-radius:20px;width:100%;max-width:520px;box-shadow:0 40px 80px rgba(0,0,0,.7);border:1px solid var(--bg4);overflow:hidden;margin:auto">'+
-
-          // ── Header ──
-          '<div style="background:linear-gradient(135deg,rgba(77,156,248,.1),rgba(167,139,250,.07));padding:22px 22px 18px;border-bottom:1px solid var(--bg4)">'+
-            '<div style="display:flex;align-items:center;gap:14px">'+
-              '<div style="width:54px;height:54px;border-radius:15px;background:linear-gradient(135deg,#4d9cf8,#3b82f6);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:#fff;flex-shrink:0;letter-spacing:-0.5px">'+esc(initials)+'</div>'+
-              '<div style="flex:1;min-width:0">'+
-                '<div style="font-size:18px;font-weight:800;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(client.name)+'</div>'+
-                '<div style="display:flex;align-items:center;gap:7px;margin-top:5px;flex-wrap:wrap">'+
-                  '<span style="background:'+statusCol+'20;color:'+statusCol+';border-radius:6px;padding:2px 8px;font-size:10px;font-weight:700">'+statusLbl+'</span>'+
-                  (client.source?'<span style="font-size:11px;color:var(--muted)">'+esc(client.source)+'</span>':'')+
-                  (client.startDate?'<span style="font-size:11px;color:var(--muted)">· Des del '+esc(fmtDate(client.startDate))+'</span>':'')+
-                '</div>'+
-              '</div>'+
-              '<button id="_nf_prof_x" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--muted);width:34px;height:34px;border-radius:9px;cursor:pointer;font-size:18px;line-height:1;flex-shrink:0;display:flex;align-items:center;justify-content:center">×</button>'+
-            '</div>'+
-          '</div>'+
-
-          // ── Stats row ──
-          '<div style="display:grid;grid-template-columns:1fr 1fr'+(lastW?' 1fr':'')+';border-bottom:1px solid var(--bg4)">'+
-            '<div style="padding:16px 18px;border-right:1px solid var(--bg4)">'+
-              '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-bottom:7px">Porta amb tu</div>'+
-              '<div style="display:flex;align-items:baseline;gap:5px">'+
-                '<span id="_nf_prof_md" style="font-size:24px;font-weight:800;color:#4d9cf8;cursor:pointer" title="Editar">'+months+'</span>'+
-                '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
-                '<button id="_nf_prof_me" title="Editar" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0 0 0 3px;transition:color .15s">✏</button>'+
-              '</div>'+
-            '</div>'+
-            '<div style="padding:16px 18px'+(lastW?';border-right:1px solid var(--bg4)':'')+'">' +
-              '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-bottom:7px">Total pagat</div>'+
-              '<div style="display:flex;align-items:baseline;gap:5px">'+
-                '<span id="_nf_prof_td" style="font-size:24px;font-weight:800;color:#34d399;cursor:pointer" title="Editar">'+fmt(totalPaid)+'</span>'+
-                '<button id="_nf_prof_te" title="Editar" style="background:none;border:none;color:var(--muted);font-size:13px;cursor:pointer;padding:0 0 0 3px;transition:color .15s">✏</button>'+
-              '</div>'+
-            '</div>'+
-            (lastW?
-              '<div style="padding:16px 18px">'+
-                '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--muted);font-weight:700;margin-bottom:7px">Pes actual</div>'+
-                '<div style="font-size:24px;font-weight:800;color:#a78bfa">'+esc(String(lastW))+' <span style="font-size:13px;font-weight:600;color:var(--muted)">kg</span></div>'+
-              '</div>':'')+
-          '</div>'+
-
-          // ── Body ──
-          '<div style="padding:20px 22px 24px">'+
-
-            // Chart
-            '<div style="margin-bottom:18px">'+
-              '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px">Evolució del pes</div>'+
-              '<div style="background:var(--bg3);border-radius:12px;padding:14px 12px 10px">'+svgWeight(weights)+'</div>'+
-            '</div>'+
-
-            // Add weight form
-            '<div style="background:var(--bg3);border-radius:12px;padding:15px;margin-bottom:16px">'+
-              '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:11px">Registrar pes</div>'+
-              '<div style="display:flex;gap:9px;align-items:flex-end">'+
-                '<div style="flex:1">'+
-                  '<label style="font-size:10px;color:var(--muted);font-weight:600;display:block;margin-bottom:5px">Data</label>'+
-                  '<input id="_nf_prof_wd" type="date" value="'+today+'" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
-                '</div>'+
-                '<div style="width:95px">'+
-                  '<label style="font-size:10px;color:var(--muted);font-weight:600;display:block;margin-bottom:5px">Pes (kg)</label>'+
-                  '<input id="_nf_prof_wk" type="number" step="0.1" min="1" max="999" placeholder="70.5" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
-                '</div>'+
-                '<button id="_nf_prof_wa" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:9px 14px;border-radius:9px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.35)">+ Afegir</button>'+
-              '</div>'+
-            '</div>'+
-
-            // History
-            (weights.length?
-              '<div>'+
-                '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:9px">Historial ('+weights.length+')</div>'+
-                '<div style="max-height:200px;overflow-y:auto;padding-right:2px">'+wRows+'</div>'+
-              '</div>'
-              :'<div style="text-align:center;padding:8px 0 0;color:var(--muted);font-size:12px;opacity:.65">Cap registre de pes — afegeix el primer ↑</div>')+
+    wEl.innerHTML=
+      // ── Stats strip (mesos + total + pes actual) ──
+      '<div style="display:grid;grid-template-columns:1fr 1fr'+(lastW?' 1fr':'')+';border-top:1px solid var(--border);border-bottom:1px solid var(--border);margin:0 0 20px">'+
+        '<div style="padding:13px 16px;border-right:1px solid var(--border)">'+
+          '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Porta amb tu</div>'+
+          '<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">'+
+            '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#4d9cf8;cursor:pointer" title="Editar">'+months+'</span>'+
+            '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
+            '<button id="_nf_pme" title="Editar" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0 0 0 2px">✏</button>'+
           '</div>'+
         '</div>'+
-      '</div>';
+        '<div style="padding:13px 16px'+(lastW?';border-right:1px solid var(--border)':'')+'">' +
+          '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Total pagat</div>'+
+          '<div style="display:flex;align-items:baseline;gap:4px;flex-wrap:wrap">'+
+            '<span id="_nf_pt" style="font-size:22px;font-weight:800;color:#34d399;cursor:pointer" title="Editar">'+fmt(totalPaid)+'</span>'+
+            '<button id="_nf_pte" title="Editar" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:0 0 0 2px">✏</button>'+
+          '</div>'+
+        '</div>'+
+        (lastW?
+          '<div style="padding:13px 16px">'+
+            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Pes actual</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#a78bfa">'+esc(String(lastW))+' <span style="font-size:12px;font-weight:600;color:var(--muted)">kg</span></div>'+
+          '</div>':'')+
+      '</div>'+
 
-    // ── Event handlers ──
-    el('_nf_prof_x').onclick=closeModal;
-    el('_nf_prof_bg').onclick=function(e){if(e.target===this)closeModal();};
+      // ── Weight section label ──
+      '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Control de pes</div>'+
 
+      // ── Chart ──
+      '<div style="background:var(--bg3);border-radius:10px;padding:12px 10px 8px;margin-bottom:12px">'+svgWeight(weights)+'</div>'+
+
+      // ── Add weight form ──
+      '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">'+
+        '<div style="flex:1">'+
+          '<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">Data</div>'+
+          '<input id="_nf_wd" type="date" value="'+today+'" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">'+
+        '</div>'+
+        '<div style="width:86px">'+
+          '<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">Pes (kg)</div>'+
+          '<input id="_nf_wk" type="number" step="0.1" min="1" max="999" placeholder="70" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">'+
+        '</div>'+
+        '<button id="_nf_wa" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.3)">+ Afegir</button>'+
+      '</div>'+
+
+      // ── History ──
+      (weights.length?
+        '<div style="max-height:160px;overflow-y:auto;margin-bottom:8px">'+wRows+'</div>':
+        '<div style="text-align:center;padding:6px 0 10px;color:var(--muted);font-size:12px;opacity:.6">Sense registres de pes</div>');
+
+    // ── Handlers ──
     function editMonths(){
       var cur=cov.monthsOv!=null?cov.monthsOv:monthsSince(client.startDate);
       var v=prompt('Mesos amb tu (actual: '+cur+')',String(cur));
       if(v===null)return;
       var n=parseInt(v);if(isNaN(n)||n<0)return;
-      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].monthsOv=n;saveOv(o);renderModal();
+      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].monthsOv=n;saveOv(o);
+      renderWeightSection(notasEl,client);
     }
     function editTotal(){
       var cur=cov.totalPaidOv!=null?cov.totalPaidOv:calcTotalPaid(client,monthsSince(client.startDate));
       var v=prompt('Total pagat (€) (actual: '+Math.round(cur)+')',String(Math.round(cur)));
       if(v===null)return;
       var n=parseFloat(v);if(isNaN(n)||n<0)return;
-      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].totalPaidOv=n;saveOv(o);renderModal();
+      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].totalPaidOv=n;saveOv(o);
+      renderWeightSection(notasEl,client);
     }
-    el('_nf_prof_md').onclick=editMonths;
-    el('_nf_prof_me').onclick=editMonths;
-    el('_nf_prof_td').onclick=editTotal;
-    el('_nf_prof_te').onclick=editTotal;
-
-    el('_nf_prof_wa').onclick=function(){
-      var date=el('_nf_prof_wd').value;
-      var kg=parseFloat(el('_nf_prof_wk').value);
-      if(!date||isNaN(kg)||kg<=0){el('_nf_prof_wk').style.borderColor='#f87171';el('_nf_prof_wk').focus();return;}
-      el('_nf_prof_wk').style.borderColor='var(--border2)';
+    var pm=document.getElementById('_nf_pm'),pme=document.getElementById('_nf_pme');
+    var pt=document.getElementById('_nf_pt'),pte=document.getElementById('_nf_pte');
+    var wa=document.getElementById('_nf_wa'),wd=document.getElementById('_nf_wd'),wk=document.getElementById('_nf_wk');
+    if(pm)pm.onclick=editMonths;
+    if(pme)pme.onclick=editMonths;
+    if(pt)pt.onclick=editTotal;
+    if(pte)pte.onclick=editTotal;
+    if(wa)wa.onclick=function(){
+      var date=wd?wd.value:'';
+      var kg=wk?parseFloat(wk.value):NaN;
+      if(!date||isNaN(kg)||kg<=0){if(wk){wk.style.borderColor='#f87171';wk.focus();}return;}
+      if(wk)wk.style.borderColor='var(--border2)';
       var ws=loadWeights();
       var idx=ws.findIndex(function(w){return w.clientId===client.id&&w.date===date;});
-      if(idx>=0)ws[idx].weight=kg;
-      else ws.push({id:genId(),clientId:client.id,date:date,weight:kg});
+      if(idx>=0)ws[idx].weight=kg;else ws.push({id:genId(),clientId:client.id,date:date,weight:kg});
       saveWeights(ws);
-      el('_nf_prof_wk').value='';
-      renderModal();
+      if(wk)wk.value='';
+      renderWeightSection(notasEl,client);
     };
-    el('_nf_prof_wk').onkeydown=function(e){if(e.key==='Enter')el('_nf_prof_wa').click();};
-
-    wrap.querySelectorAll('[data-wdel]').forEach(function(btn){
+    if(wk)wk.onkeydown=function(e){if(e.key==='Enter'&&wa)wa.click();};
+    wEl.querySelectorAll('[data-nfwdel]').forEach(function(btn){
       btn.onmouseenter=function(){this.style.color='#f87171';};
       btn.onmouseleave=function(){this.style.color='var(--muted)';};
-      btn.onclick=function(){
-        saveWeights(loadWeights().filter(function(w){return w.id!==this.getAttribute('data-wdel');},this));
-        renderModal();
-      };
+      btn.onclick=(function(wid){return function(){
+        saveWeights(loadWeights().filter(function(w){return w.id!==wid;}));
+        renderWeightSection(notasEl,client);
+      };})(btn.getAttribute('data-nfwdel'));
     });
   }
 
-  function closeModal(){
-    CUR_CLIENT=null;
-    var m=el('_nf_profile_modal');
-    if(m){m.innerHTML='';m.remove();}
-  }
-  document.addEventListener('keydown',function(e){if(e.key==='Escape'&&CUR_CLIENT)closeModal();});
+  // ── Poll: detect modal open/close ──
+  var _lastNotasEl=null,_lastClientId=null;
+  setInterval(function(){
+    var notasEl=findNotasEl();
 
-  // ── Button injection ──
-  var SKIP_IDS=['_nf_profile_modal','_nf_retention_root','_nf_packs_root','_nf_lstats',
-                '_nf_followup_root','_nf_wkchart','_nf_search_modal','_nf_ren_bar','_nf_notes_root'];
-
-  function isInSkip(node){
-    var p=node;
-    while(p){if(p.id&&SKIP_IDS.indexOf(p.id)>=0)return true;p=p.parentElement;}
-    return false;
-  }
-
-  function getClients(){
-    if(window._nf_clients_ref&&window._nf_clients_ref.length)return window._nf_clients_ref;
-    try{var p=getPre();if(!p)return[];return JSON.parse(localStorage.getItem(p+'clients')||'[]');}catch(e){return[];}
-  }
-
-  function injectButtons(){
-    var clients=getClients();
-    if(!clients.length)return;
-    var map={};
-    clients.forEach(function(c){if(c.name)map[c.name.trim().toLowerCase()]=c;});
-
-    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
-    var toProcess=[];
-    var node;
-    while((node=walker.nextNode())){
-      var t=(node.textContent||'').trim().toLowerCase();
-      if(t.length>=2&&map[t])toProcess.push(node);
+    if(!notasEl){
+      // Modal closed — cleanup
+      var leftover=document.getElementById('_nf_wt_section');
+      if(leftover)leftover.remove();
+      _lastNotasEl=null;_lastClientId=null;
+      return;
     }
 
-    toProcess.forEach(function(textNode){
-      var parent=textNode.parentNode;
-      if(!parent||parent.nodeType!==1)return;
-      if(isInSkip(parent))return;
-      var tag=(parent.tagName||'').toUpperCase();
-      if(tag==='BUTTON'||tag==='INPUT'||tag==='TEXTAREA'||tag==='SELECT'||tag==='OPTION')return;
-      var clientName=(textNode.textContent||'').trim().toLowerCase();
-      var client=map[clientName];
-      if(!client)return;
-      // Already injected?
-      var nx=textNode.nextSibling;
-      if(nx&&nx.nodeType===1&&nx.getAttribute&&nx.getAttribute('data-nfp')===client.id)return;
-      var btn=document.createElement('button');
-      btn.setAttribute('data-nfp',client.id);
-      btn.title='Veure perfil';
-      btn.textContent='👤';
-      btn.style.cssText='background:none;border:none;cursor:pointer;font-size:11px;padding:0 0 0 4px;line-height:1;vertical-align:middle;opacity:.5;transition:opacity .15s;flex-shrink:0';
-      btn.onmouseenter=function(){this.style.opacity='1';};
-      btn.onmouseleave=function(){this.style.opacity='.5';};
-      btn.onclick=(function(c){return function(e){e.stopPropagation();openProfile(c);};})(client);
-      parent.insertBefore(btn,textNode.nextSibling);
-    });
-  }
+    // Check if already injected for the same client+element
+    var wt=document.getElementById('_nf_wt_section');
+    if(notasEl===_lastNotasEl&&_lastClientId&&wt)return;
 
-  var obsP=new MutationObserver(function(muts){
-    var rel=muts.some(function(m){
-      return m.target&&m.target.id!=='_nf_profile_modal'&&
-        !(m.target.closest&&m.target.closest('#_nf_profile_modal'));
-    });
-    if(rel)setTimeout(injectButtons,80);
-  });
-  obsP.observe(document.body,{childList:true,subtree:true});
-  setInterval(injectButtons,3000);
+    var clientName=findClientName();
+    if(!clientName)return;
+
+    var clients=getClients();
+    var nl=clientName.toLowerCase().trim();
+    var client=null;
+    for(var i=0;i<clients.length;i++){
+      if((clients[i].name||'').toLowerCase().trim()===nl){client=clients[i];break;}
+    }
+    if(!client)return;
+
+    _lastNotasEl=notasEl;
+    _lastClientId=client.id;
+    renderWeightSection(notasEl,client);
+  },300);
 })();
 </script>
 </body>
