@@ -1812,6 +1812,10 @@ CAPACIDADES QUE TIENES:
   }
 
   // ── Render weight section into the React-managed _nf_wt_section div ──
+  var INP_S='background:var(--bg2);border:1.5px solid #4d9cf8;border-radius:7px;padding:5px 8px;color:var(--text);font-size:17px;font-weight:700;outline:none;-moz-appearance:textfield;-webkit-appearance:none;box-sizing:border-box';
+  var OK_S='background:#4d9cf8;border:none;color:#fff;border-radius:6px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap';
+  var CX_S='background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 6px;line-height:1';
+
   function renderWeightSection(wEl){
     var client=window._nf_profile_client;
     if(!client){wEl.innerHTML='';return;}
@@ -1831,70 +1835,102 @@ CAPACIDADES QUE TIENES:
       '</div>';
     }).join('');
 
+    var cols=lastW?'1fr 1fr 1fr':'1fr 1fr';
+
     wEl.innerHTML=
       '<div style="margin-bottom:20px">'+
-        // Stats strip
-        '<div style="display:grid;grid-template-columns:1fr 1fr'+(lastW?' 1fr':'')+';background:var(--bg3);border-radius:12px;overflow:hidden;margin-bottom:16px">'+
-          '<div style="padding:13px 16px;border-right:1px solid var(--border)">'+
-            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Porta amb tu</div>'+
-            '<div style="display:flex;align-items:baseline;gap:4px">'+
-              '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#4d9cf8;cursor:pointer" title="Editar">'+months+'</span>'+
+        '<div style="display:grid;grid-template-columns:'+cols+';background:var(--bg3);border-radius:12px;overflow:hidden;margin-bottom:16px">'+
+          // Cell 1: Porta amb tu
+          '<div style="padding:14px 16px;border-right:1px solid var(--border)">'+
+            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Porta amb tu</div>'+
+            '<div id="_nf_pm_wrap" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+
+              '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#4d9cf8;cursor:pointer;line-height:1">'+months+'</span>'+
               '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
-              '<button id="_nf_pme" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0 0 0 3px">&#9998;</button>'+
+              '<button id="_nf_pme" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;opacity:.8;line-height:1">&#9998;</button>'+
             '</div>'+
           '</div>'+
-          '<div style="padding:13px 16px'+(lastW?';border-right:1px solid var(--border)':'')+'>'+
-            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Total pagat</div>'+
-            '<div style="display:flex;align-items:baseline;gap:4px">'+
-              '<span id="_nf_pt" style="font-size:22px;font-weight:800;color:#34d399;cursor:pointer" title="Editar">'+fmt(totalPaid)+'</span>'+
-              '<button id="_nf_pte" style="background:none;border:none;color:var(--muted);font-size:11px;cursor:pointer;padding:0 0 0 3px">&#9998;</button>'+
+          // Cell 2: Total pagat — NOTE: closing " before > is critical!
+          '<div style="padding:14px 16px'+(lastW?';border-right:1px solid var(--border)':'')+'">'+
+            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Total pagat</div>'+
+            '<div id="_nf_pt_wrap" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+
+              '<span id="_nf_pt" style="font-size:22px;font-weight:800;color:#34d399;cursor:pointer;line-height:1">'+fmt(totalPaid)+'</span>'+
+              '<button id="_nf_pte" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;opacity:.8;line-height:1">&#9998;</button>'+
             '</div>'+
           '</div>'+
+          // Cell 3: Pes actual (only if weight logged)
           (lastW?
-            '<div style="padding:13px 16px">'+
-              '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:5px">Pes actual</div>'+
-              '<div style="font-size:22px;font-weight:800;color:#a78bfa">'+esc(String(lastW))+' <span style="font-size:12px;font-weight:600;color:var(--muted)">kg</span></div>'+
+            '<div style="padding:14px 16px">'+
+              '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Pes actual</div>'+
+              '<div style="display:flex;align-items:baseline;gap:4px">'+
+                '<span style="font-size:22px;font-weight:800;color:#a78bfa;line-height:1">'+esc(String(lastW))+'</span>'+
+                '<span style="font-size:12px;font-weight:600;color:var(--muted)">kg</span>'+
+              '</div>'+
             '</div>':'')+
         '</div>'+
-        // Label
         '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.1em;margin-bottom:10px">Control de pes</div>'+
-        // Chart
         '<div style="background:var(--bg3);border-radius:10px;padding:12px 10px 8px;margin-bottom:12px">'+svgWeight(weights)+'</div>'+
-        // Add form
         '<div style="display:flex;gap:8px;align-items:flex-end;margin-bottom:12px">'+
           '<div style="flex:1">'+
             '<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">Data</div>'+
             '<input id="_nf_wd" type="date" value="'+today+'" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">'+
           '</div>'+
-          '<div style="width:86px">'+
+          '<div style="width:84px">'+
             '<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">Pes (kg)</div>'+
             '<input id="_nf_wk" type="number" step="0.1" min="1" max="999" placeholder="70" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">'+
           '</div>'+
-          '<button id="_nf_wa" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:8px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.3)">+ Pes</button>'+
+          '<button id="_nf_wa" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:9px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.3)">+ Afegir</button>'+
         '</div>'+
-        // History
         (weights.length?
           '<div style="max-height:140px;overflow-y:auto;margin-bottom:4px">'+wRows+'</div>':
-          '<div style="text-align:center;padding:6px 0 8px;color:var(--muted);font-size:12px;opacity:.6">Sense registres de pes</div>')+
+          '<div style="text-align:center;padding:6px 0 8px;color:var(--muted);font-size:12px;opacity:.6">Sense registres de pes encara</div>')+
       '</div>';
 
-    // Handlers
+    // ── Inline edit: months ──
     function editMonths(){
+      var wrap=document.getElementById('_nf_pm_wrap');if(!wrap)return;
       var cur=cov.monthsOv!=null?cov.monthsOv:monthsSince(client.startDate);
-      var v=prompt('Mesos amb tu (actual: '+cur+')',String(cur));
-      if(v===null)return;
-      var n=parseInt(v);if(isNaN(n)||n<0)return;
-      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].monthsOv=n;saveOv(o);
-      renderWeightSection(wEl);
+      wrap.innerHTML=
+        '<input id="_nf_pm_i" type="number" min="0" max="999" value="'+cur+'" style="'+INP_S+';width:58px">'+
+        '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
+        '<button id="_nf_pm_ok" style="'+OK_S+'">&#10003; Desar</button>'+
+        '<button id="_nf_pm_cx" style="'+CX_S+'">×</button>';
+      var inp=document.getElementById('_nf_pm_i');
+      if(inp){inp.focus();inp.select();}
+      function save(){
+        var n=parseInt((document.getElementById('_nf_pm_i')||{}).value||'');
+        if(isNaN(n)||n<0){renderWeightSection(wEl);return;}
+        var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].monthsOv=n;saveOv(o);
+        renderWeightSection(wEl);
+      }
+      var ok=document.getElementById('_nf_pm_ok'),cx=document.getElementById('_nf_pm_cx');
+      if(ok)ok.onclick=save;
+      if(cx)cx.onclick=function(){renderWeightSection(wEl);};
+      if(inp)inp.onkeydown=function(e){if(e.key==='Enter')save();if(e.key==='Escape')renderWeightSection(wEl);};
     }
+
+    // ── Inline edit: total pagat ──
     function editTotal(){
+      var wrap=document.getElementById('_nf_pt_wrap');if(!wrap)return;
       var cur=cov.totalPaidOv!=null?cov.totalPaidOv:calcTotalPaid(client,monthsSince(client.startDate));
-      var v=prompt('Total pagat (euros) (actual: '+Math.round(cur)+')',String(Math.round(cur)));
-      if(v===null)return;
-      var n=parseFloat(v);if(isNaN(n)||n<0)return;
-      var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].totalPaidOv=n;saveOv(o);
-      renderWeightSection(wEl);
+      wrap.innerHTML=
+        '<input id="_nf_pt_i" type="number" min="0" step="1" value="'+Math.round(cur)+'" style="'+INP_S+';width:72px;font-size:15px">'+
+        '<span style="font-size:12px;color:var(--muted)">€</span>'+
+        '<button id="_nf_pt_ok" style="'+OK_S+'">&#10003; Desar</button>'+
+        '<button id="_nf_pt_cx" style="'+CX_S+'">×</button>';
+      var inp=document.getElementById('_nf_pt_i');
+      if(inp){inp.focus();inp.select();}
+      function save(){
+        var n=parseFloat((document.getElementById('_nf_pt_i')||{}).value||'');
+        if(isNaN(n)||n<0){renderWeightSection(wEl);return;}
+        var o=loadOv();if(!o[client.id])o[client.id]={};o[client.id].totalPaidOv=n;saveOv(o);
+        renderWeightSection(wEl);
+      }
+      var ok=document.getElementById('_nf_pt_ok'),cx=document.getElementById('_nf_pt_cx');
+      if(ok)ok.onclick=save;
+      if(cx)cx.onclick=function(){renderWeightSection(wEl);};
+      if(inp)inp.onkeydown=function(e){if(e.key==='Enter')save();if(e.key==='Escape')renderWeightSection(wEl);};
     }
+
     var pm=document.getElementById('_nf_pm'),pme=document.getElementById('_nf_pme');
     var pt=document.getElementById('_nf_pt'),pte=document.getElementById('_nf_pte');
     var wa=document.getElementById('_nf_wa'),wd=document.getElementById('_nf_wd'),wk=document.getElementById('_nf_wk');
