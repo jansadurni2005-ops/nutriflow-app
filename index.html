@@ -2072,56 +2072,80 @@ CAPACIDADES QUE TIENES:
 </script>
 <script>
 (function(){
-  var _ly=null;
-  function injectLine(){
-    // Find the recharts-wrapper that is inside / near a "Take-home" label
-    var wrapper=null;
-    var ws=document.querySelectorAll('.recharts-wrapper');
-    for(var i=0;i<ws.length;i++){
-      var p=ws[i];
-      for(var j=0;j<10;j++){
-        if(!p)break;
-        if(p.textContent&&p.textContent.indexOf('Take-home')>=0){wrapper=ws[i];break;}
-        p=p.parentElement;
+  var _ly=null,_lt=null;
+
+  function getSvgNearTakeHome(){
+    // Find a leaf element whose trimmed text is exactly "Take-home"
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
+    var node;
+    while((node=walker.nextNode())){
+      if(node.nodeValue&&node.nodeValue.trim()==='Take-home'){
+        var p=node.parentElement;
+        for(var j=0;j<12;j++){
+          if(!p)break;
+          var s=p.querySelector('svg');
+          if(s)return s;
+          p=p.parentElement;
+        }
       }
-      if(wrapper)break;
     }
-    if(!wrapper)return;
-    var circles=wrapper.querySelectorAll('.recharts-line-dots circle');
-    if(circles.length<2)return;
-    var svg=wrapper.querySelector('svg');
+    return null;
+  }
+
+  function injectLine(){
+    var svg=getSvgNearTakeHome();
     if(!svg)return;
+
+    // All circles with r >= 3 are data-point dots; sort by cx (left → right)
+    var circles=Array.from(svg.querySelectorAll('circle')).filter(function(c){
+      return parseFloat(c.getAttribute('r')||0)>=3;
+    }).sort(function(a,b){
+      return parseFloat(a.getAttribute('cx'))-parseFloat(b.getAttribute('cx'));
+    });
+    if(circles.length<2)return;
+
     var prevDot=circles[circles.length-2];
     var prevY=parseFloat(prevDot.getAttribute('cy'));
+    var svgTag=svg.outerHTML.slice(0,60); // identity check
     if(isNaN(prevY))return;
-    if(_ly===prevY)return; // no change
-    _ly=prevY;
+    if(_ly===prevY&&_lt===svgTag)return; // no change
+    _ly=prevY; _lt=svgTag;
+
     var ex=svg.querySelector('#_nf_rl');
     if(ex)ex.remove();
-    var allC=Array.from(circles);
-    var x1=parseFloat(allC[0].getAttribute('cx'));
-    var x2=parseFloat(allC[allC.length-1].getAttribute('cx'));
-    if(isNaN(x1)||isNaN(x2))return;
+
+    var x1=parseFloat(circles[0].getAttribute('cx'));
+    var x2=parseFloat(circles[circles.length-1].getAttribute('cx'));
+    if(isNaN(x1)||isNaN(x2)||x2<=x1)return;
+
     var ns='http://www.w3.org/2000/svg';
     var g=document.createElementNS(ns,'g');
     g.id='_nf_rl';
     g.setAttribute('pointer-events','none');
+
     var ln=document.createElementNS(ns,'line');
-    ln.setAttribute('x1',x1);ln.setAttribute('x2',x2);
-    ln.setAttribute('y1',prevY);ln.setAttribute('y2',prevY);
-    ln.setAttribute('stroke','rgba(167,139,248,0.65)');
+    ln.setAttribute('x1',String(x1));
+    ln.setAttribute('x2',String(x2));
+    ln.setAttribute('y1',String(prevY));
+    ln.setAttribute('y2',String(prevY));
+    ln.setAttribute('stroke','rgba(167,139,248,0.7)');
     ln.setAttribute('stroke-width','1.5');
     ln.setAttribute('stroke-dasharray','5,3');
+
     var tx=document.createElementNS(ns,'text');
-    tx.setAttribute('x',x2-2);tx.setAttribute('y',prevY-5);
+    tx.setAttribute('x',String(x2));
+    tx.setAttribute('y',String(prevY-5));
     tx.setAttribute('text-anchor','end');
-    tx.setAttribute('font-size','9');
-    tx.setAttribute('fill','rgba(167,139,248,0.85)');
-    tx.setAttribute('font-family','inherit');
-    tx.textContent='periodo ant.';
-    g.appendChild(ln);g.appendChild(tx);
+    tx.setAttribute('font-size','10');
+    tx.setAttribute('fill','rgba(167,139,248,0.9)');
+    tx.setAttribute('font-family','sans-serif');
+    tx.textContent='mes ant.';
+
+    g.appendChild(ln);
+    g.appendChild(tx);
     svg.appendChild(g);
   }
+
   setInterval(injectLine,400);
 })();
 </script>
