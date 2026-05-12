@@ -1380,7 +1380,7 @@ CAPACIDADES QUE TIENES:
     function catFor(m){for(var i=0;i<CATS.length;i++){if(m>=CATS[i].min&&m<CATS[i].max)return CATS[i];}return CATS[0];}
 
     var momHtml='';
-    if(mom!==null){var mc=mom>=0?'#34d399':'#f87171';momHtml='<span style="font-size:11px;font-weight:700;color:'+mc+';background:'+mc+'18;border:1px solid '+mc+'33;border-radius:20px;padding:3px 10px;white-space:nowrap">'+(mom>=0?'↑ +':'↓ ')+Math.abs(mom)+'% vs mes ant.</span>';}
+    if(mom!==null){var mc=mom>=0?'#34d399':'#f87171';var diff=selData.total-prvData.total;var ds=(diff>=0?'+':'')+fmt(diff);momHtml='<span style="font-size:11px;font-weight:700;color:'+mc+';background:'+mc+'18;border:1px solid '+mc+'33;border-radius:20px;padding:3px 10px;white-space:nowrap">'+(mom>=0?'↑ +':'↓ ')+Math.abs(mom)+'% &nbsp;·&nbsp; '+ds+'</span>';}
 
     var barsHtml=bars.map(function(b){
       var h=b.rev>0?Math.max(Math.round(b.rev/maxB*100),4):0;
@@ -2068,6 +2068,61 @@ CAPACIDADES QUE TIENES:
       renderWeightSection(wEl);
     }
   },300);
+})();
+</script>
+<script>
+(function(){
+  var _ly=null;
+  function injectLine(){
+    // Find the recharts-wrapper that is inside / near a "Take-home" label
+    var wrapper=null;
+    var ws=document.querySelectorAll('.recharts-wrapper');
+    for(var i=0;i<ws.length;i++){
+      var p=ws[i];
+      for(var j=0;j<10;j++){
+        if(!p)break;
+        if(p.textContent&&p.textContent.indexOf('Take-home')>=0){wrapper=ws[i];break;}
+        p=p.parentElement;
+      }
+      if(wrapper)break;
+    }
+    if(!wrapper)return;
+    var circles=wrapper.querySelectorAll('.recharts-line-dots circle');
+    if(circles.length<2)return;
+    var svg=wrapper.querySelector('svg');
+    if(!svg)return;
+    var prevDot=circles[circles.length-2];
+    var prevY=parseFloat(prevDot.getAttribute('cy'));
+    if(isNaN(prevY))return;
+    if(_ly===prevY)return; // no change
+    _ly=prevY;
+    var ex=svg.querySelector('#_nf_rl');
+    if(ex)ex.remove();
+    var allC=Array.from(circles);
+    var x1=parseFloat(allC[0].getAttribute('cx'));
+    var x2=parseFloat(allC[allC.length-1].getAttribute('cx'));
+    if(isNaN(x1)||isNaN(x2))return;
+    var ns='http://www.w3.org/2000/svg';
+    var g=document.createElementNS(ns,'g');
+    g.id='_nf_rl';
+    g.setAttribute('pointer-events','none');
+    var ln=document.createElementNS(ns,'line');
+    ln.setAttribute('x1',x1);ln.setAttribute('x2',x2);
+    ln.setAttribute('y1',prevY);ln.setAttribute('y2',prevY);
+    ln.setAttribute('stroke','rgba(167,139,248,0.65)');
+    ln.setAttribute('stroke-width','1.5');
+    ln.setAttribute('stroke-dasharray','5,3');
+    var tx=document.createElementNS(ns,'text');
+    tx.setAttribute('x',x2-2);tx.setAttribute('y',prevY-5);
+    tx.setAttribute('text-anchor','end');
+    tx.setAttribute('font-size','9');
+    tx.setAttribute('fill','rgba(167,139,248,0.85)');
+    tx.setAttribute('font-family','inherit');
+    tx.textContent='periodo ant.';
+    g.appendChild(ln);g.appendChild(tx);
+    svg.appendChild(g);
+  }
+  setInterval(injectLine,400);
 })();
 </script>
 </body>
