@@ -1222,36 +1222,61 @@ CAPACIDADES QUE TIENES:
 </script>
 <script>
 (function(){
-  var DK='_nf_ren_dis';
   function getPre(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
   function getClients(){try{return JSON.parse(localStorage.getItem(getPre()+'clients')||'[]');}catch(e){return[];}}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function ymd(){return new Date().toISOString().slice(0,10);}
   function daysTo(ds){var d=new Date(ds);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
+  function dis(tier){return localStorage.getItem('_nf_ren_dis_'+tier+'_'+ymd())==='1';}
+  function setDis(tier){localStorage.setItem('_nf_ren_dis_'+tier+'_'+ymd(),'1');}
+  function cleanDis(){var t=ymd();Object.keys(localStorage).forEach(function(k){if(k.indexOf('_nf_ren_dis_')===0&&k.indexOf(t)<0)localStorage.removeItem(k);});}
 
-  function render(){
-    if(sessionStorage.getItem(DK)){var e=document.getElementById('_nf_ren_bar');if(e)e.remove();return;}
-    var soon=getClients().filter(function(c){return c.active&&c.renewalDate&&daysTo(c.renewalDate)>=0&&daysTo(c.renewalDate)<=14;});
+  // ─── URGENT TIER: 0-15 days, prominent top banner, daily ───
+  function renderUrgent(){
+    var bar=document.getElementById('_nf_ren_bar');
+    if(dis('urgent')){if(bar)bar.remove();return;}
+    var soon=getClients().filter(function(c){return c.active&&c.renewalDate&&daysTo(c.renewalDate)>=0&&daysTo(c.renewalDate)<=15;});
     soon.sort(function(a,b){return daysTo(a.renewalDate)-daysTo(b.renewalDate);});
-    if(!soon.length){var e2=document.getElementById('_nf_ren_bar');if(e2)e2.remove();return;}
+    if(!soon.length){if(bar)bar.remove();return;}
     var urgent=soon.some(function(c){return daysTo(c.renewalDate)<=3;});
     var col=urgent?'#ef4444':'#f59e0b';
     var chips=soon.slice(0,3).map(function(c){
       var d=daysTo(c.renewalDate);
-      return '<span style="background:rgba(0,0,0,.18);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap">'+esc(c.name)+' — '+(d===0?'hoy':d===1?'mañana':'en '+d+' d.')+' </span>';
+      return '<span style="background:rgba(0,0,0,.18);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap">'+esc(c.name)+' — '+(d===0?'hoy':d===1?'mañana':'en '+d+' d.')+'</span>';
     }).join('');
-    var more=soon.length>3?'<span style="font-size:12px;opacity:.75">+'+( soon.length-3)+' más</span>':'';
-    var bar=document.getElementById('_nf_ren_bar');
+    var more=soon.length>3?'<span style="font-size:12px;opacity:.75">+'+(soon.length-3)+' más</span>':'';
     if(!bar){bar=document.createElement('div');bar.id='_nf_ren_bar';document.body.appendChild(bar);}
     bar.innerHTML='<div style="position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:800;background:'+col+';color:#fff;padding:9px 16px;border-radius:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 4px 24px rgba(0,0,0,.35);max-width:92vw;font-weight:600;font-size:13px">'+
       '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>'+
       '<span style="white-space:nowrap">Renovaciones próximas:</span>'+chips+more+
-      '<button id="_nf_ren_x" style="background:rgba(0,0,0,.2);border:none;color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;margin-left:4px">&#215;</button>'+
+      '<button id="_nf_ren_x" style="background:rgba(0,0,0,.2);border:none;color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;margin-left:4px">×</button>'+
     '</div>';
-    document.getElementById('_nf_ren_x').onclick=function(){sessionStorage.setItem(DK,'1');render();};
+    document.getElementById('_nf_ren_x').onclick=function(){setDis('urgent');renderUrgent();};
   }
 
-  setTimeout(render,1800);
-  setInterval(render,10000);
+  // ─── HEADS-UP TIER: 16-30 days, subtle bottom-right, dismissable per day ───
+  function renderHeadsUp(){
+    var bar=document.getElementById('_nf_ren_hu');
+    if(dis('headsup')){if(bar)bar.remove();return;}
+    var fut=getClients().filter(function(c){if(!c.active||!c.renewalDate)return false;var d=daysTo(c.renewalDate);return d>=16&&d<=30;});
+    fut.sort(function(a,b){return daysTo(a.renewalDate)-daysTo(b.renewalDate);});
+    if(!fut.length){if(bar)bar.remove();return;}
+    var chips=fut.slice(0,4).map(function(c){
+      var d=daysTo(c.renewalDate);
+      return '<span style="background:rgba(255,255,255,.04);border:1px solid rgba(167,139,250,.18);border-radius:5px;padding:2px 7px;font-size:11px;color:#cbd5e1;white-space:nowrap">'+esc(c.name.split(' ')[0])+' <span style="color:#a78bfa;font-weight:600">'+d+'d</span></span>';
+    }).join(' ');
+    var more=fut.length>4?'<span style="opacity:.55;font-size:11px;color:#94a3b8">+'+(fut.length-4)+'</span>':'';
+    if(!bar){bar=document.createElement('div');bar.id='_nf_ren_hu';document.body.appendChild(bar);}
+    bar.innerHTML='<div style="position:fixed;bottom:18px;right:18px;z-index:790;background:rgba(15,23,42,0.92);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(167,139,250,0.22);color:#cbd5e1;padding:8px 12px;border-radius:10px;display:flex;align-items:center;gap:6px;flex-wrap:wrap;max-width:420px;font-size:11px;box-shadow:0 4px 16px rgba(0,0,0,.45)">'+
+      '<span style="color:#a78bfa;font-weight:700;white-space:nowrap;letter-spacing:0.02em">Próximos a renovar:</span>'+chips+more+
+      '<button id="_nf_ren_hux" style="background:rgba(255,255,255,.04);border:none;color:#94a3b8;width:18px;height:18px;border-radius:4px;cursor:pointer;font-size:12px;line-height:1;margin-left:4px">×</button>'+
+    '</div>';
+    document.getElementById('_nf_ren_hux').onclick=function(){setDis('headsup');renderHeadsUp();};
+  }
+
+  function renderAll(){cleanDis();renderUrgent();renderHeadsUp();}
+  setTimeout(renderAll,1800);
+  setInterval(renderAll,15000);
 })();
 </script>
 <script>
