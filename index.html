@@ -2583,6 +2583,66 @@ CAPACIDADES QUE TIENES:
     document.body.appendChild(btn);
   }
   setInterval(ensureButton,2000);
+
+  // ─── COMMISSION CARDS FOR CUSTOM SOURCES ───
+  function getClientsLS(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});if(!k)return[];try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return[];}}
+  function fmtEur(v){if(v==null)return'0€';return (Math.round(v*100)/100).toFixed(2).replace(/.00$/,'').replace(/(.d)0$/,'$1')+'€';}
+
+  function findGEIEGCard(){
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
+    var node;
+    while((node=walker.nextNode())){
+      var t=(node.nodeValue||'').trim();
+      if(t.indexOf('Comisi')===0&&t.indexOf('GEIEG')>0){
+        var p=node.parentElement;
+        for(var i=0;i<6;i++){
+          if(!p)break;
+          var bg=(p.style&&p.style.background)||'';
+          if(bg.indexOf('245,158')>=0||bg.indexOf('fffbeb')>=0)return p;
+          p=p.parentElement;
+        }
+        return node.parentElement&&node.parentElement.parentElement;
+      }
+    }
+    return null;
+  }
+
+  function renderCommissionCards(){
+    var srcs=loadSources();
+    var withCom=srcs.filter(function(s){return s.name&&parseFloat(s.pct)>0;});
+    var container=document.getElementById('_nf_src_com_container');
+    if(!withCom.length){if(container)container.remove();return;}
+    var geiegCard=findGEIEGCard();
+    if(!geiegCard){if(container)container.remove();return;}
+
+    var clients=getClientsLS().filter(function(c){return c.active!==false;});
+    var cardsToShow=withCom.map(function(s){
+      var pct=parseFloat(s.pct)||0;
+      var monthly=clients.filter(function(c){return c.source===s.name;}).reduce(function(sum,c){return sum+(parseFloat(c.price)||0)*pct/100;},0);
+      return {name:s.name,pct:pct,color:s.color||'#a78bfa',monthly:monthly};
+    }).filter(function(x){return x.monthly>0;});
+
+    if(!cardsToShow.length){if(container)container.remove();return;}
+
+    if(!container){
+      container=document.createElement('div');
+      container.id='_nf_src_com_container';
+      container.style.cssText='display:flex;flex-direction:column;gap:8px;margin-top:8px';
+    }
+    container.innerHTML=cardsToShow.map(function(c){
+      var col=c.color;
+      return '<div style="background:'+col+'12;border:1px solid '+col+'33;border-radius:10px;padding:11px 16px;font-size:13px;display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
+        '<span style="width:8px;height:8px;border-radius:50%;background:'+col+';flex-shrink:0;box-shadow:0 0 6px '+col+'88"></span>'+
+        '<span style="color:'+col+';font-weight:700">Comisión '+esc(c.name)+' ('+c.pct+'%):</span>'+
+        '<span style="color:var(--text2)">Cedes <strong style="color:var(--text)">'+fmtEur(c.monthly)+'/mes</strong> · <strong>'+fmtEur(c.monthly*12)+'/año</strong></span>'+
+      '</div>';
+    }).join('');
+
+    if(geiegCard.parentNode&&(container.parentNode!==geiegCard.parentNode||container.previousSibling!==geiegCard)){
+      geiegCard.parentNode.insertBefore(container,geiegCard.nextSibling);
+    }
+  }
+  setInterval(renderCommissionCards,1500);
 })();
 </script>
 </body>
