@@ -1419,14 +1419,52 @@ CAPACIDADES QUE TIENES:
       '</div>';
     }).join('');
 
+    // Color per source (defaults + custom hash-based)
+    var DEF_SRC={'GEIEG':'#4d9cf8','Instagram':'#ec4899','Webinar':'#34d399','Referral':'#f59e0b','Àurea':'#f97316','Ads':'#06b6d4','Other':'#94a3b8','':'#94a3b8'};
+    function srcColor(name){if(DEF_SRC[name])return DEF_SRC[name];var h=0;for(var i=0;i<(name||'').length;i++)h=((h<<5)-h)+name.charCodeAt(i);var hue=Math.abs(h)%360;return 'hsl('+hue+',70%,62%)';}
+    function srcCommission(source){if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return cp;}if(source===sp)return Math.round((1-pct)*100);return 0;}
+
+    // "Per origen" breakdown
+    var byOrigin={};
+    selData.clients.forEach(function(c){
+      var s=c.source||'Other';
+      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
+      var gross=(parseFloat(c.price)||0)*bm;
+      var take=th(c.price,c.billing,c.source,sp,pct);
+      if(!byOrigin[s])byOrigin[s]={count:0,gross:0,take:0,com:srcCommission(s)};
+      byOrigin[s].count++;byOrigin[s].gross+=gross;byOrigin[s].take+=take;
+    });
+    var orderedSrc=Object.keys(byOrigin).sort(function(a,b){return byOrigin[b].take-byOrigin[a].take;});
+    var byOriginHtml=orderedSrc.length?orderedSrc.map(function(s){
+      var d=byOrigin[s],col=srcColor(s);
+      var dscount=d.com>0?'<div style="font-size:10px;color:var(--muted);margin-top:1px">de '+fmt(d.gross)+' <span style="color:'+col+';opacity:.85;font-weight:600">-'+d.com+'%</span></div>':'';
+      return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:'+col+'14;border:1px solid '+col+'30;margin-bottom:5px;gap:8px">'+
+        '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+          '<span style="width:9px;height:9px;border-radius:50%;background:'+col+';flex-shrink:0;box-shadow:0 0 6px '+col+'80"></span>'+
+          '<span style="font-size:12px;color:var(--text);font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(s||'Sense origen')+'</span>'+
+          '<span style="font-size:10px;color:var(--muted);flex-shrink:0;font-weight:500">· '+d.count+(d.count===1?' client':' clients')+'</span>'+
+        '</div>'+
+        '<div style="text-align:right;flex-shrink:0">'+
+          '<div style="font-size:13px;font-weight:800;color:'+col+';line-height:1.1">'+fmt(d.take)+'</div>'+
+          dscount+
+        '</div>'+
+      '</div>';
+    }).join(''):'';
+
+    // Individual client list with colored source badge
     var clientsHtml=selData.clients.length?
       selData.clients.map(function(c){
         var paid=th(c.price,c.billing,c.source,sp,pct);
         var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
         var tag=bm===1?'mens.':bm===3?'trim.':bm===6?'sem.':'anual';
-        return'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg3)">'+
-          '<span style="font-size:12px;color:var(--text2)">'+esc(c.name)+'</span>'+
-          '<span style="font-size:12px;font-weight:700;color:#4d9cf8">'+fmt(paid)+
+        var src=c.source||'Other',col=srcColor(src);
+        return'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg3);gap:8px">'+
+          '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+            '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'+
+            '<span style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name)+'</span>'+
+            '<span style="font-size:9px;color:'+col+';background:'+col+'18;border:1px solid '+col+'30;border-radius:9px;padding:1px 6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0">'+esc(src)+'</span>'+
+          '</div>'+
+          '<span style="font-size:12px;font-weight:700;color:'+col+';flex-shrink:0;white-space:nowrap">'+fmt(paid)+
             '<span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:4px">'+tag+'</span>'+
           '</span>'+
         '</div>';
@@ -1502,7 +1540,13 @@ CAPACIDADES QUE TIENES:
       '<div style="display:flex;gap:5px;align-items:flex-end;height:72px">'+barsHtml+'</div>'+
       '<div style="height:1px;background:rgba(255,255,255,.05);margin:14px 0 12px"></div>'+
 
-      // Who paid (collapsible)
+      // Per origen breakdown (always visible when there are clients)
+      (byOriginHtml?'<div style="margin-bottom:14px">'+
+        '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">Per origen</div>'+
+        byOriginHtml+
+      '</div>':'')+
+
+      // Who paid (collapsible, detailed list)
       '<details'+(selData.clients.length?' open':'')+'>'+
         '<summary style="list-style:none;-webkit-appearance:none;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;user-select:none;display:flex;align-items:center;gap:6px;cursor:pointer">'+
           'Quién pagó '+
