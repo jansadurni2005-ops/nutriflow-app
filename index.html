@@ -2409,6 +2409,78 @@ CAPACIDADES QUE TIENES:
     document.getElementById('_nf_pay_rem_x').onclick=function(){sessionStorage.setItem('_nf_pay_rem_dis','1');renderReminders();};
   }
   setInterval(renderReminders,2500);
+
+  // ─── PENDING PAYMENTS FIXED ALERT ───
+  // Persistent banner listing clients with incomplete payments in current cycle
+  // Daily-dismissable (re-appears next day, not per session)
+  function ymdToday(){return new Date().toISOString().slice(0,10);}
+  function isPendDismissed(){return localStorage.getItem('_nf_pend_dis_'+ymdToday())==='1';}
+  function dismissPend(){localStorage.setItem('_nf_pend_dis_'+ymdToday(),'1');}
+  function cleanPendDismissals(){var t=ymdToday();Object.keys(localStorage).forEach(function(k){if(k.indexOf('_nf_pend_dis_')===0&&k.indexOf(t)<0)localStorage.removeItem(k);});}
+
+  function renderPendingPayments(){
+    cleanPendDismissals();
+    var bar=document.getElementById('_nf_pend_bar');
+    if(isPendDismissed()){if(bar)bar.remove();return;}
+    var all=loadAll();
+    var clients=getClients().filter(function(c){return c.active!==false&&c.startDate;});
+    var pending=clients.map(function(c){
+      var paid=all.filter(function(p){return p.clientId===c.id&&p.cycleStart===c.startDate;})
+                  .reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+      var totalDue=(parseFloat(c.price)||0)*billingMonths(c.billing);
+      return {client:c,paid:paid,due:totalDue,remaining:totalDue-paid,pct:totalDue>0?Math.round(paid/totalDue*100):100};
+    }).filter(function(x){return x.due>0&&x.remaining>0.01;});
+    if(!pending.length){if(bar)bar.remove();return;}
+    pending.sort(function(a,b){return a.pct-b.pct;});
+    var totalPending=pending.reduce(function(s,p){return s+p.remaining;},0);
+    var chips=pending.slice(0,4).map(function(p){
+      var barCol=p.pct>=75?'#34d399':p.pct>=40?'#f59e0b':'#f87171';
+      return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:3px 8px;font-size:11px;white-space:nowrap">'+
+        '<span style="color:#cbd5e1;font-weight:600">'+esc(p.client.name.split(' ')[0])+'</span>'+
+        '<span style="color:'+barCol+';font-weight:700">'+p.pct+'%</span>'+
+        '<span style="color:#94a3b8;font-size:10px">('+fmtE(p.remaining)+')</span>'+
+      '</span>';
+    }).join('');
+    var more=pending.length>4?'<span style="opacity:.6;font-size:11px;color:#94a3b8">+'+(pending.length-4)+' més</span>':'';
+    if(!bar){bar=document.createElement('div');bar.id='_nf_pend_bar';document.body.appendChild(bar);}
+    bar.innerHTML='<div style="position:fixed;top:155px;left:50%;transform:translateX(-50%);z-index:798;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(96,165,250,0.4);color:#cbd5e1;padding:9px 14px;border-radius:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:92vw;font-size:12px">'+
+      '<span style="color:#60a5fa;font-weight:700;white-space:nowrap;letter-spacing:.02em">💰 Pagaments pendents:</span>'+
+      chips+more+
+      '<span style="color:#94a3b8;font-size:11px;border-left:1px solid rgba(255,255,255,.1);padding-left:8px;margin-left:2px;white-space:nowrap">Total <strong style="color:#fbbf24">'+fmtE(totalPending)+'</strong></span>'+
+      '<button id="_nf_pend_x" style="background:rgba(255,255,255,.05);border:none;color:#94a3b8;width:20px;height:20px;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;margin-left:4px" title="Tancar fins demà">×</button>'+
+    '</div>';
+    document.getElementById('_nf_pend_x').onclick=function(){dismissPend();renderPendingPayments();};
+  }
+  setInterval(renderPendingPayments,3000);
+
+  // ─── PROGRESS BAR INDICATOR IN NEW CLIENT FORM ───
+  // Inject a help block below the "Fecha de inicio del periodo" field showing
+  // that payment tracking is available on the client profile after save
+  var _lastFormHash='';
+  function injectFormHelp(){
+    // Find a date input that comes after a label containing "Fecha de inicio"
+    var labels=document.querySelectorAll('label');
+    for(var i=0;i<labels.length;i++){
+      var txt=(labels[i].textContent||'').toLowerCase();
+      if(txt.indexOf('fecha de inicio')<0)continue;
+      var parent=labels[i].parentElement;
+      if(!parent)continue;
+      // Avoid duplicate injection
+      if(parent.querySelector('[data-nf-formhelp]'))return;
+      var hash=parent.outerHTML.length+'';
+      if(hash===_lastFormHash)continue;
+      _lastFormHash=hash;
+      var help=document.createElement('div');
+      help.setAttribute('data-nf-formhelp','1');
+      help.style.cssText='margin-top:10px;padding:10px 12px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.22);border-radius:8px;font-size:11px;color:#cbd5e1;line-height:1.55;display:flex;gap:8px;align-items:flex-start';
+      help.innerHTML='<span style="font-size:14px;flex-shrink:0">💳</span>'+
+        '<div><strong style="color:#60a5fa">Pagaments per a aquest client</strong><br>'+
+        'Quan desis el client, podràs registrar pagaments parcials des del seu <b>perfil</b> (botons + Afegir pagament / ✓ Marcar com pagat tot). Apareixerà una <b>alerta blava</b> a dalt mentre quedi import per cobrar.</div>';
+      parent.appendChild(help);
+      return;
+    }
+  }
+  setInterval(injectFormHelp,800);
 })();
 </script>
 <script>
