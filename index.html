@@ -2481,6 +2481,77 @@ CAPACIDADES QUE TIENES:
     }
   }
   setInterval(injectFormHelp,800);
+
+  // ─── PENDING PAYMENT BADGE ON EACH CLIENT ROW ───
+  // Inject a pulsing red "!" badge at the end of each client list row when
+  // the client still has an unpaid amount in their current cycle.
+  function ensurePulseCSS(){
+    if(document.getElementById('_nf_pulse_css'))return;
+    var st=document.createElement('style');
+    st.id='_nf_pulse_css';
+    st.textContent='@keyframes nfPulse{0%,100%{box-shadow:0 0 0 0 rgba(239,68,68,0.5)}50%{box-shadow:0 0 0 6px rgba(239,68,68,0)}}.nf-pend-badge{animation:nfPulse 1.8s ease-out infinite}';
+    document.head.appendChild(st);
+  }
+  function findClientRow(textNode){
+    var p=textNode.parentElement;
+    for(var i=0;i<10;i++){
+      if(!p)return null;
+      if(p.tagName==='TR')return p;
+      if(p.tagName==='TABLE')break;
+      p=p.parentElement;
+    }
+    p=textNode.parentElement;
+    for(var j=0;j<10;j++){
+      if(!p)return null;
+      var hasEuro=(p.textContent||'').indexOf('€')>=0;
+      var childCount=p.children.length;
+      if(hasEuro&&childCount>=4)return p;
+      p=p.parentElement;
+    }
+    return null;
+  }
+  function decorateClientRows(){
+    ensurePulseCSS();
+    var clients=getClients();
+    var clientByName={};
+    clients.forEach(function(c){if(c.active!==false&&c.name)clientByName[c.name]=c;});
+    // Always clear old badges, then re-add (React-resistant)
+    document.querySelectorAll('[data-nf-pend-bd]').forEach(function(b){b.remove();});
+    if(!Object.keys(clientByName).length)return;
+    var all=loadAll();
+    var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
+    var nodes=[];var n;
+    while((n=walker.nextNode()))nodes.push(n);
+    var visited=new WeakSet();
+    nodes.forEach(function(node){
+      var name=(node.nodeValue||'').trim();
+      if(!clientByName[name])return;
+      var row=findClientRow(node);
+      if(!row||visited.has(row))return;
+      visited.add(row);
+      var c=clientByName[name];
+      var paid=all.filter(function(p){return p.clientId===c.id&&p.cycleStart===c.startDate;})
+                  .reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+      var totalDue=(parseFloat(c.price)||0)*billingMonths(c.billing);
+      if(totalDue<=0||paid>=totalDue-0.01)return;
+      var remaining=totalDue-paid;
+      var pct=Math.round(paid/totalDue*100);
+      var badge=document.createElement('span');
+      badge.setAttribute('data-nf-pend-bd','1');
+      badge.className='nf-pend-badge';
+      badge.title='Pagament pendent: '+fmtE(remaining)+' ('+pct+'% cobrat de '+fmtE(totalDue)+')';
+      badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:50%;background:rgba(239,68,68,0.22);border:1.5px solid rgba(239,68,68,0.6);color:#fca5a5;font-size:15px;font-weight:900;margin-left:10px;cursor:help;flex-shrink:0;vertical-align:middle;font-family:system-ui,sans-serif';
+      badge.innerHTML='!';
+      if(row.tagName==='TR'){
+        var cells=row.cells||row.querySelectorAll('td');
+        if(cells.length){cells[cells.length-1].appendChild(badge);}
+        else{row.appendChild(badge);}
+      }else{
+        row.appendChild(badge);
+      }
+    });
+  }
+  setInterval(decorateClientRows,1500);
 })();
 </script>
 <script>
