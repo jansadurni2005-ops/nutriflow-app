@@ -2590,6 +2590,35 @@ CAPACIDADES QUE TIENES:
   setTimeout(stripEncodedSources,1500);
   setInterval(stripEncodedSources,30000);
 
+  // ─── AUTO-COLOR PALETTE ───
+  // Each new source gets a distinct color from this list. Existing sources
+  // without a color (or with the default gray) get auto-assigned too.
+  var COLOR_PALETTE=['#fbbf24','#34d399','#ec4899','#06b6d4','#a78bfa','#ef4444','#10b981','#f97316','#8b5cf6','#3b82f6'];
+  function isDefaultColor(c){return !c||c===''||c==='#94a3b8'||c==='#000000';}
+  function assignAutoColors(){
+    var srcs=loadSources();
+    if(!srcs.length)return;
+    var changed=false;
+    // Track used palette colors so each source picks a unique one when possible
+    var usedColors={};
+    srcs.forEach(function(s){if(s.color&&!isDefaultColor(s.color))usedColors[s.color]=true;});
+    srcs.forEach(function(s){
+      if(!isDefaultColor(s.color))return;
+      // Find next unused palette color
+      var picked=null;
+      for(var i=0;i<COLOR_PALETTE.length;i++){
+        if(!usedColors[COLOR_PALETTE[i]]){picked=COLOR_PALETTE[i];break;}
+      }
+      if(!picked)picked=COLOR_PALETTE[Math.floor(Math.random()*COLOR_PALETTE.length)];
+      s.color=picked;
+      usedColors[picked]=true;
+      changed=true;
+    });
+    if(changed)saveSources(srcs);
+  }
+  setTimeout(assignAutoColors,1700);
+  setInterval(assignAutoColors,8000);
+
   // Identity decode (kept for backward compat with display patches)
   window._nf_displaySource=function(s){
     if(!s||typeof s!=='string')return s||'';
@@ -2685,7 +2714,12 @@ CAPACIDADES QUE TIENES:
     bg.onclick=function(e){if(e.target===bg)bg.remove();};
     document.getElementById('_nf_src_add').onclick=function(){
       var srcs=collectSources();
-      srcs.push({name:'',pct:30});
+      // Pick next unused palette color for the new source
+      var used={};srcs.forEach(function(s){if(s.color&&!isDefaultColor(s.color))used[s.color]=true;});
+      var newColor=null;
+      for(var i=0;i<COLOR_PALETTE.length;i++){if(!used[COLOR_PALETTE[i]]){newColor=COLOR_PALETTE[i];break;}}
+      if(!newColor)newColor=COLOR_PALETTE[srcs.length%COLOR_PALETTE.length];
+      srcs.push({name:'',pct:30,color:newColor});
       saveSources(srcs);
       renderModal();
       setTimeout(function(){
