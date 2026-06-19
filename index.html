@@ -2567,66 +2567,47 @@ CAPACIDADES QUE TIENES:
   function saveSources(a){var k=getKey();if(k)localStorage.setItem(k,JSON.stringify(a));}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-  // ─── CROSS-DEVICE COMMISSION ENCODING ───
-  // We encode the commission % directly into the source field stored on the client
-  // record, so it syncs via the existing clients table (Supabase). Format: "Name~~30"
-  // means source "Name" with 30% partner commission.
-  function decodeSource(s){
-    if(!s||typeof s!=='string')return{name:s||'',pct:null};
-    var m=s.match(/^(.+?)~~(d{1,3})$/);
-    if(m)return{name:m[1],pct:parseFloat(m[2])};
-    return{name:s,pct:null};
-  }
-  function encodeSource(name,pct){
-    if(pct==null||isNaN(parseFloat(pct))||!name)return name||'';
-    return name+'~~'+Math.round(parseFloat(pct));
-  }
-  window._nf_decodeSource=decodeSource;
-  window._nf_encodeSource=encodeSource;
-  window._nf_displaySource=function(s){return decodeSource(s).name;};
-
-  // Returns the commission % the PARTNER takes (0-100), or null if not applicable
-  // Checks encoded source string FIRST (cross-device safe), then local sources list
-  window._nf_getSourcePct=function(name){
-    if(!name)return null;
-    var d=decodeSource(name);
-    if(d.pct!=null)return d.pct;
-    var clean=d.name;
-    var srcs=loadSources();
-    for(var i=0;i<srcs.length;i++){if(srcs[i].name===clean)return parseFloat(srcs[i].pct)||0;}
-    return null;
-  };
-
-  // Re-write all clients to embed/update commission in their source field
-  // Called after the sources modal is saved, so commissions sync via Supabase
-  function migrateClientSources(){
+  // ─── ONE-TIME DEMIGRATION: strip any ~~XX suffix from client sources ───
+  // (reverts a previous encoding experiment that turned "Priego" into "Priego~~30")
+  function stripEncodedSources(){
     var email=getEmail();
     if(!email)return;
     var key='nf_'+email+'_clients';
     var clients;
     try{clients=JSON.parse(localStorage.getItem(key)||'[]');}catch(e){return;}
-    var srcs=loadSources();
-    var pctByName={};
-    srcs.forEach(function(s){if(s.name)pctByName[s.name]=parseFloat(s.pct)||0;});
     var changed=false;
     clients.forEach(function(c){
-      if(!c.source)return;
-      var d=decodeSource(c.source);
-      if(pctByName.hasOwnProperty(d.name)){
-        var newSrc=encodeSource(d.name,pctByName[d.name]);
-        if(c.source!==newSrc){c.source=newSrc;changed=true;}
-      }else if(d.pct!=null){
-        if(c.source!==d.name){c.source=d.name;changed=true;}
-      }
+      if(!c.source||typeof c.source!=='string')return;
+      var m=c.source.match(/^(.+?)~~d{1,3}$/);
+      if(m){c.source=m[1];changed=true;}
     });
     if(changed){
       localStorage.setItem(key,JSON.stringify(clients));
       if(window._nf_setClients){try{window._nf_setClients(clients.slice());}catch(e){}}
     }
   }
-  window._nf_migrateClientSources=migrateClientSources;
-  // Run periodically too as safety net (and on first load)
-  setInterval(migrateClientSources,4000);
+  // Run once shortly after load, then periodically as safety net
+  setTimeout(stripEncodedSources,1500);
+  setInterval(stripEncodedSources,30000);
+
+  // Identity decode (kept for backward compat with display patches)
+  window._nf_displaySource=function(s){
+    if(!s||typeof s!=='string')return s||'';
+    var m=s.match(/^(.+?)~~d{1,3}$/);
+    return m?m[1]:s;
+  };
+
+  // Returns the commission % the PARTNER takes (0-100), or null if not applicable
+  window._nf_getSourcePct=function(name){
+    if(!name)return null;
+    // Strip any legacy ~~XX suffix
+    var clean=name;
+    var m=String(name).match(/^(.+?)~~d{1,3}$/);
+    if(m)clean=m[1];
+    var srcs=loadSources();
+    for(var i=0;i<srcs.length;i++){if(srcs[i].name===clean)return parseFloat(srcs[i].pct)||0;}
+    return null;
+  };
 
   // ─── DROPDOWN INJECTION ───
   function isSourceSelect(sel){
@@ -2642,20 +2623,18 @@ CAPACIDADES QUE TIENES:
   }
   function injectInto(sel){
     var custom=loadSources();
-    // Build encoded value set
-    var encodedValues=custom.filter(function(s){return s.name;}).map(function(s){return encodeSource(s.name,parseFloat(s.pct)||0);});
+    var names=custom.filter(function(s){return s.name;}).map(function(s){return s.name;});
     // Remove orphan data-nfx options
     Array.from(sel.querySelectorAll('option[data-nfx]')).forEach(function(o){
-      if(encodedValues.indexOf(o.value)<0)o.remove();
+      if(names.indexOf(o.value)<0)o.remove();
     });
-    // Add missing custom sources with ENCODED value + clean display
+    // Add missing custom sources as plain names (no encoding)
     custom.forEach(function(s){
       if(!s.name)return;
-      var enc=encodeSource(s.name,parseFloat(s.pct)||0);
-      var ex=Array.from(sel.options).find(function(o){return o.value===enc;});
+      var ex=Array.from(sel.options).find(function(o){return o.value===s.name;});
       if(ex)return;
       var opt=document.createElement('option');
-      opt.value=enc;
+      opt.value=s.name;
       opt.textContent=s.name;
       opt.setAttribute('data-nfx','1');
       sel.appendChild(opt);
@@ -2726,7 +2705,7 @@ CAPACIDADES QUE TIENES:
     document.getElementById('_nf_src_ok').onclick=function(){
       var srcs=collectSources().filter(function(s){return (s.name||'').trim().length>0;});
       saveSources(srcs);
-      migrateClientSources();
+      stripEncodedSources();
       bg.remove();
     };
   }
@@ -2742,10 +2721,10 @@ CAPACIDADES QUE TIENES:
     });
     return srcs;
   }
-  // Expose color getter for use in facturación panel — uses DECODED name
+  // Expose color getter for use in facturación panel
   window._nf_getSourceColor=function(name){
     if(!name)return null;
-    var clean=decodeSource(name).name;
+    var clean=window._nf_displaySource?window._nf_displaySource(name):name;
     var srcs=loadSources();
     for(var i=0;i<srcs.length;i++){if(srcs[i].name===clean&&srcs[i].color)return srcs[i].color;}
     return null;
@@ -2753,9 +2732,8 @@ CAPACIDADES QUE TIENES:
   // Render a React source badge with % keep amount, used by patched bundle
   window._nf_srcBadge=function(source,P){
     if(!P||!P.jsx)return source;
-    var d=decodeSource(source);
-    var displayName=d.name;
-    var pct=d.pct!=null?d.pct:(window._nf_getSourcePct?window._nf_getSourcePct(displayName):null);
+    var displayName=window._nf_displaySource?window._nf_displaySource(source):source;
+    var pct=window._nf_getSourcePct?window._nf_getSourcePct(displayName):null;
     if(pct!=null&&pct>0){
       var col=window._nf_getSourceColor?window._nf_getSourceColor(displayName):null;
       col=col||'#8b5cf6';
@@ -2825,7 +2803,7 @@ CAPACIDADES QUE TIENES:
     var clients=getClientsLS().filter(function(c){return c.active!==false;});
     var cardsToShow=withCom.map(function(s){
       var pct=parseFloat(s.pct)||0;
-      var monthly=clients.filter(function(c){return decodeSource(c.source).name===s.name;}).reduce(function(sum,c){return sum+(parseFloat(c.price)||0)*pct/100;},0);
+      var monthly=clients.filter(function(c){var cn=window._nf_displaySource?window._nf_displaySource(c.source):c.source;return cn===s.name;}).reduce(function(sum,c){return sum+(parseFloat(c.price)||0)*pct/100;},0);
       return {name:s.name,pct:pct,color:s.color||'#a78bfa',monthly:monthly};
     }).filter(function(x){return x.monthly>0;});
 
