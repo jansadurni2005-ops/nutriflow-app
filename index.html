@@ -1656,12 +1656,27 @@ CAPACIDADES QUE TIENES:
     if(hn)hn.onclick=function(){if(_histOff<0){_histOff++;render();}};
   }
 
+  // Track data hash so we re-render whenever clients, antrop, payments or sources change
+  var _lastDataHash='';
+  function dataHash(){
+    var pre=getPre();
+    if(!pre)return '';
+    var c=localStorage.getItem(pre+'clients')||'';
+    var a=localStorage.getItem(pre+'antrop')||'';
+    var p=localStorage.getItem(pre+'payments')||'';
+    var s=localStorage.getItem(pre+'sources')||'';
+    return c.length+':'+a.length+':'+p.length+':'+s.length+':'+(_histOff||0);
+  }
   setInterval(function(){
     var root=document.getElementById('_nf_retention_root');
     if(!root)return;
-    if(!root.innerHTML.trim())render();
-  },300);
-  window.addEventListener('storage',function(e){if(e.key&&(e.key.indexOf('clients')>-1||e.key.indexOf('antrop')>-1))render();});
+    var h=dataHash();
+    if(!root.innerHTML.trim()||h!==_lastDataHash){
+      _lastDataHash=h;
+      render();
+    }
+  },1000);
+  window.addEventListener('storage',function(e){if(e.key&&(e.key.indexOf('clients')>-1||e.key.indexOf('antrop')>-1||e.key.indexOf('payments')>-1||e.key.indexOf('sources')>-1))render();});
 })();
 </script>
 <script>
