@@ -1383,7 +1383,12 @@ CAPACIDADES QUE TIENES:
     var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
     var payments=loadPayments();
     var effPays=effectivePayments(clients,payments);
-    var paysInMo=effPays.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getFullYear()===yr&&d.getMonth()===mo;});
+    // Use STRING-based date matching to avoid any timezone issues
+    var moStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
+    var paysInMo=effPays.filter(function(p){
+      if(!p.date||typeof p.date!=='string')return false;
+      return p.date.slice(0,7)===moStr;
+    });
     // Each payment: apply commission for its client's source
     var crv=0;
     var clientsSet={};
@@ -1411,6 +1416,11 @@ CAPACIDADES QUE TIENES:
     var sp=cfg.partnerSource||cfg.splitPartner||'GEIEG',pct=(cfg.splitPercent||70)/100;
     var active=clients.filter(function(c){return c.active!==false;});
     if(!active.length){root.innerHTML='';return;}
+
+    // Diagnostic counters (for visible status line)
+    var allPayments=loadPayments();
+    var realPayCount=allPayments.length;
+    var realPayTotal=allPayments.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
 
     var now=new Date(),cy=now.getFullYear(),cm=now.getMonth();
     var isCur=_histOff===0;
@@ -1551,7 +1561,7 @@ CAPACIDADES QUE TIENES:
     '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:18px 20px">'+
 
       // Header: title + month navigator
-      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px;flex-wrap:wrap">'+
+      '<div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;flex-wrap:wrap">'+
         '<span style="font-size:13px;font-weight:700;color:var(--text)">Facturación mensual</span>'+
         '<div style="display:flex;align-items:center;gap:4px;margin-left:auto">'+
           '<button id="_nf_hp" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1">‹</button>'+
@@ -1559,6 +1569,13 @@ CAPACIDADES QUE TIENES:
           '<button id="_nf_hn" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:18px;display:flex;align-items:center;justify-content:center;line-height:1;opacity:'+(isCur?'0.3':'1')+'">›</button>'+
         '</div>'+
         momHtml+
+      '</div>'+
+
+      // Diagnostic line (helps see if payments are saved correctly)
+      '<div style="font-size:10px;color:var(--muted);margin-bottom:14px;display:flex;gap:10px;flex-wrap:wrap">'+
+        '<span>📊 <b style="color:var(--text2)">'+realPayCount+'</b> pagaments registrats al sistema (total <b style="color:var(--text2)">'+fmt(realPayTotal)+'</b>)</span>'+
+        '<span>·</span>'+
+        '<span><b style="color:var(--text2)">'+(selData.paymentsInMonth||[]).filter(function(p){return !p._auto;}).length+'</b> al mes selecionat</span>'+
       '</div>'+
 
       // KPI cards
@@ -2335,7 +2352,7 @@ CAPACIDADES QUE TIENES:
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
           '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Import (€)</label>'+
             '<input id="_nf_pn_amt" type="number" step="0.01" min="0" placeholder="'+remaining.toFixed(2)+'" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
-          '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Data</label>'+
+          '<div><label style="font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>Data del cobrament</span><button type="button" id="_nf_pn_today" style="background:#4d9cf8;border:none;color:#fff;border-radius:4px;padding:1px 8px;font-size:9px;font-weight:700;cursor:pointer;letter-spacing:.04em">AVUI</button></label>'+
             '<input id="_nf_pn_dt" type="date" value="'+ymd()+'" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
@@ -2410,6 +2427,9 @@ CAPACIDADES QUE TIENES:
 
     var cx=document.getElementById('_nf_pn_cx');
     if(cx)cx.onclick=function(){_addOpen=false;renderSection(el);};
+
+    var todayBtn=document.getElementById('_nf_pn_today');
+    if(todayBtn)todayBtn.onclick=function(){var d=document.getElementById('_nf_pn_dt');if(d){d.value=ymd();d.focus();}};
 
     var ok=document.getElementById('_nf_pn_ok');
     if(ok)ok.onclick=function(){
