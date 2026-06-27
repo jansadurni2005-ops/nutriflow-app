@@ -1348,19 +1348,54 @@ CAPACIDADES QUE TIENES:
   function th(price,billing,source,sp,pct){var bm=billing==='quarterly'?3:billing==='semiannual'?6:billing==='annual'?12:1;var g=price*bm;if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return g*(100-cp)/100;}return source===sp?pct*g:g;}
   function offMo(off){var now=new Date();var tm=now.getFullYear()*12+now.getMonth()+off;return{yr:Math.floor(tm/12),mo:((tm%12)+12)%12};}
 
-  function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
-    var paid=clients.filter(function(c){
-      if(c.active===false||!c.startDate)return false;
-      var sd=new Date(c.startDate),sy=sd.getFullYear(),sm=sd.getMonth();
-      if(isCur)return sy===yr&&sm===mo;
-      if(sy>yr||(sy===yr&&sm>mo))return false;
-      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
-      var di=(yr-sy)*12+(mo-sm);
-      return di%bm===0;
+  // Load registered payments (PATCH 37 storage)
+  function loadPayments(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_payments$/.test(k);});if(!k)return[];try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return[];}}
+  function billingMonths(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:1;}
+
+  // Build effective payments: real registered payments + auto-generated for clients
+  // whose current cycle has NO payments registered yet (treated as fully paid on startDate)
+  function effectivePayments(clients,payments){
+    var byKey={};
+    payments.forEach(function(p){var k=p.clientId+'_'+p.cycleStart;if(!byKey[k])byKey[k]=0;byKey[k]+=parseFloat(p.amount)||0;});
+    var result=payments.slice();
+    clients.forEach(function(c){
+      if(!c.startDate||c.active===false)return;
+      var bm=billingMonths(c.billing);
+      var totalDue=(parseFloat(c.price)||0)*bm;
+      if(totalDue<=0)return;
+      var k=c.id+'_'+c.startDate;
+      if(!byKey[k]){
+        result.push({id:'_auto_'+c.id+'_'+c.startDate,clientId:c.id,cycleStart:c.startDate,amount:totalDue,date:c.startDate,notes:'(automàtic — sense pagaments registrats)',method:'other',_auto:true});
+      }
     });
-    var crv=paid.reduce(function(s,c){return s+th(c.price,c.billing,c.source,sp,pct);},0);
+    return result;
+  }
+
+  // Cash-based monthly revenue: sums actual payments dated in the month
+  function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
+    var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
+    var payments=loadPayments();
+    var effPays=effectivePayments(clients,payments);
+    var paysInMo=effPays.filter(function(p){if(!p.date)return false;var d=new Date(p.date);return d.getFullYear()===yr&&d.getMonth()===mo;});
+    // Each payment: apply commission for its client's source
+    var crv=0;
+    var clientsSet={};
+    paysInMo.forEach(function(p){
+      var amt=parseFloat(p.amount)||0;
+      var c=clientMap[p.clientId];
+      var take=amt;
+      if(c){
+        var com=window._nf_getSourcePct?window._nf_getSourcePct(c.source):null;
+        if(com==null&&c.source===sp)com=Math.round((1-pct)*100);
+        if(com!=null&&com>0)take=amt*(100-com)/100;
+        clientsSet[c.id]=c;
+      }
+      crv+=take;
+    });
+    // Distinct clients that paid this month (for display)
+    var paid=Object.keys(clientsSet).map(function(k){return clientsSet[k];});
     var arv=antrop.filter(function(a){var d=new Date(a.date);return d.getFullYear()===yr&&d.getMonth()===mo;}).reduce(function(s,a){return s+(parseFloat(a.price)||0);},0);
-    return{total:crv+arv,clients:paid,antrop:arv};
+    return{total:crv+arv,clients:paid,antrop:arv,paymentsInMonth:paysInMo};
   }
 
   function render(){
@@ -1424,21 +1459,26 @@ CAPACIDADES QUE TIENES:
     function srcColor(name){if(window._nf_getSourceColor){var c=window._nf_getSourceColor(name);if(c)return c;}if(DEF_SRC[name])return DEF_SRC[name];return '#94a3b8';}
     function srcCommission(source){if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return cp;}if(source===sp)return Math.round((1-pct)*100);return 0;}
 
-    // "Per origen" breakdown
+    // "Per origen" breakdown — based on ACTUAL CASH PAYMENTS this month
+    var clientMapForOrigin={};clients.forEach(function(c){clientMapForOrigin[c.id]=c;});
     var byOrigin={};
-    selData.clients.forEach(function(c){
+    (selData.paymentsInMonth||[]).forEach(function(p){
+      var amt=parseFloat(p.amount)||0;
+      var c=clientMapForOrigin[p.clientId];
+      if(!c)return;
       var rawSrc=c.source||'Other';
       var s=window._nf_displaySource?window._nf_displaySource(rawSrc):rawSrc;
-      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
-      var gross=(parseFloat(c.price)||0)*bm;
-      var take=th(c.price,c.billing,c.source,sp,pct);
-      if(!byOrigin[s])byOrigin[s]={count:0,gross:0,take:0,com:srcCommission(rawSrc)};
-      byOrigin[s].count++;byOrigin[s].gross+=gross;byOrigin[s].take+=take;
+      var com=srcCommission(rawSrc);
+      var take=com>0?amt*(100-com)/100:amt;
+      if(!byOrigin[s])byOrigin[s]={count:0,gross:0,take:0,com:com,clientIds:{}};
+      byOrigin[s].clientIds[c.id]=true;
+      byOrigin[s].gross+=amt;byOrigin[s].take+=take;
     });
+    Object.keys(byOrigin).forEach(function(k){byOrigin[k].count=Object.keys(byOrigin[k].clientIds).length;});
     var orderedSrc=Object.keys(byOrigin).sort(function(a,b){return byOrigin[b].take-byOrigin[a].take;});
     var byOriginHtml=orderedSrc.length?orderedSrc.map(function(s){
       var d=byOrigin[s],col=srcColor(s);
-      var dscount=d.com>0?'<div style="font-size:10px;color:var(--muted);margin-top:1px">de '+fmt(d.gross)+' <span style="color:'+col+';opacity:.85;font-weight:600">-'+d.com+'%</span></div>':'';
+      var dscount=d.com>0?'<div style="font-size:10px;color:var(--muted);margin-top:1px">cobrat '+fmt(d.gross)+' <span style="color:'+col+';opacity:.85;font-weight:600">-'+d.com+'%</span></div>':'';
       return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:'+col+'14;border:1px solid '+col+'30;margin-bottom:5px;gap:8px">'+
         '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
           '<span style="width:9px;height:9px;border-radius:50%;background:'+col+';flex-shrink:0;box-shadow:0 0 6px '+col+'80"></span>'+
@@ -1452,25 +1492,32 @@ CAPACIDADES QUE TIENES:
       '</div>';
     }).join(''):'';
 
-    // Individual client list with colored source badge
-    var clientsHtml=selData.clients.length?
-      selData.clients.map(function(c){
-        var paid=th(c.price,c.billing,c.source,sp,pct);
-        var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
-        var tag=bm===1?'mens.':bm===3?'trim.':bm===6?'sem.':'anual';
-        var rawSrc=c.source||'Other',src=window._nf_displaySource?window._nf_displaySource(rawSrc):rawSrc,col=srcColor(src);
+    // "Quién pagó" list — based on actual PAYMENTS in the month (one row per payment)
+    var METHOD_LBL={cash:'Efectiu',bizum:'Bizum',transfer:'Transferència',card:'Targeta',other:'Altres'};
+    var paysList=(selData.paymentsInMonth||[]).slice().sort(function(a,b){return (a.date||'').localeCompare(b.date||'');});
+    var clientsHtml=paysList.length?
+      paysList.map(function(p){
+        var amt=parseFloat(p.amount)||0;
+        var c=clientMapForOrigin[p.clientId];
+        var name=c?c.name:'(client eliminat)';
+        var rawSrc=(c&&c.source)||'Other',src=window._nf_displaySource?window._nf_displaySource(rawSrc):rawSrc,col=srcColor(src);
+        var com=srcCommission(rawSrc);
+        var take=com>0?amt*(100-com)/100:amt;
+        var autoLabel=p._auto?' <span style="color:var(--muted);font-size:9px;font-style:italic;font-weight:400">(autom.)</span>':'';
+        var methodTag=p.method&&METHOD_LBL[p.method]?'<span style="font-size:9px;color:var(--muted);background:var(--bg2);border-radius:4px;padding:1px 5px;margin-left:2px;font-weight:500">'+METHOD_LBL[p.method]+'</span>':'';
         return'<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 0;border-bottom:1px solid var(--bg3);gap:8px">'+
-          '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
+          '<div style="display:flex;align-items:center;gap:6px;min-width:0;flex:1;flex-wrap:wrap">'+
             '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:'+col+';flex-shrink:0"></span>'+
-            '<span style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name)+'</span>'+
+            '<span style="font-size:12px;color:var(--text2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(name)+autoLabel+'</span>'+
             '<span style="font-size:9px;color:'+col+';background:'+col+'18;border:1px solid '+col+'30;border-radius:9px;padding:1px 6px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;flex-shrink:0">'+esc(src)+'</span>'+
+            methodTag+
           '</div>'+
-          '<span style="font-size:12px;font-weight:700;color:'+col+';flex-shrink:0;white-space:nowrap">'+fmt(paid)+
-            '<span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:4px">'+tag+'</span>'+
+          '<span style="font-size:12px;font-weight:700;color:'+col+';flex-shrink:0;white-space:nowrap">'+fmt(take)+
+            (com>0?'<span style="font-size:10px;font-weight:400;color:var(--muted);margin-left:4px">de '+fmt(amt)+'</span>':'')+
           '</span>'+
         '</div>';
       }).join(''):
-      '<div style="font-size:12px;color:var(--muted);padding:8px 0">Ninguno este periodo</div>';
+      '<div style="font-size:12px;color:var(--muted);padding:8px 0">Cap pagament aquest mes</div>';
 
     var catHtml=CATS.map(function(cat){
       var n=list.filter(function(c){return c.months>=cat.min&&c.months<cat.max;}).length;
@@ -2251,12 +2298,18 @@ CAPACIDADES QUE TIENES:
     var barCol=pct>=100?'#34d399':pct>=50?'#4d9cf8':'#f59e0b';
     var endDate=client.renewalDate||cycleEnd(cycle,client.billing);
 
+    var METHOD_LABELS={cash:'Efectiu',bizum:'Bizum',transfer:'Transferència',card:'Targeta',other:'Altres'};
+    var METHOD_COLORS={cash:'#34d399',bizum:'#06b6d4',transfer:'#a78bfa',card:'#f59e0b',other:'#94a3b8'};
     var paymentList=thisCycle.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');}).map(function(p){
       var rem=p.reminderDate?'<div style="font-size:11px;color:#f59e0b;margin-top:3px">🔔 Recordatori: '+fmtD(p.reminderDate)+'</div>':'';
       var notes=p.notes?'<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">'+esc(p.notes)+'</div>':'';
+      var mt=p.method||'other';
+      var mlabel=METHOD_LABELS[mt]||'Altres';
+      var mcol=METHOD_COLORS[mt]||'#94a3b8';
+      var methodBadge='<span style="display:inline-block;font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.04em;color:'+mcol+';background:'+mcol+'22;border:1px solid '+mcol+'44;border-radius:4px;padding:1px 6px;margin-left:7px;vertical-align:middle">'+mlabel+'</span>';
       return '<div style="display:flex;justify-content:space-between;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--bg3)">'+
         '<div style="flex:1">'+
-          '<div style="font-size:13px;color:var(--text2)"><b style="color:var(--text);font-weight:700">'+fmtE(p.amount)+'</b> <span style="color:var(--muted);font-size:11px;margin-left:6px">'+fmtD(p.date)+'</span></div>'+
+          '<div style="font-size:13px;color:var(--text2)"><b style="color:var(--text);font-weight:700">'+fmtE(p.amount)+'</b> <span style="color:var(--muted);font-size:11px;margin-left:6px">'+fmtD(p.date)+'</span>'+methodBadge+'</div>'+
           notes+rem+
         '</div>'+
         '<button data-pdel="'+p.id+'" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:14px;padding:4px 6px;line-height:1" title="Eliminar">×</button>'+
@@ -2273,8 +2326,18 @@ CAPACIDADES QUE TIENES:
           '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Data</label>'+
             '<input id="_nf_pn_dt" type="date" value="'+ymd()+'" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '</div>'+
-        '<div style="margin-bottom:8px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Notes (opcional)</label>'+
-          '<input id="_nf_pn_nt" type="text" placeholder="ex: 1r plazo, transferencia..." style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
+        '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
+          '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Mètode de pagament</label>'+
+            '<select id="_nf_pn_mt" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none">'+
+              '<option value="cash">Efectiu</option>'+
+              '<option value="bizum">Bizum</option>'+
+              '<option value="transfer">Transferència</option>'+
+              '<option value="card">Targeta</option>'+
+              '<option value="other">Altres</option>'+
+            '</select></div>'+
+          '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Concepte (opcional)</label>'+
+            '<input id="_nf_pn_nt" type="text" placeholder="ex: 1r plazo, paga i senyal..." style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
+        '</div>'+
         '<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Recordatori per propera quota (opcional)</label>'+
           '<input id="_nf_pn_rem" type="date" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '<div style="display:flex;gap:6px;justify-content:flex-end">'+
@@ -2328,7 +2391,7 @@ CAPACIDADES QUE TIENES:
     if(fullBtn)fullBtn.onclick=function(){
       if(!confirm('Marcar com a totalment pagat ('+fmtE(remaining)+')?'))return;
       var all=loadAll();
-      all.push({id:genId(),clientId:client.id,cycleStart:cycle,amount:remaining,date:ymd(),notes:'Pagat completament',reminderDate:''});
+      all.push({id:genId(),clientId:client.id,cycleStart:cycle,amount:remaining,date:ymd(),notes:'Pagat completament',method:'other',reminderDate:''});
       saveAll(all);
       renderSection(el);
     };
@@ -2341,11 +2404,12 @@ CAPACIDADES QUE TIENES:
       var amt=parseFloat((document.getElementById('_nf_pn_amt')||{}).value);
       var dt=(document.getElementById('_nf_pn_dt')||{}).value;
       var nt=((document.getElementById('_nf_pn_nt')||{}).value||'').trim();
+      var mt=((document.getElementById('_nf_pn_mt')||{}).value||'cash');
       var rem=(document.getElementById('_nf_pn_rem')||{}).value;
       if(isNaN(amt)||amt<=0){var x=document.getElementById('_nf_pn_amt');if(x){x.style.borderColor='#f87171';x.focus();}return;}
       if(!dt){dt=ymd();}
       var all=loadAll();
-      all.push({id:genId(),clientId:client.id,cycleStart:cycle,amount:amt,date:dt,notes:nt,reminderDate:rem||''});
+      all.push({id:genId(),clientId:client.id,cycleStart:cycle,amount:amt,date:dt,notes:nt,method:mt,reminderDate:rem||''});
       saveAll(all);
       _addOpen=false;
       renderSection(el);
