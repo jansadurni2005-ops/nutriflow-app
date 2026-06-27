@@ -1354,12 +1354,19 @@ CAPACIDADES QUE TIENES:
 
   // Build effective payments: real registered payments + auto-generated for clients
   // whose current cycle has NO payments registered yet (treated as fully paid on startDate)
+  // CRITICAL: auto-payments are ONLY generated for clients whose cycle has ALREADY STARTED
+  // Future-startDate clients (reservations/deposits) do NOT get auto-payments — their
+  // real cash is whatever the user registers manually
   function effectivePayments(clients,payments){
+    var todayStr=new Date().toISOString().slice(0,10);
     var byKey={};
     payments.forEach(function(p){var k=p.clientId+'_'+p.cycleStart;if(!byKey[k])byKey[k]=0;byKey[k]+=parseFloat(p.amount)||0;});
     var result=payments.slice();
     clients.forEach(function(c){
       if(!c.startDate||c.active===false)return;
+      // Skip clients whose service hasn't started yet (deposits/reservations should be
+      // entered manually; we don't assume they paid in full)
+      if(c.startDate>todayStr)return;
       var bm=billingMonths(c.billing);
       var totalDue=(parseFloat(c.price)||0)*bm;
       if(totalDue<=0)return;
@@ -2581,9 +2588,10 @@ CAPACIDADES QUE TIENES:
     var clientByName={};
     clients.forEach(function(c){if(c.active!==false&&c.name)clientByName[c.name]=c;});
     // Always clear old badges, then re-add (React-resistant)
-    document.querySelectorAll('[data-nf-pend-bd]').forEach(function(b){b.remove();});
+    document.querySelectorAll('[data-nf-pend-bd],[data-nf-rsv-bd]').forEach(function(b){b.remove();});
     if(!Object.keys(clientByName).length)return;
     var all=loadAll();
+    var todayStr=new Date().toISOString().slice(0,10);
     var walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT,null,false);
     var nodes=[];var n;
     while((n=walker.nextNode()))nodes.push(n);
@@ -2596,28 +2604,46 @@ CAPACIDADES QUE TIENES:
       visited.add(row);
       var c=clientByName[name];
       var clientPayments=all.filter(function(p){return p.clientId===c.id&&p.cycleStart===c.startDate;});
-      // Only show badge for PARTIAL payments: there must be at least one registered payment
-      // and the total paid must be less than the total due. Clients with no payments registered
-      // are assumed paid-in-full (default state).
-      if(clientPayments.length===0)return;
       var paid=clientPayments.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
       var totalDue=(parseFloat(c.price)||0)*billingMonths(c.billing);
-      if(totalDue<=0||paid>=totalDue-0.01||paid<=0)return;
-      var remaining=totalDue-paid;
-      var pct=Math.round(paid/totalDue*100);
-      var badge=document.createElement('span');
-      badge.setAttribute('data-nf-pend-bd','1');
-      badge.className='nf-pend-badge';
-      badge.title='Pagament parcial: '+fmtE(remaining)+' pendent ('+pct+'% cobrat de '+fmtE(totalDue)+')';
-      badge.style.cssText='display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.55);color:#fca5a5;font-size:10px;font-weight:800;margin-left:6px;cursor:help;flex-shrink:0;vertical-align:middle;font-family:system-ui,sans-serif;line-height:1';
-      badge.innerHTML='!';
+      var isFuture=c.startDate&&c.startDate>todayStr;
+      var badges=[];
+
+      // RESERVAT badge for future-startDate clients
+      if(isFuture){
+        var rsvCol=paid>0?'#06b6d4':'#a78bfa';
+        var rsvLbl=paid>0?'RESERVAT':'PER COMENÇAR';
+        var rsvTitle=paid>0
+          ?'Servei reservat. Comença el '+c.startDate+'. Pagat '+fmtE(paid)+' de '+fmtE(totalDue)
+          :'Servei per començar el '+c.startDate+'. Sense pagaments encara.';
+        var rsv=document.createElement('span');
+        rsv.setAttribute('data-nf-rsv-bd','1');
+        rsv.title=rsvTitle;
+        rsv.style.cssText='display:inline-flex;align-items:center;justify-content:center;height:14px;padding:0 6px;border-radius:7px;background:'+rsvCol+'22;border:1px solid '+rsvCol+'55;color:'+rsvCol+';font-size:8px;font-weight:800;letter-spacing:.04em;margin-left:6px;cursor:help;flex-shrink:0;vertical-align:middle;font-family:system-ui,sans-serif;line-height:1';
+        rsv.textContent=rsvLbl;
+        badges.push(rsv);
+      }
+
+      // PARTIAL PAYMENT badge (only for clients whose service has started)
+      if(!isFuture&&clientPayments.length>0&&totalDue>0&&paid<totalDue-0.01&&paid>0){
+        var remaining=totalDue-paid;
+        var pct=Math.round(paid/totalDue*100);
+        var bd=document.createElement('span');
+        bd.setAttribute('data-nf-pend-bd','1');
+        bd.className='nf-pend-badge';
+        bd.title='Pagament parcial: '+fmtE(remaining)+' pendent ('+pct+'% cobrat de '+fmtE(totalDue)+')';
+        bd.style.cssText='display:inline-flex;align-items:center;justify-content:center;width:14px;height:14px;border-radius:50%;background:rgba(239,68,68,0.18);border:1px solid rgba(239,68,68,0.55);color:#fca5a5;font-size:10px;font-weight:800;margin-left:6px;cursor:help;flex-shrink:0;vertical-align:middle;font-family:system-ui,sans-serif;line-height:1';
+        bd.innerHTML='!';
+        badges.push(bd);
+      }
+
+      if(!badges.length)return;
+      var target=row;
       if(row.tagName==='TR'){
         var cells=row.cells||row.querySelectorAll('td');
-        if(cells.length){cells[cells.length-1].appendChild(badge);}
-        else{row.appendChild(badge);}
-      }else{
-        row.appendChild(badge);
+        if(cells.length)target=cells[cells.length-1];
       }
+      badges.forEach(function(b){target.appendChild(b);});
     });
   }
   setInterval(decorateClientRows,1500);
