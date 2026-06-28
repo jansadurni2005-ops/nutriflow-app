@@ -1388,30 +1388,70 @@ CAPACIDADES QUE TIENES:
     return result;
   }
 
-  // ─── GLOBAL CASH HELPERS (used by patched native React KPIs) ───
-  // Computes total cash received (take-home, with commission applied) for a given month
-  // R is the take-home function provided by React component (applies commission)
+  // ─── GLOBAL CASH HELPERS ───
+  // Compute current cycle start for a client based on month-arithmetic.
+  // The current cycle is the most recent cycle that started <= today.
+  function currentCycleStart(client, refDate){
+    if(!client.startDate)return null;
+    var bm=billingMonths(client.billing);
+    var cs=new Date(client.startDate);cs.setHours(0,0,0,0);
+    var ref=refDate||new Date();
+    var safety=0;
+    while(safety++<240){
+      var next=new Date(cs);next.setMonth(next.getMonth()+bm);
+      if(next>ref)break;
+      cs=next;
+    }
+    return cs;
+  }
+
+  // Computes net cash (with R commission applied) for given year+month
+  // Logic: for each active client:
+  //  - If their current cycle started in this month → count their cycle take-home,
+  //    using real registered payments if any exist, otherwise full cycle amount
+  //  - Otherwise → count only real payments dated this month (deposits etc.)
+  function _cashForMonth(clients,R,yr,mo,gross){
+    var refDate=new Date(yr,mo,28);refDate.setHours(0,0,0,0); // end-of-month reference
+    var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
+    var payments=loadPayments();
+    var total=0;
+    clients.forEach(function(c){
+      if(c.active===false||!c.startDate)return;
+      var bm=billingMonths(c.billing);
+      var cycleTotal=(parseFloat(c.price)||0)*bm;
+      // Real payments by this client dated in this month
+      var realInMonth=payments.filter(function(p){
+        return p.clientId===c.id&&p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
+      });
+      var realSum=realInMonth.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+
+      var cs=currentCycleStart(c,refDate);
+      var cycleStartedThisMonth=cs&&cs.getFullYear()===yr&&cs.getMonth()===mo;
+
+      var amtToCount=0;
+      if(cycleStartedThisMonth){
+        // Cycle is in this month → use real payments if any, else full cycle
+        amtToCount=realSum>0?realSum:cycleTotal;
+      }else{
+        // Cycle not this month → only count real payments dated this month
+        amtToCount=realSum;
+      }
+      if(amtToCount<=0)return;
+      total+=(gross||!R)?amtToCount:R(amtToCount,c.source);
+    });
+    return total;
+  }
+
   window._nf_cashThisMonth=function(clients,R){
-    var payments=loadPayments();
-    var effPays=effectivePayments(clients,payments);
     var nw=new Date();
-    var mStr=String(nw.getFullYear())+'-'+(nw.getMonth()<9?'0':'')+(nw.getMonth()+1);
-    var cMap={};clients.forEach(function(c){cMap[c.id]=c;});
-    return effPays.filter(function(p){return p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;}).reduce(function(s,p){
-      var amt=parseFloat(p.amount)||0;
-      var c=cMap[p.clientId];
-      if(!c)return s+amt;
-      return s+(R?R(amt,c.source):amt);
-    },0);
+    return _cashForMonth(clients,R,nw.getFullYear(),nw.getMonth(),false);
   };
-  // Gross (no commission) variant
   window._nf_cashGrossThisMonth=function(clients){
-    var payments=loadPayments();
-    var effPays=effectivePayments(clients,payments);
     var nw=new Date();
-    var mStr=String(nw.getFullYear())+'-'+(nw.getMonth()<9?'0':'')+(nw.getMonth()+1);
-    return effPays.filter(function(p){return p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;}).reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+    return _cashForMonth(clients,null,nw.getFullYear(),nw.getMonth(),true);
   };
+  window._nf_cashForMonth=_cashForMonth;
+  window._nf_currentCycleStart=currentCycleStart;
 
   // Cash-based monthly revenue: sums actual payments dated in the month
   function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
