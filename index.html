@@ -1358,21 +1358,31 @@ CAPACIDADES QUE TIENES:
   // Future-startDate clients (reservations/deposits) do NOT get auto-payments — their
   // real cash is whatever the user registers manually
   function effectivePayments(clients,payments){
-    var todayStr=new Date().toISOString().slice(0,10);
+    var today=new Date();today.setHours(0,0,0,0);
+    var todayStr=today.toISOString().slice(0,10);
     var byKey={};
     payments.forEach(function(p){var k=p.clientId+'_'+p.cycleStart;if(!byKey[k])byKey[k]=0;byKey[k]+=parseFloat(p.amount)||0;});
     var result=payments.slice();
     clients.forEach(function(c){
       if(!c.startDate||c.active===false)return;
-      // Skip clients whose service hasn't started yet (deposits/reservations should be
-      // entered manually; we don't assume they paid in full)
+      // Skip clients whose service hasn't started yet (reservations entered manually)
       if(c.startDate>todayStr)return;
       var bm=billingMonths(c.billing);
       var totalDue=(parseFloat(c.price)||0)*bm;
       if(totalDue<=0)return;
-      var k=c.id+'_'+c.startDate;
-      if(!byKey[k]){
-        result.push({id:'_auto_'+c.id+'_'+c.startDate,clientId:c.id,cycleStart:c.startDate,amount:totalDue,date:c.startDate,notes:'(automàtic — sense pagaments registrats)',method:'other',_auto:true});
+      var dm=c.billing==='quarterly'?90:c.billing==='semiannual'?180:c.billing==='annual'?365:30;
+      // Generate auto-payments for EVERY cycle elapsed since startDate (until today)
+      // This ensures that even if the user hasn't clicked "Renovar", the cash is still
+      // attributed to the right month based on the cycle rhythm.
+      var cycleStart=new Date(c.startDate);cycleStart.setHours(0,0,0,0);
+      var safety=0;
+      while(cycleStart.getTime()<=today.getTime()&&safety++<120){
+        var cycleStartStr=cycleStart.toISOString().slice(0,10);
+        var k=c.id+'_'+cycleStartStr;
+        if(!byKey[k]){
+          result.push({id:'_auto_'+c.id+'_'+cycleStartStr,clientId:c.id,cycleStart:cycleStartStr,amount:totalDue,date:cycleStartStr,notes:'(automàtic — sense pagaments registrats)',method:'other',_auto:true});
+        }
+        cycleStart.setDate(cycleStart.getDate()+dm);
       }
     });
     return result;
