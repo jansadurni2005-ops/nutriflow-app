@@ -1388,22 +1388,40 @@ CAPACIDADES QUE TIENES:
     return result;
   }
 
-  // ─── PURE CASH HELPERS — ONLY registered payments, NO auto-anything ───
-  // RULE: totalIngressos = SUM(payment.amount) where payment.date is in given month
-  // No assumed payments, no cycle logic, no auto-fill. Pure registered cash only.
+  // ─── CASH HELPERS — Per client this month: real payments override cycle take-home ───
+  // RULE per client:
+  //   - If client has REAL payment(s) registered dated this month → sum them (e.g., Pol 50€)
+  //   - Else if client's cycle started this month (= they should pay this month) → cycle take-home
+  //   - Else (cycle is past/future, no real payments dated this month) → 0
   function _cashForMonth(clients,R,yr,mo,gross){
+    var refDate=new Date(yr,mo,28);refDate.setHours(0,0,0,0);
     var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
     var payments=loadPayments();
-    var cMap={};clients.forEach(function(c){cMap[c.id]=c;});
-    return payments.filter(function(p){
-      return p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
-    }).reduce(function(s,p){
-      var amt=parseFloat(p.amount)||0;
-      if(amt<=0)return s;
-      var c=cMap[p.clientId];
-      if(!c)return s+amt; // orphan payment, count as-is (no source = no commission)
-      return s+((gross||!R)?amt:R(amt,c.source));
-    },0);
+    var total=0;
+    clients.forEach(function(c){
+      if(c.active===false||!c.startDate)return;
+      // Real payments registered for this client dated in target month
+      var realInMonth=payments.filter(function(p){
+        return p.clientId===c.id&&p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
+      });
+      var realSum=realInMonth.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+      var amtToCount=0;
+      if(realSum>0){
+        // Real registered payments take priority — use exactly what's recorded
+        amtToCount=realSum;
+      }else{
+        // No real payments registered — check if cycle is in this month
+        var bm=billingMonths(c.billing);
+        var cycleTotal=(parseFloat(c.price)||0)*bm;
+        if(cycleTotal>0){
+          var cs=currentCycleStart(c,refDate);
+          if(cs&&cs.getFullYear()===yr&&cs.getMonth()===mo)amtToCount=cycleTotal;
+        }
+      }
+      if(amtToCount<=0)return;
+      total+=(gross||!R)?amtToCount:R(amtToCount,c.source);
+    });
+    return total;
   }
 
   window._nf_cashThisMonth=function(clients,R){
@@ -1443,12 +1461,13 @@ CAPACIDADES QUE TIENES:
     return _cashForMonth([client],R,nw.getFullYear(),nw.getMonth(),false);
   };
 
-  // PURE CASH: only registered payments dated in the given month, NO auto
+  // HYBRID CASH: real registered payments override; missing payments = cycle take-home
   function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
     var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
     var payments=loadPayments();
+    var effPays=effectivePayments(clients,payments);
     var moStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
-    var paysInMo=payments.filter(function(p){
+    var paysInMo=effPays.filter(function(p){
       if(!p.date||typeof p.date!=='string')return false;
       return p.date.slice(0,7)===moStr;
     });
