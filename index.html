@@ -1360,27 +1360,36 @@ CAPACIDADES QUE TIENES:
   function effectivePayments(clients,payments){
     var today=new Date();today.setHours(0,0,0,0);
     var todayStr=today.toISOString().slice(0,10);
-    var byKey={};
-    payments.forEach(function(p){var k=p.clientId+'_'+p.cycleStart;if(!byKey[k])byKey[k]=0;byKey[k]+=parseFloat(p.amount)||0;});
-    var result=payments.slice();
+    // Map of valid (active) clients — orphan payments to non-existent clients are filtered out
+    var clientMap={};
+    clients.forEach(function(c){if(c.active!==false)clientMap[c.id]=c;});
+    // Track real payments per client per month (YYYY-MM), so auto-payments don't
+    // duplicate a month where the client already has real cash registered
+    var realByClientMonth={};
+    payments.forEach(function(p){
+      if(!clientMap[p.clientId])return;
+      if(!p.date||typeof p.date!=='string')return;
+      var k=p.clientId+'_'+p.date.slice(0,7);
+      if(!realByClientMonth[k])realByClientMonth[k]=true;
+    });
+    // Result starts with all VALID real payments (orphans skipped → no "(client eliminat)")
+    var result=[];
+    payments.forEach(function(p){if(clientMap[p.clientId])result.push(p);});
+    // For each active client, iterate cycles. Generate auto ONLY if no real payment
+    // exists for that client in that cycle's month.
     clients.forEach(function(c){
-      if(!c.startDate||c.active===false)return;
-      // Skip clients whose service hasn't started yet (reservations entered manually)
-      if(c.startDate>todayStr)return;
+      if(!c.startDate||c.active===false||c.startDate>todayStr)return;
       var bm=billingMonths(c.billing);
       var totalDue=(parseFloat(c.price)||0)*bm;
       if(totalDue<=0)return;
       var dm=c.billing==='quarterly'?90:c.billing==='semiannual'?180:c.billing==='annual'?365:30;
-      // Generate auto-payments for EVERY cycle elapsed since startDate (until today)
-      // This ensures that even if the user hasn't clicked "Renovar", the cash is still
-      // attributed to the right month based on the cycle rhythm.
       var cycleStart=new Date(c.startDate);cycleStart.setHours(0,0,0,0);
       var safety=0;
       while(cycleStart.getTime()<=today.getTime()&&safety++<120){
         var cycleStartStr=cycleStart.toISOString().slice(0,10);
-        var k=c.id+'_'+cycleStartStr;
-        if(!byKey[k]){
-          result.push({id:'_auto_'+c.id+'_'+cycleStartStr,clientId:c.id,cycleStart:cycleStartStr,amount:totalDue,date:cycleStartStr,notes:'(automàtic — sense pagaments registrats)',method:'other',_auto:true});
+        var monthKey=c.id+'_'+cycleStartStr.slice(0,7);
+        if(!realByClientMonth[monthKey]){
+          result.push({id:'_auto_'+c.id+'_'+cycleStartStr,clientId:c.id,cycleStart:cycleStartStr,amount:totalDue,date:cycleStartStr,notes:'(automàtic)',method:'other',_auto:true});
         }
         cycleStart.setDate(cycleStart.getDate()+dm);
       }
