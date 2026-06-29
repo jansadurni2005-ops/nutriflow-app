@@ -1388,10 +1388,41 @@ CAPACIDADES QUE TIENES:
     return result;
   }
 
-  // ─── GLOBAL CASH HELPERS ───
-  // Compute current cycle start for a client based on month-arithmetic.
-  // The current cycle is the most recent cycle that started <= today.
-  function currentCycleStart(client, refDate){
+  // ─── PURE CASH HELPERS — ONLY registered payments, NO auto-anything ───
+  // RULE: totalIngressos = SUM(payment.amount) where payment.date is in given month
+  // No assumed payments, no cycle logic, no auto-fill. Pure registered cash only.
+  function _cashForMonth(clients,R,yr,mo,gross){
+    var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
+    var payments=loadPayments();
+    var cMap={};clients.forEach(function(c){cMap[c.id]=c;});
+    return payments.filter(function(p){
+      return p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
+    }).reduce(function(s,p){
+      var amt=parseFloat(p.amount)||0;
+      if(amt<=0)return s;
+      var c=cMap[p.clientId];
+      if(!c)return s+amt; // orphan payment, count as-is (no source = no commission)
+      return s+((gross||!R)?amt:R(amt,c.source));
+    },0);
+  }
+
+  window._nf_cashThisMonth=function(clients,R){
+    var nw=new Date();
+    return _cashForMonth(clients,R,nw.getFullYear(),nw.getMonth(),false);
+  };
+  window._nf_cashGrossThisMonth=function(clients){
+    var nw=new Date();
+    return _cashForMonth(clients,null,nw.getFullYear(),nw.getMonth(),true);
+  };
+  window._nf_cashForMonth=_cashForMonth;
+  window._nf_clientCashThisMonth=function(client,R){
+    if(!client)return 0;
+    var nw=new Date();
+    return _cashForMonth([client],R,nw.getFullYear(),nw.getMonth(),false);
+  };
+
+  // currentCycleStart kept for compatibility (used elsewhere)
+  function currentCycleStart(client,refDate){
     if(!client.startDate)return null;
     var bm=billingMonths(client.billing);
     var cs=new Date(client.startDate);cs.setHours(0,0,0,0);
@@ -1404,53 +1435,6 @@ CAPACIDADES QUE TIENES:
     }
     return cs;
   }
-
-  // Computes net cash (with R commission applied) for given year+month
-  // Logic: for each active client:
-  //  - If their current cycle started in this month → count their cycle take-home,
-  //    using real registered payments if any exist, otherwise full cycle amount
-  //  - Otherwise → count only real payments dated this month (deposits etc.)
-  function _cashForMonth(clients,R,yr,mo,gross){
-    var refDate=new Date(yr,mo,28);refDate.setHours(0,0,0,0); // end-of-month reference
-    var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
-    var payments=loadPayments();
-    var total=0;
-    clients.forEach(function(c){
-      if(c.active===false||!c.startDate)return;
-      var bm=billingMonths(c.billing);
-      var cycleTotal=(parseFloat(c.price)||0)*bm;
-      // Real payments by this client dated in this month
-      var realInMonth=payments.filter(function(p){
-        return p.clientId===c.id&&p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
-      });
-      var realSum=realInMonth.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
-
-      var cs=currentCycleStart(c,refDate);
-      var cycleStartedThisMonth=cs&&cs.getFullYear()===yr&&cs.getMonth()===mo;
-
-      var amtToCount=0;
-      if(cycleStartedThisMonth){
-        // Cycle is in this month → use real payments if any, else full cycle
-        amtToCount=realSum>0?realSum:cycleTotal;
-      }else{
-        // Cycle not this month → only count real payments dated this month
-        amtToCount=realSum;
-      }
-      if(amtToCount<=0)return;
-      total+=(gross||!R)?amtToCount:R(amtToCount,c.source);
-    });
-    return total;
-  }
-
-  window._nf_cashThisMonth=function(clients,R){
-    var nw=new Date();
-    return _cashForMonth(clients,R,nw.getFullYear(),nw.getMonth(),false);
-  };
-  window._nf_cashGrossThisMonth=function(clients){
-    var nw=new Date();
-    return _cashForMonth(clients,null,nw.getFullYear(),nw.getMonth(),true);
-  };
-  window._nf_cashForMonth=_cashForMonth;
   window._nf_currentCycleStart=currentCycleStart;
   // Single-client cash this month (with commission applied via R)
   window._nf_clientCashThisMonth=function(client,R){
@@ -1459,14 +1443,12 @@ CAPACIDADES QUE TIENES:
     return _cashForMonth([client],R,nw.getFullYear(),nw.getMonth(),false);
   };
 
-  // Cash-based monthly revenue: sums actual payments dated in the month
+  // PURE CASH: only registered payments dated in the given month, NO auto
   function monthRev(yr,mo,clients,antrop,sp,pct,isCur){
     var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
     var payments=loadPayments();
-    var effPays=effectivePayments(clients,payments);
-    // Use STRING-based date matching to avoid any timezone issues
     var moStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
-    var paysInMo=effPays.filter(function(p){
+    var paysInMo=payments.filter(function(p){
       if(!p.date||typeof p.date!=='string')return false;
       return p.date.slice(0,7)===moStr;
     });
