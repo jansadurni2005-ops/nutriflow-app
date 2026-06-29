@@ -1609,7 +1609,9 @@ CAPACIDADES QUE TIENES:
         var c=clientMapForOrigin[p.clientId];
         var name=c?c.name:'(client eliminat)';
         var rawSrc=(c&&c.source)||'Other',src=window._nf_displaySource?window._nf_displaySource(rawSrc):rawSrc,col=srcColor(src);
-        var com=srcCommission(rawSrc);
+        // Apply commission ONLY for auto-generated cycle take-home; real registered
+        // payments are shown as-is (cash that already arrived to your account)
+        var com=p._auto?srcCommission(rawSrc):0;
         var take=com>0?amt*(100-com)/100:amt;
         var autoLabel=p._auto?' <span style="color:var(--muted);font-size:9px;font-style:italic;font-weight:400">(autom.)</span>':'';
         var methodTag=p.method&&METHOD_LBL[p.method]?'<span style="font-size:9px;color:var(--muted);background:var(--bg2);border-radius:4px;padding:1px 5px;margin-left:2px;font-weight:500">'+METHOD_LBL[p.method]+'</span>':'';
