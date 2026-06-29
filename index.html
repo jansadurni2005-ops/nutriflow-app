@@ -2410,7 +2410,17 @@ CAPACIDADES QUE TIENES:
     var totalDue=(parseFloat(client.price)||0)*bm;
     var cycle=client.startDate||ymd();
     var all=loadAll();
-    var thisCycle=all.filter(function(p){return p.clientId===client.id&&p.cycleStart===cycle;});
+    // Show payments by DATE range of current cycle (not cycleStart equality) so
+    // historical/orphan payments with mismatched cycleStart still appear and can be
+    // edited or deleted
+    var endDateStr=cycleEnd(cycle,client.billing);
+    var thisCycle=all.filter(function(p){
+      if(p.clientId!==client.id)return false;
+      if(p.cycleStart===cycle)return true;
+      // Fallback: include if payment date falls within current cycle's range
+      if(p.date&&typeof p.date==='string'&&p.date>=cycle&&p.date<endDateStr)return true;
+      return false;
+    });
     var paid=thisCycle.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
     var remaining=Math.max(0,totalDue-paid);
     var pct=totalDue>0?Math.min(100,Math.round(paid/totalDue*100)):0;
