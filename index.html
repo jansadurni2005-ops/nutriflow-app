@@ -1390,8 +1390,9 @@ CAPACIDADES QUE TIENES:
 
   // ─── CASH HELPERS — Per client this month ───
   // RULE per client:
-  //   - If real registered payment(s) dated this month → sum AS-IS (no commission;
-  //     these are euros that already entered your bank account)
+  //   - Only count REAL payments registered for the client's CURRENT cycle dated this
+  //     month (orphan duplicates from old cycles are ignored)
+  //   - If real cash exists → sum AS-IS (no commission applied to partials)
   //   - Else if cycle started this month → assume full cycle paid (apply commission R)
   //   - Else → 0
   function _cashForMonth(clients,R,yr,mo,gross){
@@ -1401,8 +1402,15 @@ CAPACIDADES QUE TIENES:
     var total=0;
     clients.forEach(function(c){
       if(c.active===false||!c.startDate)return;
+      // Compute current cycle start for this client (to match profile view)
+      var cs=currentCycleStart(c,refDate);
+      var csStr=cs?cs.toISOString().slice(0,10):c.startDate;
+      // Real payments registered for CURRENT cycle dated this month (dedup orphan cycles)
       var realInMonth=payments.filter(function(p){
-        return p.clientId===c.id&&p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
+        if(p.clientId!==c.id)return false;
+        if(!p.date||typeof p.date!=='string'||p.date.slice(0,7)!==mStr)return false;
+        // Accept payments matching current cycle OR original startDate (back-compat)
+        return p.cycleStart===csStr||p.cycleStart===c.startDate;
       });
       var realSum=realInMonth.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
       if(realSum>0){
@@ -1414,7 +1422,6 @@ CAPACIDADES QUE TIENES:
       var bm=billingMonths(c.billing);
       var cycleTotal=(parseFloat(c.price)||0)*bm;
       if(cycleTotal<=0)return;
-      var cs=currentCycleStart(c,refDate);
       if(!cs||cs.getFullYear()!==yr||cs.getMonth()!==mo)return;
       total+=(gross||!R)?cycleTotal:R(cycleTotal,c.source);
     });
@@ -1650,35 +1657,7 @@ CAPACIDADES QUE TIENES:
         momHtml+
       '</div>'+
 
-      // Diagnostic line + DUPLICATE DETECTOR (helps identify why totals are off)
-      (function(){
-        var realInSelMo=allPayments.filter(function(p){return p.date&&typeof p.date==='string'&&p.date.slice(0,7)===String(sel.yr)+'-'+(sel.mo<9?'0':'')+(sel.mo+1);});
-        var clientMapDg={};clients.forEach(function(cc){clientMapDg[cc.id]=cc;});
-        var byClient={};
-        realInSelMo.forEach(function(p){
-          if(!byClient[p.clientId])byClient[p.clientId]={count:0,sum:0};
-          byClient[p.clientId].count++;
-          byClient[p.clientId].sum+=parseFloat(p.amount)||0;
-        });
-        var dupes=Object.keys(byClient).filter(function(k){return byClient[k].count>1;});
-        var dupesHtml='';
-        if(dupes.length){
-          dupesHtml='<div style="background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.3);border-radius:8px;padding:8px 10px;margin-top:6px;font-size:11px;color:#fca5a5"><b>⚠ Atenció:</b> aquests clients tenen <b>més d’un pagament registrat aquest mes</b> (possibles duplicats):<br>';
-          dupes.forEach(function(k){
-            var c=clientMapDg[k];var name=c?c.name:'(client eliminat)';
-            dupesHtml+='• <b>'+esc(name)+'</b>: '+byClient[k].count+' pagaments · suma <b>'+fmt(byClient[k].sum)+'</b><br>';
-          });
-          dupesHtml+='<span style="font-size:10px;opacity:0.8">Obre el perfil del client → elimina amb × els pagaments duplicats.</span></div>';
-        }
-        var realSum=realInSelMo.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
-        return '<div style="font-size:10px;color:var(--muted);margin-bottom:14px">'+
-          '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'+
-            '<span>📊 <b style="color:var(--text2)">'+realPayCount+'</b> pagaments registrats al sistema (total <b style="color:var(--text2)">'+fmt(realPayTotal)+'</b>)</span>'+
-            '<span>·</span>'+
-            '<span><b style="color:var(--text2)">'+realInSelMo.length+'</b> pagaments reals al mes selecionat — suma <b style="color:var(--text2)">'+fmt(realSum)+'</b></span>'+
-          '</div>'+dupesHtml+
-        '</div>';
-      })()+
+      ''+
 
       // KPI cards
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">'+
