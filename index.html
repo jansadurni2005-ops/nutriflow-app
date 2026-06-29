@@ -1388,11 +1388,12 @@ CAPACIDADES QUE TIENES:
     return result;
   }
 
-  // ─── CASH HELPERS — Per client this month: real payments override cycle take-home ───
+  // ─── CASH HELPERS — Per client this month ───
   // RULE per client:
-  //   - If client has REAL payment(s) registered dated this month → sum them (e.g., Pol 50€)
-  //   - Else if client's cycle started this month (= they should pay this month) → cycle take-home
-  //   - Else (cycle is past/future, no real payments dated this month) → 0
+  //   - If real registered payment(s) dated this month → sum AS-IS (no commission;
+  //     these are euros that already entered your bank account)
+  //   - Else if cycle started this month → assume full cycle paid (apply commission R)
+  //   - Else → 0
   function _cashForMonth(clients,R,yr,mo,gross){
     var refDate=new Date(yr,mo,28);refDate.setHours(0,0,0,0);
     var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
@@ -1400,26 +1401,22 @@ CAPACIDADES QUE TIENES:
     var total=0;
     clients.forEach(function(c){
       if(c.active===false||!c.startDate)return;
-      // Real payments registered for this client dated in target month
       var realInMonth=payments.filter(function(p){
         return p.clientId===c.id&&p.date&&typeof p.date==='string'&&p.date.slice(0,7)===mStr;
       });
       var realSum=realInMonth.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
-      var amtToCount=0;
       if(realSum>0){
-        // Real registered payments take priority — use exactly what's recorded
-        amtToCount=realSum;
-      }else{
-        // No real payments registered — check if cycle is in this month
-        var bm=billingMonths(c.billing);
-        var cycleTotal=(parseFloat(c.price)||0)*bm;
-        if(cycleTotal>0){
-          var cs=currentCycleStart(c,refDate);
-          if(cs&&cs.getFullYear()===yr&&cs.getMonth()===mo)amtToCount=cycleTotal;
-        }
+        // Real cash — count AS-IS (commission only applies on the full cycle later)
+        total+=realSum;
+        return;
       }
-      if(amtToCount<=0)return;
-      total+=(gross||!R)?amtToCount:R(amtToCount,c.source);
+      // No real payments — auto cycle take-home if cycle starts this month
+      var bm=billingMonths(c.billing);
+      var cycleTotal=(parseFloat(c.price)||0)*bm;
+      if(cycleTotal<=0)return;
+      var cs=currentCycleStart(c,refDate);
+      if(!cs||cs.getFullYear()!==yr||cs.getMonth()!==mo)return;
+      total+=(gross||!R)?cycleTotal:R(cycleTotal,c.source);
     });
     return total;
   }
