@@ -1397,17 +1397,15 @@ CAPACIDADES QUE TIENES:
     return result;
   }
 
-  // ─── CASH HELPERS — Per client this month (consistent with panel display) ───
+  // ─── CASH HELPERS — Per client this month ───
   // RULE per client:
-  //   - Sum ALL real registered payments dated this month for the client (no cycleStart
-  //     filter — this matches what the panel "Quién pagó" shows; user can delete
-  //     duplicates from the client profile)
-  //   - If real sum > 0 → use it AS-IS (no commission applied; partials are cash that
+  //   - Sum ALL real registered payments dated this month for the client AS-IS
+  //   - If real sum > 0 → use it (no commission applied; partials are cash that
   //     has already entered the account)
-  //   - Else if cycle started this month → assume full cycle paid (apply commission R)
-  //   - Else → 0
+  //   - Else if client.startDate falls in target month (= you manually clicked
+  //     Renova or created the client this month) → assume full cycle paid
+  //   - Else → 0 (no auto-payment from theoretical cycle calculations)
   function _cashForMonth(clients,R,yr,mo,gross){
-    var refDate=new Date(yr,mo,28);refDate.setHours(0,0,0,0);
     var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
     var payments=loadPayments();
     var total=0;
@@ -1423,11 +1421,12 @@ CAPACIDADES QUE TIENES:
         total+=realSum;
         return;
       }
+      // Auto fires ONLY if the client's startDate is literally in the target month
+      // (i.e. you manually clicked Renova this month or just signed them up)
+      if(c.startDate.slice(0,7)!==mStr)return;
       var bm=billingMonths(c.billing);
       var cycleTotal=(parseFloat(c.price)||0)*bm;
       if(cycleTotal<=0)return;
-      var cs=currentCycleStart(c,refDate);
-      if(!cs||cs.getFullYear()!==yr||cs.getMonth()!==mo)return;
       total+=(gross||!R)?cycleTotal:R(cycleTotal,c.source);
     });
     return total;
