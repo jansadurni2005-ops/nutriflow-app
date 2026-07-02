@@ -573,7 +573,7 @@ CAPACIDADES QUE TIENES:
           0%,80%,100% { transform:scale(0.6); opacity:0.4; }
           40% { transform:scale(1); opacity:1; }
         }
-      `})]})}var GY=[{id:`overview`,label:`Resumen`,icon:`⊞`},{id:`leads`,label:`Leads`,icon:`◎`},{id:`clients`,label:`Clientes`,icon:`◉`},{id:`revenue`,label:`Ingresos`,icon:`▦`},{id:`antrop`,label:`Antrop`,icon:`◈`,extraOnly:!0},{id:`ads`,label:`Ads`,icon:`▲`},{id:`agenda`,label:`Agenda`,icon:`▣`},{id:`instagram`,label:`Instagram`,icon:`📸`}],KY=`jansadurni2005@gmail.com`,qY=[{id:`l1`,name:`Fernando`,source:`Other`,status:`Contacted`,note:`contactar demà dia 15`,date:`2026-04-14`},{id:`l2`,name:`Daniel Figueres`,source:`GEIEG`,status:`Lost`,note:`No te diners diu`,date:`2026-04-11`},{id:`l3`,name:`Jesús`,source:`GEIEG`,status:`New`,note:`Escriure'l el divendres`,date:`2026-04-10`},{id:`l4`,name:`Boulze berengere`,source:`GEIEG`,status:`Lost`,note:`S'ho està pensant ja ha pagat per antropometria`,date:`2026-04-09`},{id:`l5`,name:`Sandra montero`,source:`GEIEG`,status:`Lost`,note:`—`,date:`2026-04-08`},{id:`l6`,name:`Fill Josep Padilla`,source:`Referral`,status:`New`,note:`—`,date:`2026-04-03`}],JY=[{id:`c1`,name:`Dan Reyes`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-04-15`,renewalDate:`2026-07-14`,active:!0},{id:`c2`,name:`Aurèlia Teixidor`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-15`,renewalDate:`2026-07-14`,active:!0},{id:`c3`,name:`Anna Bonet`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-11`,renewalDate:`2026-07-10`,active:!0},{id:`c4`,name:`Anna Conde`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-09`,renewalDate:`2026-07-08`,active:!0},{id:`c5`,name:`Laura Tivau`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2026-03-21`,renewalDate:`2026-06-19`,active:!0},{id:`c6`,name:`Glòria Rodríguez`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-03-20`,renewalDate:`2026-06-18`,active:!0},{id:`c7`,name:`Pau Cargol`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-02-27`,renewalDate:`2026-05-28`,active:!0},{id:`c8`,name:`Mar Carreras`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-02-10`,renewalDate:`2026-05-11`,active:!0},{id:`c9`,name:`Josep Padilla`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-01-15`,renewalDate:`2026-04-15`,active:!0},{id:`c10`,name:`Cristina Vila`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2025-12-10`,renewalDate:`2026-03-10`,active:!0},{id:`c11`,name:`Raquel Torres`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2025-11-20`,renewalDate:`2026-02-18`,active:!0},{id:`c12`,name:`Montse Pujol`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-11-05`,renewalDate:`2026-02-03`,active:!0},{id:`c13`,name:`Eva Soler`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-10-15`,renewalDate:`2026-01-13`,active:!0},{id:`c14`,name:`Mireia Camps`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-10-01`,renewalDate:`2025-12-30`,active:!0}],YY=[{id:`a1`,client:`Pau Serra`,price:16.8,date:`2026-04-13`,notes:`—`},{id:`a2`,client:`Boulze Berangere`,price:21,date:`2026-04-09`,notes:`Geieg`},{id:`a3`,client:`Josep Padilla`,price:21,date:`2026-03-24`,notes:`—`},{id:`a4`,client:`Glòria Rodriguez`,price:21,date:`2026-03-19`,notes:`GEIEG`}];function XY({user:e,userConfig:t,onLogout:n}){let[r,i]=(0,v.useState)(`overview`),[a,o]=(0,v.useState)([]),[s,c]=(0,v.useState)([]),[l,u]=(0,v.useState)([]),[d,f]=(0,v.useState)([]),[p,m]=(0,v.useState)([]),[h,g]=(0,v.useState)(!1),[_,y]=(0,v.useState)(!1);(0,v.useEffect)(()=>{let t=e.email===KY,n=`nf_${e.email}_seeded`,r=localStorage.getItem(n),i=M(e.email,`leads`,null),a=M(e.email,`clients`,null),s=M(e.email,`antrop`,null);t&&!r?(o(i||qY),c(a||JY),u(s||YY),localStorage.setItem(n,`1`)):(o(i||[]),c(a||[]),u(s||[])),f(M(e.email,`campaigns`,[])),m(M(e.email,`lostClients`,[])),y(!0)},[e.email]),(0,v.useEffect)(()=>{_&&N(e.email,`leads`,a)},[a,_]),(0,v.useEffect)(()=>{_&&N(e.email,`clients`,s)},[s,_]),(0,v.useEffect)(()=>{_&&N(e.email,`antrop`,l)},[l,_]),(0,v.useEffect)(()=>{_&&N(e.email,`campaigns`,d)},[d,_]),(0,v.useEffect)(()=>{_&&N(e.email,`lostClients`,p)},[p,_]);let{start:b,end:x}=oe(),S=a.filter(e=>{let t=new Date(e.date);return t>=b&&t<=x}),C=S.length>0?Math.round(S.filter(e=>e.status===`Closed`).length/S.length*100):0,w=(0,v.useCallback)(e=>{c(t=>t.map(t=>{if(t.id!==e)return t;let n=new Date().toISOString().split(`T`)[0],r=le(t.billing||`quarterly`);return{...t,startDate:n,renewalDate:r}}))},[]),T=(0,v.useCallback)(e=>{c(t=>t.map(t=>t.id===e.id?{...t,active:!1}:t)),m(t=>[{...e,lostAt:new Date().toISOString().split(`T`)[0],reason:`no renovó`,type:`client`},...t])},[]),E=()=>{k(),n()},D=e.name?.split(` `)[0]||e.email.split(`@`)[0],O=e.email===`jansadurni2005@gmail.com`,A=t||{},j=O?`Dietista-Nutricionista`:A.professionLabel||A.customProfession||`Profesional`,ee=O?`GEIEG`:A.splitPartner||``,F=O?70:parseFloat(A.splitPercent)||100,I=O?!0:A.hasSplit||!1,te=O?21:parseInt(A.goalClients)||20,L=O?`Antrop`:A.extraServicesName===`Personalizado`?A.customExtraName||`Servicios`:A.extraServicesName||`Servicios`,ne=O?!0:A.hasExtraServices||!1,re=O?`€`:A.currency||`€`,ie=O?3e3:parseInt(A.goalRevenue)||2e3;return(0,P.jsxs)(`div`,{style:{minHeight:`100vh`,background:`var(--bg)`},children:[(0,P.jsxs)(`header`,{style:{display:`flex`,alignItems:`center`,justifyContent:`space-between`,padding:`14px 28px`,background:`var(--bg2)`,borderBottom:`1px solid var(--border)`,position:`sticky`,top:0,zIndex:50},children:[(0,P.jsxs)(`div`,{style:{display:`flex`,alignItems:`center`,gap:14},children:[(0,P.jsx)(`div`,{style:{width:36,height:36,borderRadius:10,background:`#3b82f6`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:800,fontSize:15,color:`#fff`},children:`N`}),(0,P.jsxs)(`div`,{children:[(0,P.jsxs)(`div`,{style:{fontSize:15,fontWeight:700,letterSpacing:`-0.01em`},children:[`Hola, `,D,` 👋`]}),(0,P.jsx)(`div`,{style:{fontSize:11,color:`var(--muted)`},children:j})]})]}),(0,P.jsxs)(`div`,{style:{display:`flex`,alignItems:`center`,gap:12},children:[(0,P.jsx)(`button`,{onClick:()=>g(!0),style:{background:`none`,border:`none`,color:`var(--muted)`,cursor:`pointer`,fontSize:13,padding:`6px 10px`,borderRadius:6},children:`Cerrar sesión`}),(0,P.jsx)(`div`,{style:{width:34,height:34,borderRadius:50,background:`var(--bg4)`,border:`1px solid var(--border2)`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:700,fontSize:13},children:D[0]?.toUpperCase()})]})]}),(0,P.jsx)(`nav`,{style:{display:`flex`,gap:2,padding:`12px 28px 0`,background:`var(--bg2)`,borderBottom:`1px solid var(--border)`,overflowX:`auto`},children:GY.filter(e=>!e.extraOnly||ne).map(e=>e.id===`antrop`?{...e,label:L}:e).map(e=>(0,P.jsx)(`button`,{onClick:()=>i(e.id),style:{display:`flex`,alignItems:`center`,gap:7,padding:`9px 16px`,borderRadius:`8px 8px 0 0`,cursor:`pointer`,fontSize:13,fontWeight:500,color:r===e.id?`var(--text)`:`var(--muted)`,background:r===e.id?`var(--bg)`:`transparent`,border:r===e.id?`1px solid var(--border)`:`1px solid transparent`,borderBottom:r===e.id?`1px solid var(--bg)`:`1px solid transparent`,transition:`all 0.15s`,whiteSpace:`nowrap`},children:e.label},e.id))}),(0,P.jsxs)(`main`,{style:{padding:`24px 28px`,maxWidth:1280,margin:`0 auto`},children:[r===`overview`&&(0,P.jsx)(ke,{leads:a,clients:s,antrop:l,onRenew:w,onNoRenew:T,goalClients:te,goalRevenue:ie,splitPartner:ee,hasSplit:I}),r===`leads`&&(0,P.jsxs)(`div`,{children:[(0,P.jsx)(sm,{leads:a,setLeads:o}),(0,P.jsx)(`div`,{id:`_nf_followup_root`})]}),r===`clients`&&(0,P.jsx)(dm,{clients:s,setClients:c,lostClients:p,setLostClients:m,leads:a,setLeads:o,splitPartner:ee,splitPercent:F,hasSplit:I,currency:re}),r===`revenue`&&(0,P.jsx)(MY,{clients:s,antrop:l,leads:a,splitPartner:ee,splitPercent:F,hasSplit:I,currency:re}),r===`antrop`&&(0,P.jsx)(NY,{antrop:l,setAntrop:u,label:L,currency:re}),r===`ads`&&(0,P.jsx)(LY,{campaigns:d,setCampaigns:f,closingRate:C}),r===`agenda`&&(0,P.jsx)(`div`,{id:`_nf_agenda_root`}),r===`instagram`&&(0,P.jsx)(`div`,{id:`_nf_instagram_root`})]}),(0,P.jsx)(WY,{clients:s,leads:a,antrop:l,campaigns:d,user:e,userConfig:t}),(0,P.jsx)(Ce,{open:h,message:`¿Cerrar sesión?`,onConfirm:E,onCancel:()=>g(!1)})]})}function ZY(){let[e,t]=(0,v.useState)(null),[n,r]=(0,v.useState)(null),[i,a]=(0,v.useState)(!0);return(0,v.useEffect)(()=>{w();let e=A();e&&(t(e),r(M(e.email,`config`,null))),a(!1)},[]),i?(0,P.jsx)(`div`,{style:{minHeight:`100vh`,display:`flex`,alignItems:`center`,justifyContent:`center`,background:`#0d1117`},children:(0,P.jsx)(`div`,{style:{color:`#4d9cf8`,fontSize:13,letterSpacing:`0.05em`},children:`Cargando...`})}):e?e.email!==`jansadurni2005@gmail.com`&&(!n||!n.onboardingComplete)?(0,P.jsx)(ae,{user:e,onComplete:e=>r(e)}):(0,P.jsx)(XY,{user:e,userConfig:n,onLogout:()=>{t(null),r(null)}}):(0,P.jsx)(I,{onAuth:e=>{t(e),r(M(e.email,`config`,null))}})}(0,y.createRoot)(document.getElementById(`root`)).render((0,P.jsx)(v.StrictMode,{children:(0,P.jsx)(ZY,{})}));</script>
+      `})]})}var GY=[{id:`overview`,label:`Resumen`,icon:`⊞`},{id:`leads`,label:`Leads`,icon:`◎`},{id:`clients`,label:`Clientes`,icon:`◉`},{id:`revenue`,label:`Ingresos`,icon:`▦`},{id:`antrop`,label:`Antrop`,icon:`◈`,extraOnly:!0},{id:`ads`,label:`Ads`,icon:`▲`},{id:`agenda`,label:`Agenda`,icon:`▣`},{id:`instagram`,label:`Instagram`,icon:`📸`}],KY=`jansadurni2005@gmail.com`,qY=[{id:`l1`,name:`Fernando`,source:`Other`,status:`Contacted`,note:`contactar demà dia 15`,date:`2026-04-14`},{id:`l2`,name:`Daniel Figueres`,source:`GEIEG`,status:`Lost`,note:`No te diners diu`,date:`2026-04-11`},{id:`l3`,name:`Jesús`,source:`GEIEG`,status:`New`,note:`Escriure'l el divendres`,date:`2026-04-10`},{id:`l4`,name:`Boulze berengere`,source:`GEIEG`,status:`Lost`,note:`S'ho està pensant ja ha pagat per antropometria`,date:`2026-04-09`},{id:`l5`,name:`Sandra montero`,source:`GEIEG`,status:`Lost`,note:`—`,date:`2026-04-08`},{id:`l6`,name:`Fill Josep Padilla`,source:`Referral`,status:`New`,note:`—`,date:`2026-04-03`}],JY=[{id:`c1`,name:`Dan Reyes`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-04-15`,renewalDate:`2026-07-14`,active:!0},{id:`c2`,name:`Aurèlia Teixidor`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-15`,renewalDate:`2026-07-14`,active:!0},{id:`c3`,name:`Anna Bonet`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-11`,renewalDate:`2026-07-10`,active:!0},{id:`c4`,name:`Anna Conde`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-04-09`,renewalDate:`2026-07-08`,active:!0},{id:`c5`,name:`Laura Tivau`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2026-03-21`,renewalDate:`2026-06-19`,active:!0},{id:`c6`,name:`Glòria Rodríguez`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-03-20`,renewalDate:`2026-06-18`,active:!0},{id:`c7`,name:`Pau Cargol`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-02-27`,renewalDate:`2026-05-28`,active:!0},{id:`c8`,name:`Mar Carreras`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2026-02-10`,renewalDate:`2026-05-11`,active:!0},{id:`c9`,name:`Josep Padilla`,price:53.33,billing:`quarterly`,source:`Other`,startDate:`2026-01-15`,renewalDate:`2026-04-15`,active:!0},{id:`c10`,name:`Cristina Vila`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2025-12-10`,renewalDate:`2026-03-10`,active:!0},{id:`c11`,name:`Raquel Torres`,price:48.33,billing:`quarterly`,source:`Other`,startDate:`2025-11-20`,renewalDate:`2026-02-18`,active:!0},{id:`c12`,name:`Montse Pujol`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-11-05`,renewalDate:`2026-02-03`,active:!0},{id:`c13`,name:`Eva Soler`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-10-15`,renewalDate:`2026-01-13`,active:!0},{id:`c14`,name:`Mireia Camps`,price:48.33,billing:`quarterly`,source:`GEIEG`,startDate:`2025-10-01`,renewalDate:`2025-12-30`,active:!0}],YY=[{id:`a1`,client:`Pau Serra`,price:16.8,date:`2026-04-13`,notes:`—`},{id:`a2`,client:`Boulze Berangere`,price:21,date:`2026-04-09`,notes:`Geieg`},{id:`a3`,client:`Josep Padilla`,price:21,date:`2026-03-24`,notes:`—`},{id:`a4`,client:`Glòria Rodriguez`,price:21,date:`2026-03-19`,notes:`GEIEG`}];function XY({user:e,userConfig:t,onLogout:n}){let[r,i]=(0,v.useState)(`overview`),[a,o]=(0,v.useState)([]),[s,c]=(0,v.useState)([]),[l,u]=(0,v.useState)([]),[d,f]=(0,v.useState)([]),[p,m]=(0,v.useState)([]),[h,g]=(0,v.useState)(!1),[_,y]=(0,v.useState)(!1);(0,v.useEffect)(()=>{let t=e.email===KY,n=`nf_${e.email}_seeded`,r=localStorage.getItem(n),i=M(e.email,`leads`,null),a=M(e.email,`clients`,null),s=M(e.email,`antrop`,null);t&&!r?(o(i||qY),c(a||JY),u(s||YY),localStorage.setItem(n,`1`)):(o(i||[]),c(a||[]),u(s||[])),f(M(e.email,`campaigns`,[])),m(M(e.email,`lostClients`,[])),y(!0)},[e.email]),(0,v.useEffect)(()=>{_&&N(e.email,`leads`,a)},[a,_]),(0,v.useEffect)(()=>{_&&N(e.email,`clients`,s)},[s,_]),(0,v.useEffect)(()=>{_&&N(e.email,`antrop`,l)},[l,_]),(0,v.useEffect)(()=>{_&&N(e.email,`campaigns`,d)},[d,_]),(0,v.useEffect)(()=>{_&&N(e.email,`lostClients`,p)},[p,_]);let{start:b,end:x}=oe(),S=a.filter(e=>{let t=new Date(e.date);return t>=b&&t<=x}),C=S.length>0?Math.round(S.filter(e=>e.status===`Closed`).length/S.length*100):0,w=(0,v.useCallback)(e=>{c(t=>t.map(t=>{if(t.id!==e)return t;let n=new Date().toISOString().split(`T`)[0],r=le(t.billing||`quarterly`);return{...t,startDate:n,renewalDate:r}}))},[]),T=(0,v.useCallback)(e=>{c(t=>t.map(t=>t.id===e.id?{...t,active:!1}:t)),m(t=>[{...e,lostAt:new Date().toISOString().split(`T`)[0],reason:`no renovó`,type:`client`},...t])},[]),E=()=>{k(),n()},D=e.name?.split(` `)[0]||e.email.split(`@`)[0],O=e.email===`jansadurni2005@gmail.com`,A=t||{},j=O?`Dietista-Nutricionista`:A.professionLabel||A.customProfession||`Profesional`,ee=O?`GEIEG`:A.splitPartner||``,F=O?70:parseFloat(A.splitPercent)||100,I=O?!0:A.hasSplit||!1,te=O?21:parseInt(A.goalClients)||20,L=O?`Antrop`:A.extraServicesName===`Personalizado`?A.customExtraName||`Servicios`:A.extraServicesName||`Servicios`,ne=O?!0:A.hasExtraServices||!1,re=O?`€`:A.currency||`€`,ie=O?3e3:parseInt(A.goalRevenue)||2e3;return(0,P.jsxs)(`div`,{style:{minHeight:`100vh`,background:`var(--bg)`},children:[(0,P.jsxs)(`header`,{style:{display:`flex`,alignItems:`center`,justifyContent:`space-between`,padding:`14px 28px`,background:`var(--bg2)`,borderBottom:`1px solid var(--border)`,position:`sticky`,top:0,zIndex:50},children:[(0,P.jsxs)(`div`,{style:{display:`flex`,alignItems:`center`,gap:14},children:[(0,P.jsx)(`div`,{style:{width:36,height:36,borderRadius:10,background:`#3b82f6`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:800,fontSize:15,color:`#fff`},children:`N`}),(0,P.jsxs)(`div`,{children:[(0,P.jsxs)(`div`,{style:{fontSize:15,fontWeight:700,letterSpacing:`-0.01em`},children:[`Hola, `,D,` 👋`]}),(0,P.jsx)(`div`,{style:{fontSize:11,color:`var(--muted)`},children:j})]})]}),(0,P.jsxs)(`div`,{style:{display:`flex`,alignItems:`center`,gap:12},children:[(0,P.jsx)(`button`,{onClick:()=>g(!0),style:{background:`none`,border:`none`,color:`var(--muted)`,cursor:`pointer`,fontSize:13,padding:`6px 10px`,borderRadius:6},children:`Cerrar sesión`}),(0,P.jsx)(`div`,{style:{width:34,height:34,borderRadius:50,background:`var(--bg4)`,border:`1px solid var(--border2)`,display:`flex`,alignItems:`center`,justifyContent:`center`,fontWeight:700,fontSize:13},children:D[0]?.toUpperCase()})]})]}),(0,P.jsx)(`nav`,{style:{display:`flex`,gap:2,padding:`12px 28px 0`,background:`var(--bg2)`,borderBottom:`1px solid var(--border)`,overflowX:`auto`},children:GY.filter(e=>!e.extraOnly||ne).map(e=>e.id===`antrop`?{...e,label:L}:e).map(e=>(0,P.jsx)(`button`,{onClick:()=>i(e.id),style:{display:`flex`,alignItems:`center`,gap:7,padding:`9px 16px`,borderRadius:`8px 8px 0 0`,cursor:`pointer`,fontSize:13,fontWeight:500,color:r===e.id?`var(--text)`:`var(--muted)`,background:r===e.id?`var(--bg)`:`transparent`,border:r===e.id?`1px solid var(--border)`:`1px solid transparent`,borderBottom:r===e.id?`1px solid var(--bg)`:`1px solid transparent`,transition:`all 0.15s`,whiteSpace:`nowrap`},children:e.label},e.id))}),(0,P.jsxs)(`main`,{style:{padding:`24px 28px`,maxWidth:1280,margin:`0 auto`},children:[r===`overview`&&(0,P.jsx)(ke,{leads:a,clients:s,antrop:l,onRenew:w,onNoRenew:T,goalClients:te,goalRevenue:ie,splitPartner:ee,hasSplit:I}),r===`leads`&&(0,P.jsxs)(`div`,{children:[(0,P.jsx)(`div`,{id:`_nf_leadgroups_root`}),(0,P.jsx)(sm,{leads:a,setLeads:o}),(0,P.jsx)(`div`,{id:`_nf_followup_root`})]}),r===`clients`&&(0,P.jsx)(dm,{clients:s,setClients:c,lostClients:p,setLostClients:m,leads:a,setLeads:o,splitPartner:ee,splitPercent:F,hasSplit:I,currency:re}),r===`revenue`&&(0,P.jsx)(MY,{clients:s,antrop:l,leads:a,splitPartner:ee,splitPercent:F,hasSplit:I,currency:re}),r===`antrop`&&(0,P.jsx)(NY,{antrop:l,setAntrop:u,label:L,currency:re}),r===`ads`&&(0,P.jsx)(LY,{campaigns:d,setCampaigns:f,closingRate:C}),r===`agenda`&&(0,P.jsx)(`div`,{id:`_nf_agenda_root`}),r===`instagram`&&(0,P.jsx)(`div`,{id:`_nf_instagram_root`})]}),(0,P.jsx)(WY,{clients:s,leads:a,antrop:l,campaigns:d,user:e,userConfig:t}),(0,P.jsx)(Ce,{open:h,message:`¿Cerrar sesión?`,onConfirm:E,onCancel:()=>g(!1)})]})}function ZY(){let[e,t]=(0,v.useState)(null),[n,r]=(0,v.useState)(null),[i,a]=(0,v.useState)(!0);return(0,v.useEffect)(()=>{w();let e=A();e&&(t(e),r(M(e.email,`config`,null))),a(!1)},[]),i?(0,P.jsx)(`div`,{style:{minHeight:`100vh`,display:`flex`,alignItems:`center`,justifyContent:`center`,background:`#0d1117`},children:(0,P.jsx)(`div`,{style:{color:`#4d9cf8`,fontSize:13,letterSpacing:`0.05em`},children:`Cargando...`})}):e?e.email!==`jansadurni2005@gmail.com`&&(!n||!n.onboardingComplete)?(0,P.jsx)(ae,{user:e,onComplete:e=>r(e)}):(0,P.jsx)(XY,{user:e,userConfig:n,onLogout:()=>{t(null),r(null)}}):(0,P.jsx)(I,{onAuth:e=>{t(e),r(M(e.email,`config`,null))}})}(0,y.createRoot)(document.getElementById(`root`)).render((0,P.jsx)(v.StrictMode,{children:(0,P.jsx)(ZY,{})}));</script>
 <script>
 (function(){
   var CID='_nf_wkchart';
@@ -3068,6 +3068,160 @@ CAPACIDADES QUE TIENES:
     }
   }
   setInterval(renderCommissionCards,1500);
+})();
+</script>
+<script>
+(function(){
+  function getPre(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_leads$/.test(k);});return k?k.replace(/_leads$/,'')+'_':'';}
+  function getLeads(){try{return JSON.parse(localStorage.getItem(getPre()+'leads')||'[]');}catch(e){return[];}}
+  function loadGroups(){var p=getPre();if(!p)return[];try{return JSON.parse(localStorage.getItem(p+'leadgroups')||'[]');}catch(e){return[];}}
+  function saveGroups(a){var p=getPre();if(p)localStorage.setItem(p+'leadgroups',JSON.stringify(a));}
+  function loadTags(){var p=getPre();if(!p)return{};try{return JSON.parse(localStorage.getItem(p+'leadtags')||'{}');}catch(e){return{};}}
+  function saveTags(o){var p=getPre();if(p)localStorage.setItem(p+'leadtags',JSON.stringify(o));}
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  var PALETTE=['#4d9cf8','#34d399','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#ef4444','#10b981','#8b5cf6'];
+  var _sel=null;      // selected group filter (null = all / assign view)
+  var _open=true;     // panel expanded
+  var _adding=false;  // showing new-group input
+
+  function gColor(name){var g=loadGroups();for(var i=0;i<g.length;i++){if(g[i].name===name)return g[i].color;}return '#94a3b8';}
+  function leadGroups(id){var t=loadTags();return t[id]||[];}
+  function toggleTag(id,name){
+    var t=loadTags();if(!t[id])t[id]=[];
+    var i=t[id].indexOf(name);
+    if(i>=0)t[id].splice(i,1);else t[id].push(name);
+    if(!t[id].length)delete t[id];
+    saveTags(t);
+  }
+
+  function activeLeads(){return getLeads().filter(function(l){return l.status!=='Closed'&&l.status!=='Lost';});}
+
+  function render(){
+    var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
+    var groups=loadGroups();
+    var tags=loadTags();
+    var leads=getLeads();
+    var leadById={};leads.forEach(function(l){leadById[l.id]=l;});
+
+    // Count leads per group
+    var counts={};groups.forEach(function(g){counts[g.name]=0;});
+    Object.keys(tags).forEach(function(lid){
+      if(!leadById[lid])return;
+      (tags[lid]||[]).forEach(function(n){if(counts[n]!=null)counts[n]++;});
+    });
+
+    // Group filter chips
+    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Assignar / Tots</span>';
+    chips+=groups.map(function(g){
+      var on=_sel===g.name;
+      return '<span data-gf="'+esc(g.name)+'" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap;background:'+g.color+(on?'':'22')+';color:'+(on?'#fff':g.color)+';border:1px solid '+g.color+(on?'':'44')+'">'+
+        esc(g.name)+'<span style="font-size:10px;opacity:.85;background:rgba(0,0,0,.15);border-radius:10px;padding:0 6px">'+(counts[g.name]||0)+'</span>'+
+        '<span data-gdel="'+esc(g.name)+'" title="Eliminar grup" style="opacity:.6;margin-left:2px;font-size:12px">×</span>'+
+      '</span>';
+    }).join('');
+
+    var addBtn=_adding
+      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nom del grup..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#4d9cf8;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
+      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#4d9cf8;border:1px dashed #4d9cf855">+ Nou grup</span>';
+
+    // Body: list of leads (all-active for assign view, filtered for a group)
+    var listLeads;
+    if(_sel===null){
+      listLeads=activeLeads();
+    }else{
+      listLeads=leads.filter(function(l){return (tags[l.id]||[]).indexOf(_sel)>=0;});
+    }
+    // Sort by name
+    listLeads.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+
+    var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
+
+    var rows=listLeads.map(function(l){
+      var myTags=(tags[l.id]||[]);
+      var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" style="cursor:pointer;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+c+'22;color:'+c+';border:1px solid '+c+'44;white-space:nowrap">'+esc(n)+' ×</span>';}).join(' ');
+      // available groups to add (not already assigned)
+      var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
+      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:3px 6px;color:var(--muted);font-size:10px;outline:none;cursor:pointer"><option value="">+ etiqueta</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
+      var st=l.status||'';var stl=ST_LBL[st]||st;
+      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(l.name||'—')+'</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:1px">'+esc(stl)+(l.source?' · '+esc(l.source):'')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:60%">'+tagPills+addMenu+'</div>'+
+      '</div>';
+    }).join('');
+    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center;font-style:italic">'+(_sel===null?'Cap lead actiu':'Cap lead en aquest grup encara')+'</div>';
+
+    root.innerHTML=
+      '<div style="margin-bottom:20px;background:var(--bg2);border-radius:14px;border:1px solid var(--border);overflow:hidden">'+
+        '<div id="_nf_lg_hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none;border-bottom:'+(_open?'1px solid var(--border)':'none')+'">'+
+          '<div style="display:flex;align-items:center;gap:10px">'+
+            '<span style="font-size:16px">📋</span>'+
+            '<span style="font-size:13px;font-weight:700;color:var(--text)">Grups de leads</span>'+
+            '<span style="background:#4d9cf822;color:#4d9cf8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+groups.length+'</span>'+
+          '</div>'+
+          '<span style="color:var(--muted);font-size:11px">'+(_open?'▾':'▸')+'</span>'+
+        '</div>'+
+        (_open?
+          '<div style="padding:14px 20px">'+
+            '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Crea grups (ex: <b>Cerrar llamada</b>, <b>Cerrar venta</b>) i assigna’ls als leads. Clica un grup per veure només els leads d’aquell grup.</div>'+
+            '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+chips+addBtn+'</div>'+
+            '<div>'+rows+'</div>'+
+          '</div>'
+        :'')+
+      '</div>';
+
+    // Bind
+    document.getElementById('_nf_lg_hdr').onclick=function(){_open=!_open;render();};
+    if(_open){
+      Array.prototype.forEach.call(root.querySelectorAll('[data-gf]'),function(el){
+        el.onclick=function(ev){
+          if(ev.target&&ev.target.getAttribute('data-gdel'))return;
+          var g=el.getAttribute('data-gf');
+          _sel=(g==='__all')?null:g;
+          render();
+        };
+      });
+      Array.prototype.forEach.call(root.querySelectorAll('[data-gdel]'),function(el){
+        el.onclick=function(ev){
+          ev.stopPropagation();
+          var name=el.getAttribute('data-gdel');
+          if(!confirm('Eliminar el grup "'+name+'"? (els leads no s’esborren, només l’etiqueta)'))return;
+          var g=loadGroups().filter(function(x){return x.name!==name;});saveGroups(g);
+          var t=loadTags();Object.keys(t).forEach(function(k){t[k]=(t[k]||[]).filter(function(n){return n!==name;});if(!t[k].length)delete t[k];});saveTags(t);
+          if(_sel===name)_sel=null;
+          render();
+        };
+      });
+      var addEl=document.getElementById('_nf_lg_add');
+      if(addEl)addEl.onclick=function(){_adding=true;render();setTimeout(function(){var i=document.getElementById('_nf_lg_new');if(i)i.focus();},20);};
+      var newOk=document.getElementById('_nf_lg_newok');
+      var newInp=document.getElementById('_nf_lg_new');
+      function commitNew(){
+        var v=(newInp&&newInp.value||'').trim();
+        if(v){var g=loadGroups();if(!g.find(function(x){return x.name===v;})){g.push({name:v,color:PALETTE[g.length%PALETTE.length]});saveGroups(g);}}
+        _adding=false;render();
+      }
+      if(newOk)newOk.onclick=commitNew;
+      if(newInp)newInp.onkeydown=function(e){if(e.key==='Enter')commitNew();if(e.key==='Escape'){_adding=false;render();}};
+      Array.prototype.forEach.call(root.querySelectorAll('[data-untag]'),function(el){
+        el.onclick=function(){var parts=el.getAttribute('data-untag').split('|');toggleTag(parts[0],parts[1]);render();};
+      });
+      Array.prototype.forEach.call(root.querySelectorAll('[data-addsel]'),function(sel){
+        sel.onchange=function(){var id=sel.getAttribute('data-addsel');var v=sel.value;if(v){toggleTag(id,v);render();}};
+      });
+    }
+  }
+
+  var _lastHash='';
+  function hash(){var p=getPre();if(!p)return '';return (localStorage.getItem(p+'leads')||'').length+':'+(localStorage.getItem(p+'leadgroups')||'').length+':'+(localStorage.getItem(p+'leadtags')||'').length+':'+_sel+':'+_open+':'+_adding;}
+  setInterval(function(){
+    var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
+    var h=hash();
+    if(!root.innerHTML.trim()||h!==_lastHash){_lastHash=h;render();}
+  },500);
 })();
 </script>
 </body>
