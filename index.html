@@ -1787,15 +1787,15 @@ CAPACIDADES QUE TIENES:
       var rcol=rate>=50?'#34d399':rate>=25?'#f59e0b':'#f87171';
       return '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
-          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">📞</span><span style="font-size:13px;font-weight:700">Trucades · '+selLbl+'</span></div>'+
+          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">📞</span><span style="font-size:13px;font-weight:700">Llamadas · '+selLbl+'</span></div>'+
           '<span style="display:inline-flex;align-items:center;gap:5px;background:'+rcol+'12;border:1px solid '+rcol+'30;border-radius:8px;padding:5px 11px">'+
             '<b style="font-size:17px;color:'+rcol+'">'+rate+'%</b>'+
-            '<span style="font-size:9px;color:'+rcol+';font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.3">tancament</span>'+
+            '<span style="font-size:9px;color:'+rcol+';font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.3">cierre</span>'+
           '</span>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">'+
           '<div style="background:var(--bg3);border-radius:10px;padding:12px 14px">'+
-            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:6px">Trucades fetes</div>'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:6px">Llamadas hechas</div>'+
             '<div style="display:flex;align-items:center;justify-content:space-between">'+
               '<button data-call="total-" style="background:var(--bg4);border:none;color:var(--text2);width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1">−</button>'+
               '<span style="font-size:26px;font-weight:800;color:var(--text)">'+tot+'</span>'+
@@ -1803,7 +1803,7 @@ CAPACIDADES QUE TIENES:
             '</div>'+
           '</div>'+
           '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:12px 14px">'+
-            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:6px">Tancades</div>'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:6px">Cerradas</div>'+
             '<div style="display:flex;align-items:center;justify-content:space-between">'+
               '<button data-call="closed-" style="background:var(--bg4);border:none;color:var(--text2);width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1">−</button>'+
               '<span style="font-size:26px;font-weight:800;color:#34d399">'+clo+'</span>'+
@@ -1811,16 +1811,15 @@ CAPACIDADES QUE TIENES:
             '</div>'+
           '</div>'+
         '</div>'+
-        // Income earned this month linked to closes
+        // Income earned this month
         (function(){
           var earned=selData.total||0;
-          if(clo>0&&earned>0){
+          if(earned>0){
             return '<div style="margin-top:12px;padding:10px 12px;background:rgba(77,156,248,.08);border:1px solid rgba(77,156,248,.2);border-radius:9px;font-size:12px;color:var(--text2)">'+
-              '💰 Tancant <b style="color:#34d399">'+clo+'</b> '+(clo===1?'venda':'vendes')+' aquest mes has generat <b style="color:#4d9cf8">'+fmt(earned)+'</b>'+
-              (clo>0?' · <span style="color:var(--muted)">'+fmt(earned/clo)+'/venda</span>':'')+
+              '💰 Este mes has ganado <b style="color:#4d9cf8">'+fmt(earned)+'</b>'+
             '</div>';
           }
-          return '<div style="font-size:10px;color:var(--muted);margin-top:10px">Marca les trucades del mes i les que tanques. El % de tancament es calcula sol.</div>';
+          return '<div style="font-size:10px;color:var(--muted);margin-top:10px">Marca las llamadas del mes y las que cierras. El % de cierre se calcula solo.</div>';
         })()+
 
         // History: last 6 months evolution
@@ -1849,7 +1848,7 @@ CAPACIDADES QUE TIENES:
             '</div>';
           }).join('');
           return '<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.05)">'+
-            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Evolució · % tancament per mes</div>'+
+            '<div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Evolución · % cierre por mes</div>'+
             '<div style="display:flex;gap:5px;align-items:flex-end;height:70px">'+rowsH+'</div>'+
           '</div>';
         })()+
