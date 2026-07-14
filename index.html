@@ -1706,25 +1706,25 @@ CAPACIDADES QUE TIENES:
         byOriginHtml+
       '</div>':'')+
 
-      // Plans en pausa (atletes que han parat temporada)
+      // Planes en pausa (atletas que han parado temporada)
       (function(){
         var pmap=loadPaused();var ML=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
         var pausedList=clients.filter(function(c){return c.active!==false&&pmap[c.id]&&pmap[c.id].pausedAt;});
         if(!pausedList.length)return '';
         var rowsP=pausedList.map(function(c){
-          var pi=pmap[c.id];var rm=pi.resumeMonth?(function(){var p=pi.resumeMonth.split('-');return (ML[parseInt(p[1])-1]||'')+' '+p[0];})():'sense definir';
+          var pi=pmap[c.id];var rm=pi.resumeMonth?(function(){var p=pi.resumeMonth.split('-');return (ML[parseInt(p[1])-1]||'')+' '+p[0];})():'sin definir';
           return '<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;border-radius:8px;background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.28);margin-bottom:5px;gap:8px">'+
             '<div style="display:flex;align-items:center;gap:7px;min-width:0;flex:1">'+
               '<span style="font-size:12px">⏸️</span>'+
               '<span style="font-size:12px;color:var(--text);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+esc(c.name)+'</span>'+
             '</div>'+
-            '<span style="font-size:10px;color:#f59e0b;font-weight:600;flex-shrink:0">torna '+esc(rm)+'</span>'+
+            '<span style="font-size:10px;color:#f59e0b;font-weight:600;flex-shrink:0">vuelve '+esc(rm)+'</span>'+
           '</div>';
         }).join('');
         return '<div style="margin-bottom:14px">'+
-          '<div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏸️ Plans en pausa · '+pausedList.length+'</div>'+
+          '<div style="font-size:11px;font-weight:700;color:#f59e0b;text-transform:uppercase;letter-spacing:.06em;margin-bottom:8px">⏸️ Planes en pausa · '+pausedList.length+'</div>'+
           rowsP+
-          '<div style="font-size:10px;color:var(--muted);margin-top:2px">No compten als ingressos mentre estiguin pausats.</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:2px">No cuentan en los ingresos mientras estén pausados.</div>'+
         '</div>';
       })()+
 
@@ -2856,7 +2856,7 @@ CAPACIDADES QUE TIENES:
       if(window._nf_isPaused&&window._nf_isPaused(c.id)){
         var pz=document.createElement('span');
         pz.setAttribute('data-nf-pause-bd','1');
-        pz.title='Pla en pausa — no compta als ingressos';
+        pz.title='Plan en pausa — no cuenta en los ingresos';
         pz.style.cssText='display:inline-flex;align-items:center;justify-content:center;height:14px;padding:0 6px;border-radius:7px;background:#f59e0b22;border:1px solid #f59e0b66;color:#f59e0b;font-size:8px;font-weight:800;letter-spacing:.04em;margin-left:6px;cursor:help;flex-shrink:0;vertical-align:middle;font-family:system-ui,sans-serif;line-height:1';
         pz.textContent='⏸ PAUSA';
         badges.push(pz);
@@ -3436,13 +3436,13 @@ CAPACIDADES QUE TIENES:
             '<div style="display:flex;align-items:center;gap:8px">'+
               '<span style="font-size:16px">⏸️</span>'+
               '<div>'+
-                '<div style="font-size:13px;font-weight:700;color:#f59e0b">Pla en PAUSA</div>'+
-                '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pausat des del '+esc(since)+' · torna aprox. <b style="color:var(--text2)">'+esc(resumeTxt)+'</b></div>'+
+                '<div style="font-size:13px;font-weight:700;color:#f59e0b">Plan en PAUSA</div>'+
+                '<div style="font-size:11px;color:var(--muted);margin-top:2px">Pausado desde el '+esc(since)+' · vuelve aprox. <b style="color:var(--text2)">'+esc(resumeTxt)+'</b></div>'+
               '</div>'+
             '</div>'+
-            '<button id="_nf_pz_resume" style="background:#34d399;border:none;color:#06231a;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">▶ Reprendre pla</button>'+
+            '<button id="_nf_pz_resume" style="background:#34d399;border:none;color:#06231a;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">▶ Reanudar plan</button>'+
           '</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.5">Mentre estigui en pausa <b>no compta als ingressos</b>. En reprendre, la data de renovació s’allarga pels dies que ha estat parat (manté els dies que li quedaven del trimestre).</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-top:10px;line-height:1.5">Mientras esté en pausa <b>no cuenta en los ingresos</b>. Al reanudar, la fecha de renovación se alarga por los días que ha estado parado (mantiene los días que le quedaban del trimestre).</div>'+
         '</div>';
       var rb=document.getElementById('_nf_pz_resume');
       if(rb)rb.onclick=function(){
@@ -3467,13 +3467,13 @@ CAPACIDADES QUE TIENES:
         '<div style="background:var(--bg3);border-radius:12px;padding:14px 16px;margin-bottom:12px">'+
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:10px">'+
             '<span style="font-size:15px">⏸️</span>'+
-            '<span style="font-size:12px;font-weight:700;color:var(--text)">Pausar pla nutricional</span>'+
+            '<span style="font-size:12px;font-weight:700;color:var(--text)">Pausar plan nutricional</span>'+
           '</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Per atletes que paren temporada. Mentre estigui en pausa no comptarà als ingressos. En reprendre, mantindrà els dies que li quedaven.</div>'+
+          '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Para atletas que paran temporada. Mientras esté en pausa no contará en los ingresos. Al reanudar, mantendrá los días que le quedaban.</div>'+
           '<div style="display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">'+
-            '<div style="flex:1;min-width:140px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Mes previst de tornada</label>'+
+            '<div style="flex:1;min-width:140px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Mes previsto de vuelta</label>'+
               '<input id="_nf_pz_month" type="month" value="'+defMonth+'" style="background:var(--bg2);border:1.5px solid var(--bg4);border-radius:7px;padding:7px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
-            '<button id="_nf_pz_pause" style="background:#f59e0b;border:none;color:#231a06;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏸ Pausar ara</button>'+
+            '<button id="_nf_pz_pause" style="background:#f59e0b;border:none;color:#231a06;border-radius:8px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap">⏸ Pausar ahora</button>'+
           '</div>'+
         '</div>';
       var pb=document.getElementById('_nf_pz_pause');
