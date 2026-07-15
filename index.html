@@ -1354,6 +1354,13 @@ CAPACIDADES QUE TIENES:
   function callsKey(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_calls':null;}
   function loadCalls(){var k=callsKey();if(!k)return{};try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return{};}}
   function saveCalls(o){var k=callsKey();if(k)localStorage.setItem(k,JSON.stringify(o));}
+  function loadLost(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_lostClients$/.test(k);});if(!k)return[];try{return JSON.parse(localStorage.getItem(k)||'[]');}catch(e){return[];}}
+  function baseKey(suf){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_'+suf:null;}
+  function loadGoal(){var k=baseKey('goal');if(!k)return 3000;var v=parseFloat(localStorage.getItem(k));return isNaN(v)?3000:v;}
+  function saveGoal(v){var k=baseKey('goal');if(k)localStorage.setItem(k,String(v));}
+  function loadLeadClosed(){var k=baseKey('leadclosed');if(!k)return{};try{return JSON.parse(localStorage.getItem(k)||'{}');}catch(e){return{};}}
+  function saveLeadClosed(o){var k=baseKey('leadclosed');if(k)localStorage.setItem(k,JSON.stringify(o));}
+  function daysBetweenStr(a,b){var d1=new Date(a),d2=new Date(b);d1.setHours(0,0,0,0);d2.setHours(0,0,0,0);return Math.round((d2-d1)/864e5);}
   function isPausedNow(clientId){var p=loadPaused();return !!(p&&p[clientId]&&p[clientId].pausedAt);}
   function billingMonths(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:1;}
 
@@ -1759,6 +1766,105 @@ CAPACIDADES QUE TIENES:
 
     '</div>'+
 
+    // ── PANEL MÉTRICAS DEL NEGOCIO ──
+    (function(){
+      var pausedMap=loadPaused();
+      // 1) Previsión próximos 3 meses
+      var fc=[];
+      for(var fi=1;fi<=3;fi++){
+        var fm=cm+fi,fy=cy;while(fm>11){fm-=12;fy++;}
+        var inc=0;
+        clients.forEach(function(c){
+          if(c.active===false||!c.startDate)return;
+          if(pausedMap[c.id]&&pausedMap[c.id].pausedAt)return;
+          var bm=billingMonths(c.billing);
+          var sd=new Date(c.startDate);
+          var di=(fy-sd.getFullYear())*12+(fm-sd.getMonth());
+          if(di>=0&&di%bm===0)inc+=th(c.price,c.billing,c.source,sp,pct);
+        });
+        fc.push({lbl:MES[fm],inc:inc});
+      }
+      // 2) Bajas / churn del mes
+      var lost=loadLost();
+      var bajasMes=lost.filter(function(l){var d=l.lostAt||l.date;if(!d)return false;var dd=new Date(d);return dd.getFullYear()===cy&&dd.getMonth()===cm;}).length;
+      var churnBase=active.length+bajasMes;
+      var churn=churnBase>0?Math.round(bajasMes/churnBase*100):0;
+      // 3) LTV medio (valor generado por cliente activo)
+      var ltvVals=active.map(function(c){var mth=th(c.price,c.billing,c.source,sp,pct)/billingMonths(c.billing);return mth*Math.max(1,monthsSince(c.startDate));});
+      var ltvAvg=ltvVals.length?ltvVals.reduce(function(s,v){return s+v;},0)/ltvVals.length:0;
+      // 4) Tiempo medio de cierre (go-forward tracking)
+      var leadsAll=getLS('leads');
+      var lc=loadLeadClosed();
+      var isFirstLC=Object.keys(lc).length===0;
+      var lcChanged=false;
+      leadsAll.forEach(function(l){
+        if(l.status==='Closed'&&!lc[l.id]){lc[l.id]={at:new Date().toISOString().slice(0,10),hist:isFirstLC};lcChanged=true;}
+      });
+      if(lcChanged)saveLeadClosed(lc);
+      var durs=leadsAll.filter(function(l){return l.status==='Closed'&&lc[l.id]&&!lc[l.id].hist&&l.date;}).map(function(l){return daysBetweenStr(l.date,lc[l.id].at);}).filter(function(d){return d>=0;});
+      var avgClose=durs.length?Math.round(durs.reduce(function(s,d){return s+d;},0)/durs.length):null;
+      // 5) Objetivo mensual
+      var goal=loadGoal();
+      var thisMonthInc=monthRev(cy,cm,clients,antrop,sp,pct,true).total;
+      var goalPct=goal>0?Math.min(100,Math.round(thisMonthInc/goal*100)):0;
+      var goalCol=goalPct>=100?'#34d399':goalPct>=60?'#4d9cf8':'#f59e0b';
+      var maxFc=Math.max.apply(null,fc.map(function(f){return f.inc;}).concat([1]));
+
+      return '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:16px 20px">'+
+        '<div style="display:flex;align-items:center;gap:8px;margin-bottom:16px"><span style="font-size:15px">📊</span><span style="font-size:13px;font-weight:700;color:var(--text)">Métricas del negocio</span></div>'+
+
+        // Objetivo mensual + progreso
+        '<div style="background:var(--bg3);border-radius:11px;padding:13px 15px;margin-bottom:12px">'+
+          '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:9px;flex-wrap:wrap;gap:6px">'+
+            '<span style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em">🎯 Objetivo mensual</span>'+
+            '<div style="display:flex;align-items:center;gap:6px">'+
+              '<span style="font-size:12px;color:var(--text2)">'+fmt(thisMonthInc)+' / <b id="_nf_goalval" style="color:var(--text)">'+fmt(goal)+'</b></span>'+
+              '<button id="_nf_goaledit" style="background:var(--bg4);border:none;color:var(--text2);border-radius:6px;padding:3px 9px;font-size:10px;font-weight:600;cursor:pointer">Editar</button>'+
+            '</div>'+
+          '</div>'+
+          '<div style="height:9px;background:var(--bg2);border-radius:5px;overflow:hidden">'+
+            '<div style="height:100%;width:'+goalPct+'%;background:'+goalCol+';border-radius:5px;transition:width .5s ease"></div>'+
+          '</div>'+
+          '<div style="display:flex;justify-content:space-between;margin-top:6px">'+
+            '<span style="font-size:10px;font-weight:700;color:'+goalCol+'">'+goalPct+'%</span>'+
+            '<span style="font-size:10px;color:var(--muted)">'+(thisMonthInc>=goal?'✓ Objetivo alcanzado':'Faltan '+fmt(goal-thisMonthInc))+'</span>'+
+          '</div>'+
+        '</div>'+
+
+        // Previsión próximos 3 meses
+        '<div style="background:var(--bg3);border-radius:11px;padding:13px 15px;margin-bottom:12px">'+
+          '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📈 Previsión próximos 3 meses</div>'+
+          '<div style="display:flex;gap:8px">'+
+            fc.map(function(f){var h=Math.max(f.inc>0?Math.round(f.inc/maxFc*100):0,4);return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'+
+              '<div style="font-size:12px;font-weight:800;color:#4d9cf8">'+fmt(f.inc)+'</div>'+
+              '<div style="width:100%;height:34px;display:flex;align-items:flex-end"><div style="width:100%;border-radius:4px 4px 0 0;background:rgba(77,156,248,.5);height:'+h+'%"></div></div>'+
+              '<div style="font-size:10px;color:var(--muted);font-weight:600">'+f.lbl+'</div>'+
+            '</div>';}).join('')+
+          '</div>'+
+          '<div style="font-size:9px;color:var(--muted);margin-top:8px">Estimación si todos renuevan (excluye pausados).</div>'+
+        '</div>'+
+
+        // 3 KPI cards: churn, LTV, tiempo cierre
+        '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:8px">'+
+          '<div style="background:rgba(248,113,113,.06);border:1px solid rgba(248,113,113,.18);border-radius:10px;padding:11px 13px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#f87171;font-weight:700;margin-bottom:6px">📉 Bajas este mes</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#f87171;line-height:1">'+bajasMes+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">'+churn+'% churn</div>'+
+          '</div>'+
+          '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:11px 13px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#34d399;font-weight:700;margin-bottom:6px">💎 LTV medio</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#34d399;line-height:1">'+fmt(ltvAvg)+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">generado / cliente</div>'+
+          '</div>'+
+          '<div style="background:rgba(167,139,250,.06);border:1px solid rgba(167,139,250,.2);border-radius:10px;padding:11px 13px">'+
+            '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:#a78bfa;font-weight:700;margin-bottom:6px">⏱️ Tiempo cierre</div>'+
+            '<div style="font-size:22px;font-weight:800;color:#a78bfa;line-height:1">'+(avgClose!=null?avgClose+'d':'—')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:4px">'+(avgClose!=null?'lead → cierre':'midiendo desde hoy')+'</div>'+
+          '</div>'+
+        '</div>'+
+      '</div>';
+    })()+
+
     // ── PANEL RETENCIÓN ──
     '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px">'+
       '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px">'+
@@ -1859,6 +1965,16 @@ CAPACIDADES QUE TIENES:
     var hp=document.getElementById('_nf_hp'),hn=document.getElementById('_nf_hn');
     if(hp)hp.onclick=function(){_histOff--;render();};
     if(hn)hn.onclick=function(){if(_histOff<0){_histOff++;render();}};
+
+    // Bind goal edit
+    var ge=document.getElementById('_nf_goaledit');
+    if(ge)ge.onclick=function(){
+      var cur=loadGoal();
+      var v=prompt('Objetivo de ingresos mensual (€):',String(cur));
+      if(v===null)return;
+      var n=parseFloat(String(v).replace(',','.'));
+      if(!isNaN(n)&&n>=0){saveGoal(Math.round(n));render();}
+    };
 
     // Bind call counter buttons
     var _ckey=String(sel.yr)+'-'+(sel.mo<9?'0':'')+(sel.mo+1);
