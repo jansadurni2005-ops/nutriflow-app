@@ -306,6 +306,51 @@ function syncRead(token){
   });
 }
 
+// ── LIVE REFRESH: re-pull cloud data without a reload, update React state directly.
+// Runs when the tab becomes visible and periodically, so every device always shows
+// the same (cloud) data — e.g. clients dados de baja disappear everywhere.
+var _refreshing=false;
+function refreshFromCloud(){
+  if(_refreshing)return;
+  var tokData=null;try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
+  var tok=tokData&&tokData.exp>Date.now()+5000?tokData.tok:null;
+  var pt=tok?Promise.resolve(tok):getToken();
+  _refreshing=true;
+  pt.then(function(token){
+    if(!token){_refreshing=false;return;}
+    return Promise.all([
+      fetch2('/rest/v1/clients?user_id=eq.'+UID+'&select=*&order=start_date.desc','GET',token),
+      fetch2('/rest/v1/leads?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token),
+      fetch2('/rest/v1/antropometrias?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token)
+    ]).then(function(r){
+      var clients=Array.isArray(r[0])?r[0]:[];
+      var leads=Array.isArray(r[1])?r[1]:[];
+      var antrop=Array.isArray(r[2])?r[2]:[];
+      // Block interceptor only during the synchronous writes (tiny window)
+      window._nf_syncing=true;
+      try{
+        if(clients.length){
+          var fmt=clients.map(function(c){return{id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,startDate:c.start_date,renewalDate:c.renewal_date,active:c.active};});
+          var active=fmt.filter(function(c){return c.active;});
+          var lost=fmt.filter(function(c){return !c.active;});
+          localStorage.setItem(PRE+'clients',JSON.stringify(active));
+          localStorage.setItem(PRE+'lostClients',JSON.stringify(lost));
+          if(window._nf_setClients){try{window._nf_setClients(active.slice());}catch(e){}}
+          if(window._nf_setLostClients){try{window._nf_setLostClients(lost.slice());}catch(e){}}
+        }
+        var fmtLeads=leads.map(function(l){return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
+        localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
+        if(window._nf_setLeads){try{window._nf_setLeads(fmtLeads.slice());}catch(e){}}
+        var fmtAntrop=antrop.map(function(a){return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};});
+        localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
+      }finally{window._nf_syncing=false;}
+      return pullExtras(token);
+    });
+  }).then(function(){_refreshing=false;})
+   .catch(function(){window._nf_syncing=false;_refreshing=false;});
+}
+window._nf_refreshFromCloud=refreshFromCloud;
+
 var _syncClientsTimer=null;
 function saveClients(token){
   clearTimeout(_syncClientsTimer);
@@ -444,6 +489,17 @@ if(!sessionStorage.getItem('_nf_sb_ok')){
 }else{
   setupInterceptor();
 }
+
+// ── Keep every device in sync: re-pull cloud data on focus + periodically ──
+document.addEventListener('visibilitychange',function(){
+  if(!document.hidden&&sessionStorage.getItem('_nf_sb_ok'))refreshFromCloud();
+});
+window.addEventListener('focus',function(){
+  if(sessionStorage.getItem('_nf_sb_ok'))refreshFromCloud();
+});
+setInterval(function(){
+  if(sessionStorage.getItem('_nf_sb_ok')&&!document.hidden)refreshFromCloud();
+},45000);
 })();
 </script>
 
