@@ -97,6 +97,44 @@ function backupClients(){
 function backupLeads(){makeBackup(PRE+'leads',PRE+'leads_bk');}
 function backupAntrop(){makeBackup(PRE+'antrop',PRE+'antrop_bk');}
 
+// ── EXTRA DATA SYNC (payments, pauses, sources, lead groups, calls, goal, weights) ──
+// Stored in the authenticated user's Supabase user_metadata as a single JSON blob.
+// No extra tables needed. Last-write-wins across devices.
+var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov'];
+function collectExtras(){
+  var o={};
+  EXTRA_SUF.forEach(function(s){var v=localStorage.getItem(PRE+s);if(v!=null)o[s]=v;});
+  o.__ts=Date.now();
+  return o;
+}
+function applyExtras(ex){
+  if(!ex||typeof ex!=='object')return;
+  window._nf_applyingExtras=true;
+  try{
+    EXTRA_SUF.forEach(function(s){
+      if(ex[s]!=null){
+        try{localStorage.setItem(PRE+s,ex[s]);}catch(e){}
+      }
+    });
+  }finally{window._nf_applyingExtras=false;}
+}
+var _extrasTimer=null;
+function pushExtras(token){
+  clearTimeout(_extrasTimer);
+  _extrasTimer=setTimeout(function(){
+    if(!token)return;
+    fetch2('/auth/v1/user','PUT',token,{data:{nf_extras:collectExtras()}}).catch(function(){});
+  },500);
+}
+function pullExtras(token){
+  return fetch2('/auth/v1/user','GET',token).then(function(u){
+    var meta=u&&(u.user_metadata||(u.user&&u.user.user_metadata));
+    var ex=meta&&meta.nf_extras;
+    if(ex)applyExtras(ex);
+    return ex;
+  }).catch(function(){return null;});
+}
+
 function restoreClientsToSupabase(token,all){
   if(!all.length)return Promise.resolve();
   console.log('[NF] RECOVERY: uploading',all.length,'clients back to Supabase...');
@@ -228,6 +266,8 @@ function syncRead(token){
     localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
     localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
     localStorage.setItem(PRE+'seeded','1');
+    // Pull extra data (payments, pauses, sources, calls, goal, weights…) from user_metadata
+    return pullExtras(token);
   });
 }
 
@@ -309,22 +349,40 @@ function saveAntrop(val,token){
   },300);
 }
 
-function doSave(key,value,tok){
-  if(window._nf_syncing)return;
-  if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(tok);
-  else if(key===PRE+'leads')saveLeads(value,tok);
-  else if(key===PRE+'antrop')saveAntrop(value,tok);
+function isExtraKey(key){
+  if(key.indexOf(PRE)!==0)return false;
+  var suf=key.slice(PRE.length);
+  return EXTRA_SUF.indexOf(suf)>=0;
 }
 function setupInterceptor(){
   var orig=Storage.prototype.setItem;
   Storage.prototype.setItem=function(key,value){
     orig.call(this,key,value);
-    if(key!==PRE+'clients'&&key!==PRE+'lostClients'&&key!==PRE+'leads'&&key!==PRE+'antrop')return;
+    var isCore=(key===PRE+'clients'||key===PRE+'lostClients'||key===PRE+'leads'||key===PRE+'antrop');
+    var isExtra=isExtraKey(key);
+    if(!isCore&&!isExtra)return;
+    // Don't push while the initial sync is writing to localStorage
+    if(window._nf_syncing)return;
+    // Don't re-push extras while we're applying remote extras (avoids loops)
+    if(isExtra&&window._nf_applyingExtras)return;
     var tokData=null;
     try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
-    var tok=tokData&&tokData.exp>Date.now()+5000?tokData.tok:null;
-    if(tok){doSave(key,value,tok);return;}
-    getToken().then(function(newTok){if(newTok&&!window._nf_syncing)doSave(key,value,newTok);});
+    var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
+    if(!tok){
+      // token expired/missing — refresh then retry
+      getToken().then(function(newTok){
+        if(!newTok)return;
+        if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(newTok);
+        else if(key===PRE+'leads')saveLeads(value,newTok);
+        else if(key===PRE+'antrop')saveAntrop(value,newTok);
+        else if(isExtra)pushExtras(newTok);
+      });
+      return;
+    }
+    if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(tok);
+    else if(key===PRE+'leads')saveLeads(value,tok);
+    else if(key===PRE+'antrop')saveAntrop(value,tok);
+    else if(isExtra)pushExtras(tok);
   };
 }
 
