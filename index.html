@@ -26,10 +26,45 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   nav button{padding:7px 10px !important;font-size:11px !important;white-space:nowrap !important;flex-shrink:0 !important;}
   main{padding:14px !important;}
   table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch;}
+
+  /* Prevent horizontal overflow of the whole page */
+  html,body{max-width:100vw;overflow-x:hidden;}
+  main>div,main section{max-width:100% !important;}
+
+  /* Native KPI stat grids → stack to 2 or 1 column so nothing overflows */
+  main div[style*="grid-template-columns:repeat(3"],
+  main div[style*="grid-template-columns: repeat(3"],
+  main div[style*="grid-template-columns:1fr 1fr 1fr"],
+  main div[style*="grid-template-columns: 1fr 1fr 1fr"]{
+    grid-template-columns:1fr 1fr !important;
+  }
+
+  /* Injected floating buttons — smaller + safe positions on phones */
+  #_nf_src_btn{width:40px !important;height:40px !important;font-size:16px !important;bottom:14px !important;left:12px !important;}
+  #_nf_lg_btn{bottom:62px !important;left:12px !important;padding:8px 12px !important;font-size:11px !important;}
+
+  /* Top alert banners — keep inside viewport, wrap text, smaller */
+  #_nf_ren_bar>div,#_nf_pay_rem_bar>div,#_nf_pend_bar>div{
+    max-width:94vw !important;font-size:11px !important;padding:8px 12px !important;
+  }
+  #_nf_pay_rem_bar>div{top:104px !important;}
+  #_nf_pend_bar>div{top:148px !important;}
+  /* Bottom-right "próximos a renovar" heads-up — constrain width */
+  #_nf_ren_hu>div{max-width:88vw !important;font-size:10px !important;right:10px !important;bottom:12px !important;}
+
+  /* Modals (sources, lead groups) — full width, scrollable */
+  #_nf_src_mbg>div,#_nf_lg_modal>div{width:96vw !important;max-width:96vw !important;max-height:88vh !important;}
+  #_nf_src_mbg,#_nf_lg_modal{padding:16px 8px !important;align-items:flex-start !important;}
+
+  /* Profile modal sections — comfortable padding */
+  #_nf_pause_section>div,#_nf_wt_section>div,#_nf_pay_section>div{padding-left:12px !important;padding-right:12px !important;}
 }
 @media(max-width:480px){
   nav button{padding:6px 8px !important;font-size:10px !important;}
   main{padding:10px !important;}
+  /* On very small screens, single column for 2-col grids too where it would be too tight */
+  main div[style*="grid-template-columns:1fr 1fr"][style*="minmax(130"]{grid-template-columns:1fr !important;}
+  #_nf_lg_btn span,#_nf_lg_btn{font-size:10px !important;}
 }
 </style></head>
 <body>
