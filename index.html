@@ -320,13 +320,21 @@ function refreshFromCloud(){
       fetch2('/rest/v1/leads?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token),
       fetch2('/rest/v1/antropometrias?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token)
     ]).then(function(r){
-      var clients=Array.isArray(r[0])?r[0]:[];
-      var leads=Array.isArray(r[1])?r[1]:[];
-      var antrop=Array.isArray(r[2])?r[2]:[];
+      // Only treat as valid data if the response was a real array (not an error object)
+      var clientsOk=Array.isArray(r[0]);
+      var leadsOk=Array.isArray(r[1]);
+      var antropOk=Array.isArray(r[2]);
+      var clients=clientsOk?r[0]:[];
+      var leads=leadsOk?r[1]:[];
+      var antrop=antropOk?r[2]:[];
+      // If NONE of the queries returned a valid array, it was almost certainly an
+      // auth/network error — do nothing (never wipe local data on a glitch).
+      if(!clientsOk&&!leadsOk&&!antropOk){window._nf_syncing=false;return pullExtras(token);}
       // Block interceptor only during the synchronous writes (tiny window)
       window._nf_syncing=true;
       try{
-        if(clients.length){
+        // CLIENTS: only overwrite when cloud actually returned some
+        if(clientsOk&&clients.length){
           var fmt=clients.map(function(c){return{id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,startDate:c.start_date,renewalDate:c.renewal_date,active:c.active};});
           var active=fmt.filter(function(c){return c.active;});
           var lost=fmt.filter(function(c){return !c.active;});
@@ -335,11 +343,17 @@ function refreshFromCloud(){
           if(window._nf_setClients){try{window._nf_setClients(active.slice());}catch(e){}}
           if(window._nf_setLostClients){try{window._nf_setLostClients(lost.slice());}catch(e){}}
         }
-        var fmtLeads=leads.map(function(l){return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
-        localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
-        if(window._nf_setLeads){try{window._nf_setLeads(fmtLeads.slice());}catch(e){}}
-        var fmtAntrop=antrop.map(function(a){return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};});
-        localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
+        // LEADS: only overwrite when cloud returned some (never wipe on empty/error)
+        if(leadsOk&&leads.length){
+          var fmtLeads=leads.map(function(l){return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
+          localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
+          if(window._nf_setLeads){try{window._nf_setLeads(fmtLeads.slice());}catch(e){}}
+        }
+        // ANTROP: only overwrite when cloud returned some
+        if(antropOk&&antrop.length){
+          var fmtAntrop=antrop.map(function(a){return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};});
+          localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
+        }
       }finally{window._nf_syncing=false;}
       return pullExtras(token);
     });
@@ -371,8 +385,8 @@ function saveClients(token){
                   active:false};
     });
     var all=Object.keys(byId).map(function(k){return byId[k];});
-    // SAFETY: only skip if initial sync hasn't completed yet (race condition protection)
-    if(!all.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveClients: empty before initial sync – skipping');return;}
+    // SAFETY: never wipe the cloud with an empty array (protects against data loss).
+    if(!all.length){console.warn('[NF] saveClients: empty – skipping to avoid wiping cloud');return;}
     // AUTO-BACKUP before every write
     backupClients();
     fetch(SB+'/rest/v1/clients?user_id=eq.'+UID,{
@@ -393,7 +407,7 @@ function saveLeads(val,token){
   _syncLeadsTimer=setTimeout(function(){
     var leads=[];
     try{leads=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveLeads: JSON parse error, skipping sync');return;}
-    if(!leads.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveLeads: empty before initial sync – skipping');return;}
+    if(!leads.length){console.warn('[NF] saveLeads: empty – skipping to avoid wiping cloud');return;}
     backupLeads();
     var db=leads.map(function(l){
       return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
@@ -417,7 +431,7 @@ function saveAntrop(val,token){
   _syncAntropTimer=setTimeout(function(){
     var antrop=[];
     try{antrop=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveAntrop: JSON parse error, skipping sync');return;}
-    if(!antrop.length&&!sessionStorage.getItem('_nf_sb_ok')){console.warn('[NF] saveAntrop: empty before initial sync – skipping');return;}
+    if(!antrop.length){console.warn('[NF] saveAntrop: empty – skipping to avoid wiping cloud');return;}
     backupAntrop();
     var db=antrop.map(function(a){
       return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};
@@ -501,12 +515,37 @@ if(!sessionStorage.getItem('_nf_sb_ok')){
 // This runs from the device that has the truth (normally the desktop) and fixes
 // the corruption for everyone. Refreshes are held off until it completes.
 var _repairDone=false;
+// If a data type is empty in localStorage but the backup has it, restore it
+// (localStorage + React + cloud). Protects against an accidental wipe.
+function recoverFromBackupIfEmpty(token){
+  function tryRestore(suf,bkSuf,setter,mapDb,table){
+    var cur=[];try{cur=JSON.parse(localStorage.getItem(PRE+suf)||'[]');}catch(e){}
+    if(cur.length)return;
+    var bk=[];try{bk=JSON.parse(localStorage.getItem(PRE+bkSuf)||'[]');}catch(e){}
+    if(!(bk.length&&bk[0].data&&bk[0].data.length))return;
+    var data=bk[0].data;
+    console.warn('[NF] RECOVERY '+suf+' from backup:',data.length,'items');
+    window._nf_syncing=true;
+    try{localStorage.setItem(PRE+suf,JSON.stringify(data));}catch(e){}
+    window._nf_syncing=false;
+    if(setter&&window[setter]){try{window[setter](data.slice());}catch(e){}}
+    if(token&&mapDb&&table){
+      var db=data.map(mapDb);
+      fetch(SB+'/rest/v1/'+table,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(db)}).catch(function(){});
+    }
+  }
+  tryRestore('leads','leads_bk','_nf_setLeads',function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};},'leads');
+  tryRestore('antrop','antrop_bk',null,function(a){return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};},'antropometrias');
+}
+
 function repairThenEnableRefresh(){
   var tokData=null;try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
   var tok=tokData&&tokData.exp>Date.now()+5000?tokData.tok:null;
   var pt=tok?Promise.resolve(tok):getToken();
   pt.then(function(token){
     if(!token){_repairDone=true;return;}
+    // Recover leads/antrop from backup if they got wiped locally
+    recoverFromBackupIfEmpty(token);
     var ll=[];try{ll=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
     if(ll.length){ saveClients(token); } // fixed saveClients pushes correct de-duped state
     // give the repair a moment to land before allowing cloud pulls
