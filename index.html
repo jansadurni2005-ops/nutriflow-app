@@ -170,6 +170,60 @@ function pullExtras(token){
   }).catch(function(){return null;});
 }
 
+// ── CLOUD SNAPSHOT: a full copy of clients/leads/antrop kept in user_metadata.
+// Last line of defence: even if a table is wiped externally, this can restore it.
+var _snapTimer=null;
+function collectSnapshot(){
+  function g(k){try{return JSON.parse(localStorage.getItem(PRE+k)||'[]');}catch(e){return[];}}
+  return{ts:Date.now(),clients:g('clients'),lostClients:g('lostClients'),leads:g('leads'),antrop:g('antrop')};
+}
+function pushSnapshot(token){
+  clearTimeout(_snapTimer);
+  _snapTimer=setTimeout(function(){
+    if(!token)return;
+    var snap=collectSnapshot();
+    if(!(snap.clients.length||snap.lostClients.length||snap.leads.length||snap.antrop.length))return;
+    fetch2('/auth/v1/user','PUT',token,{data:{nf_snapshot:snap}}).catch(function(){});
+  },3000);
+}
+// Restore any locally-empty data type from the cloud snapshot (localStorage + React + cloud).
+function restoreFromSnapshot(token){
+  return fetch2('/auth/v1/user','GET',token).then(function(u){
+    var meta=u&&(u.user_metadata||(u.user&&u.user.user_metadata));
+    var snap=meta&&meta.nf_snapshot;
+    if(!snap)return;
+    window._nf_syncing=true;
+    try{
+      var lc=[];try{lc=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+      var ll=[];try{ll=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+      if(!lc.length&&!ll.length&&((snap.clients&&snap.clients.length)||(snap.lostClients&&snap.lostClients.length))){
+        localStorage.setItem(PRE+'clients',JSON.stringify(snap.clients||[]));
+        localStorage.setItem(PRE+'lostClients',JSON.stringify(snap.lostClients||[]));
+        if(window._nf_setClients){try{window._nf_setClients((snap.clients||[]).slice());}catch(e){}}
+        if(window._nf_setLostClients){try{window._nf_setLostClients((snap.lostClients||[]).slice());}catch(e){}}
+        var cdb=(snap.clients||[]).map(function(c){return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:true};}).concat((snap.lostClients||[]).map(function(c){return{id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};}));
+        if(cdb.length)fetch(SB+'/rest/v1/clients',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(cdb)}).catch(function(){});
+        console.warn('[NF] RECOVERY clients from cloud snapshot');
+      }
+      var lled=[];try{lled=JSON.parse(localStorage.getItem(PRE+'leads')||'[]');}catch(e){}
+      if(!lled.length&&snap.leads&&snap.leads.length){
+        localStorage.setItem(PRE+'leads',JSON.stringify(snap.leads));
+        if(window._nf_setLeads){try{window._nf_setLeads(snap.leads.slice());}catch(e){}}
+        var ldb=snap.leads.map(function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
+        fetch(SB+'/rest/v1/leads',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(ldb)}).catch(function(){});
+        console.warn('[NF] RECOVERY leads from cloud snapshot:',snap.leads.length);
+      }
+      var lan=[];try{lan=JSON.parse(localStorage.getItem(PRE+'antrop')||'[]');}catch(e){}
+      if(!lan.length&&snap.antrop&&snap.antrop.length){
+        localStorage.setItem(PRE+'antrop',JSON.stringify(snap.antrop));
+        var adb=snap.antrop.map(function(a){return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};});
+        fetch(SB+'/rest/v1/antropometrias',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(adb)}).catch(function(){});
+        console.warn('[NF] RECOVERY antrop from cloud snapshot:',snap.antrop.length);
+      }
+    }finally{window._nf_syncing=false;}
+  }).catch(function(){});
+}
+
 function restoreClientsToSupabase(token,all){
   if(!all.length)return Promise.resolve();
   console.log('[NF] RECOVERY: uploading',all.length,'clients back to Supabase...');
@@ -298,6 +352,9 @@ function syncRead(token){
     localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
     localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
     localStorage.setItem(PRE+'seeded','1');
+    setSyncedIds('clients',active.concat(lost));
+    setSyncedIds('leads',fmtLeads);
+    setSyncedIds('antrop',fmtAntrop);
     // Pull extra data (payments, pauses, sources, calls, goal, weights…) from user_metadata
     return pullExtras(token);
   });
@@ -340,6 +397,7 @@ function refreshFromCloud(){
           var lost=fmt.filter(function(c){return !c.active;});
           localStorage.setItem(PRE+'clients',JSON.stringify(active));
           localStorage.setItem(PRE+'lostClients',JSON.stringify(lost));
+          setSyncedIds('clients',active.concat(lost));
           if(window._nf_setClients){try{window._nf_setClients(active.slice());}catch(e){}}
           if(window._nf_setLostClients){try{window._nf_setLostClients(lost.slice());}catch(e){}}
         }
@@ -347,12 +405,14 @@ function refreshFromCloud(){
         if(leadsOk&&leads.length){
           var fmtLeads=leads.map(function(l){return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
           localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
+          setSyncedIds('leads',fmtLeads);
           if(window._nf_setLeads){try{window._nf_setLeads(fmtLeads.slice());}catch(e){}}
         }
         // ANTROP: only overwrite when cloud returned some
         if(antropOk&&antrop.length){
           var fmtAntrop=antrop.map(function(a){return{id:a.id,client:a.client,price:a.price,date:a.date,notes:a.notes};});
           localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
+          setSyncedIds('antrop',fmtAntrop);
         }
       }finally{window._nf_syncing=false;}
       return pullExtras(token);
@@ -363,14 +423,65 @@ function refreshFromCloud(){
 window._nf_refreshFromCloud=refreshFromCloud;
 
 var _syncClientsTimer=null;
+// Remember which ids are currently in the cloud, so targeted deletes are precise.
+function setSyncedIds(storageKey,arr){
+  try{localStorage.setItem('_nf_syncedids_'+storageKey,JSON.stringify((arr||[]).map(function(x){return x&&x.id;}).filter(Boolean)));}catch(e){}
+}
+// Seed synced-id sets from local data if not present yet (first run after this update).
+function seedSyncedIdsIfMissing(){
+  ['clients','leads','antrop'].forEach(function(k){
+    if(localStorage.getItem('_nf_syncedids_'+k)!=null)return;
+    var arr=[];
+    if(k==='clients'){
+      var a=[],l=[];
+      try{a=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+      try{l=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+      arr=a.concat(l);
+    }else{
+      try{arr=JSON.parse(localStorage.getItem(PRE+(k==='antrop'?'antrop':k))||'[]');}catch(e){}
+    }
+    setSyncedIds(k,arr);
+  });
+}
+
+// ── SAFE SYNC: UPSERT + targeted delete. NEVER "delete all then insert".
+// This guarantees there is never a moment where the cloud has no data.
+//  - Upsert (merge-duplicates on id) inserts/updates current records without deleting.
+//  - Only records that were genuinely removed (present last sync, gone now) are deleted.
+//  - Empty local array → skip entirely (never wipe the cloud).
+function syncTable(table,records,storageKey,token){
+  if(!records||!records.length){console.warn('[NF] syncTable '+table+': empty – skipping (never wipe cloud)');return;}
+  var currentIds=records.map(function(r){return r.id;});
+  var curSet={};currentIds.forEach(function(id){curSet[id]=1;});
+  var lastIds=[];try{lastIds=JSON.parse(localStorage.getItem('_nf_syncedids_'+storageKey)||'[]');}catch(e){}
+  var toDelete=lastIds.filter(function(id){return !curSet[id];});
+  // 1) UPSERT current records — no wipe window
+  fetch(SB+'/rest/v1/'+table,{
+    method:'POST',
+    headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},
+    body:JSON.stringify(records)
+  }).then(function(res){
+    // 2) DELETE only the records that were removed (targeted, safe)
+    if(toDelete.length&&currentIds.length){
+      var idList=toDelete.map(function(id){return '"'+String(id).replace(/"/g,'')+'"';}).join(',');
+      fetch(SB+'/rest/v1/'+table+'?user_id=eq.'+UID+'&id=in.('+idList+')',{
+        method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
+      }).catch(function(){});
+    }
+    // Remember what we synced so future deletes are precise
+    try{localStorage.setItem('_nf_syncedids_'+storageKey,JSON.stringify(currentIds));}catch(e){}
+    // Update the cloud snapshot (throttled) — last-resort backup
+    pushSnapshot(token);
+  }).catch(function(){});
+}
+
 function saveClients(token){
   clearTimeout(_syncClientsTimer);
   _syncClientsTimer=setTimeout(function(){
     var active=[],lost=[];
     try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
     try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
-    // Build a de-duplicated map by id. A client is INACTIVE if it's in lostClients
-    // OR its own active flag is false. lostClients is authoritative for "baja".
+    // De-dupe by id. lostClients is authoritative for "baja" (inactive).
     var byId={};
     active.forEach(function(c){
       if(!c||!c.id)return;
@@ -385,19 +496,9 @@ function saveClients(token){
                   active:false};
     });
     var all=Object.keys(byId).map(function(k){return byId[k];});
-    // SAFETY: never wipe the cloud with an empty array (protects against data loss).
     if(!all.length){console.warn('[NF] saveClients: empty – skipping to avoid wiping cloud');return;}
-    // AUTO-BACKUP before every write
     backupClients();
-    fetch(SB+'/rest/v1/clients?user_id=eq.'+UID,{
-      method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
-    }).then(function(){
-      return fetch(SB+'/rest/v1/clients',{
-        method:'POST',
-        headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify(all)
-      });
-    }).catch(function(){});
+    syncTable('clients',all,'clients',token);
   },300);
 }
 
@@ -409,19 +510,10 @@ function saveLeads(val,token){
     try{leads=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveLeads: JSON parse error, skipping sync');return;}
     if(!leads.length){console.warn('[NF] saveLeads: empty – skipping to avoid wiping cloud');return;}
     backupLeads();
-    var db=leads.map(function(l){
+    var db=leads.filter(function(l){return l&&l.id;}).map(function(l){
       return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};
     });
-    fetch(SB+'/rest/v1/leads?user_id=eq.'+UID,{
-      method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
-    }).then(function(){
-      if(!db.length)return;
-      return fetch(SB+'/rest/v1/leads',{
-        method:'POST',
-        headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify(db)
-      });
-    }).catch(function(){});
+    syncTable('leads',db,'leads',token);
   },300);
 }
 
@@ -433,19 +525,10 @@ function saveAntrop(val,token){
     try{antrop=JSON.parse(val||'[]');}catch(e){console.warn('[NF] saveAntrop: JSON parse error, skipping sync');return;}
     if(!antrop.length){console.warn('[NF] saveAntrop: empty – skipping to avoid wiping cloud');return;}
     backupAntrop();
-    var db=antrop.map(function(a){
+    var db=antrop.filter(function(a){return a&&a.id;}).map(function(a){
       return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};
     });
-    fetch(SB+'/rest/v1/antropometrias?user_id=eq.'+UID,{
-      method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token}
-    }).then(function(){
-      if(!db.length)return;
-      return fetch(SB+'/rest/v1/antropometrias',{
-        method:'POST',
-        headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},
-        body:JSON.stringify(db)
-      });
-    }).catch(function(){});
+    syncTable('antropometrias',db,'antrop',token);
   },300);
 }
 
@@ -544,8 +627,13 @@ function repairThenEnableRefresh(){
   var pt=tok?Promise.resolve(tok):getToken();
   pt.then(function(token){
     if(!token){_repairDone=true;return;}
-    // Recover leads/antrop from backup if they got wiped locally
+    seedSyncedIdsIfMissing();
+    // Recover leads/antrop from local backup if they got wiped locally
     recoverFromBackupIfEmpty(token);
+    // Last-resort: recover anything still empty from the cloud snapshot
+    restoreFromSnapshot(token);
+    // Keep a fresh cloud snapshot for the future
+    pushSnapshot(token);
     var ll=[];try{ll=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
     if(ll.length){ saveClients(token); } // fixed saveClients pushes correct de-duped state
     // give the repair a moment to land before allowing cloud pulls
