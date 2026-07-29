@@ -2761,13 +2761,13 @@ CAPACIDADES QUE TIENES:
             '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Porta amb tu</div>'+
             '<div id="_nf_pm_wrap" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+
               '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#4d9cf8;cursor:pointer;line-height:1">'+months+'</span>'+
-              '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
+              '<span style="font-size:12px;color:var(--muted)">meses</span>'+
               '<button id="_nf_pme" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;opacity:.8;line-height:1">&#9998;</button>'+
             '</div>'+
           '</div>'+
-          // Cell 2: Total pagat — NOTE: closing " before > is critical!
+          // Cell 2: Total pagado — NOTE: closing " before > is critical!
           '<div style="padding:14px 16px'+(lastW?';border-right:1px solid var(--border)':'')+'">'+
-            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Total pagat</div>'+
+            '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Total pagado</div>'+
             '<div id="_nf_pt_wrap" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+
               '<span id="_nf_pt" style="font-size:22px;font-weight:800;color:#34d399;cursor:pointer;line-height:1">'+fmt(totalPaid)+'</span>'+
               '<button id="_nf_pte" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;opacity:.8;line-height:1">&#9998;</button>'+
@@ -2798,7 +2798,7 @@ CAPACIDADES QUE TIENES:
         '</div>'+
         (weights.length?
           '<div style="max-height:140px;overflow-y:auto;margin-bottom:4px">'+wRows+'</div>':
-          '<div style="text-align:center;padding:6px 0 8px;color:var(--muted);font-size:12px;opacity:.6">Sense registres de pes encara</div>')+
+          '<div style="text-align:center;padding:6px 0 8px;color:var(--muted);font-size:12px;opacity:.6">Sin registros de peso todavía</div>')+
       '</div>';
 
     // ── Inline edit: months ──
@@ -2807,8 +2807,8 @@ CAPACIDADES QUE TIENES:
       var cur=cov.monthsOv!=null?cov.monthsOv:monthsSince(client.startDate);
       wrap.innerHTML=
         '<input id="_nf_pm_i" type="number" min="0" max="999" value="'+cur+'" style="'+INP_S+';width:58px">'+
-        '<span style="font-size:12px;color:var(--muted)">mesos</span>'+
-        '<button id="_nf_pm_ok" style="'+OK_S+'">&#10003; Desar</button>'+
+        '<span style="font-size:12px;color:var(--muted)">meses</span>'+
+        '<button id="_nf_pm_ok" style="'+OK_S+'">&#10003; Guardar</button>'+
         '<button id="_nf_pm_cx" style="'+CX_S+'">×</button>';
       var inp=document.getElementById('_nf_pm_i');
       if(inp){inp.focus();inp.select();}
@@ -2831,7 +2831,7 @@ CAPACIDADES QUE TIENES:
       wrap.innerHTML=
         '<input id="_nf_pt_i" type="number" min="0" step="1" value="'+Math.round(cur)+'" style="'+INP_S+';width:72px;font-size:15px">'+
         '<span style="font-size:12px;color:var(--muted)">€</span>'+
-        '<button id="_nf_pt_ok" style="'+OK_S+'">&#10003; Desar</button>'+
+        '<button id="_nf_pt_ok" style="'+OK_S+'">&#10003; Guardar</button>'+
         '<button id="_nf_pt_cx" style="'+CX_S+'">×</button>';
       var inp=document.getElementById('_nf_pt_i');
       if(inp){inp.focus();inp.select();}
@@ -3022,7 +3022,7 @@ CAPACIDADES QUE TIENES:
     var METHOD_LABELS={cash:'Efectiu',bizum:'Bizum',transfer:'Transferència',card:'Targeta',other:'Altres'};
     var METHOD_COLORS={cash:'#34d399',bizum:'#06b6d4',transfer:'#a78bfa',card:'#f59e0b',other:'#94a3b8'};
     var paymentList=thisCycle.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');}).map(function(p){
-      var rem=p.reminderDate?'<div style="font-size:11px;color:#f59e0b;margin-top:3px">🔔 Recordatori: '+fmtD(p.reminderDate)+'</div>':'';
+      var rem=p.reminderDate?'<div style="font-size:11px;color:#f59e0b;margin-top:3px">🔔 Recordatorio: '+fmtD(p.reminderDate)+'</div>':'';
       var notes=p.notes?'<div style="font-size:11px;color:var(--muted);margin-top:2px;font-style:italic">'+esc(p.notes)+'</div>':'';
       var mt=p.method||'other';
       var mlabel=METHOD_LABELS[mt]||'Altres';
@@ -3059,29 +3059,29 @@ CAPACIDADES QUE TIENES:
           '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Concepte (opcional)</label>'+
             '<input id="_nf_pn_nt" type="text" placeholder="ex: 1r plazo, paga i senyal..." style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '</div>'+
-        '<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Recordatori per propera quota (opcional)</label>'+
+        '<div style="margin-bottom:10px"><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Recordatorio para próxima cuota (opcional)</label>'+
           '<input id="_nf_pn_rem" type="date" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '<div style="display:flex;gap:6px;justify-content:flex-end">'+
-          '<button id="_nf_pn_cx" style="background:none;border:1px solid var(--bg4);color:var(--muted);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Cancel·lar</button>'+
-          '<button id="_nf_pn_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">✓ Desar</button>'+
+          '<button id="_nf_pn_cx" style="background:none;border:1px solid var(--bg4);color:var(--muted);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Cancelar</button>'+
+          '<button id="_nf_pn_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar</button>'+
         '</div>'+
       '</div>'
     :
       '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
-        '<button id="_nf_pa" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">+ Afegir pagament</button>'+
-        (remaining>0?'<button id="_nf_pfull" style="background:var(--bg2);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">✓ Marcar com pagat tot ('+fmtE(remaining)+')</button>':'')+
+        '<button id="_nf_pa" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">+ Añadir pago</button>'+
+        (remaining>0?'<button id="_nf_pfull" style="background:var(--bg2);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">✓ Marcar como pagado todo ('+fmtE(remaining)+')</button>':'')+
       '</div>';
 
     el.innerHTML=
       '<div style="background:var(--bg3);border-radius:12px;padding:14px 16px;margin-bottom:12px">'+
         '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:10px;flex-wrap:wrap;gap:6px">'+
           '<div>'+
-            '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700">Pagaments del cicle</div>'+
+            '<div style="font-size:11px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700">Pagos del ciclo</div>'+
             '<div style="font-size:11px;color:var(--muted);margin-top:2px">'+fmtD(cycle)+' → '+fmtD(endDate)+' · Total <b style="color:var(--text2)">'+fmtE(totalDue)+'</b></div>'+
           '</div>'+
           '<div style="text-align:right">'+
             '<div style="font-size:18px;font-weight:800;color:'+barCol+';line-height:1">'+fmtE(paid)+'</div>'+
-            '<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(remaining>0?'queden '+fmtE(remaining):'✓ cobrat completament')+'</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-top:2px">'+(remaining>0?'quedan '+fmtE(remaining):'✓ cobrado completamente')+'</div>'+
           '</div>'+
         '</div>'+
         '<div style="height:7px;background:var(--bg2);border-radius:4px;overflow:hidden;margin-bottom:14px">'+
@@ -3110,7 +3110,7 @@ CAPACIDADES QUE TIENES:
 
     var fullBtn=document.getElementById('_nf_pfull');
     if(fullBtn)fullBtn.onclick=function(){
-      if(!confirm('Marcar com a totalment pagat ('+fmtE(remaining)+')?'))return;
+      if(!confirm('¿Marcar como totalmente pagado ('+fmtE(remaining)+')?'))return;
       var all=loadAll();
       all.push({id:genId(),clientId:client.id,cycleStart:cycle,amount:remaining,date:ymd(),notes:'Pagat completament',method:'other',reminderDate:''});
       saveAll(all);
@@ -3267,7 +3267,7 @@ CAPACIDADES QUE TIENES:
       help.style.cssText='margin-top:10px;padding:10px 12px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.22);border-radius:8px;font-size:11px;color:#cbd5e1;line-height:1.55;display:flex;gap:8px;align-items:flex-start';
       help.innerHTML='<span style="font-size:14px;flex-shrink:0">💳</span>'+
         '<div><strong style="color:#60a5fa">Pagaments per a aquest client</strong><br>'+
-        'Quan desis el client, podràs registrar pagaments parcials des del seu <b>perfil</b> (botons + Afegir pagament / ✓ Marcar com pagat tot). Apareixerà una <b>alerta blava</b> a dalt mentre quedi import per cobrar.</div>';
+        'Cuando guardes el cliente, podrás registrar pagos parciales desde su <b>perfil</b> (botones + Añadir pago / ✓ Marcar como pagado todo). Aparecerá una <b>alerta azul</b> arriba mientras quede importe por cobrar.</div>';
       parent.appendChild(help);
       return;
     }
@@ -3344,8 +3344,8 @@ CAPACIDADES QUE TIENES:
         var rsvCol=paid>0?'#06b6d4':'#a78bfa';
         var rsvLbl=paid>0?'RESERVAT':'PER COMENÇAR';
         var rsvTitle=paid>0
-          ?'Servei reservat. Comença el '+c.startDate+'. Pagat '+fmtE(paid)+' de '+fmtE(totalDue)
-          :'Servei per començar el '+c.startDate+'. Sense pagaments encara.';
+          ?'Servicio reservado. Empieza el '+c.startDate+'. Pagat '+fmtE(paid)+' de '+fmtE(totalDue)
+          :'Servicio por empezar el '+c.startDate+'. Sin pagos todavía.';
         var rsv=document.createElement('span');
         rsv.setAttribute('data-nf-rsv-bd','1');
         rsv.title=rsvTitle;
@@ -3505,13 +3505,13 @@ CAPACIDADES QUE TIENES:
     var sources=loadSources();
     var rows=sources.map(function(s,i){
       return '<div data-row="'+i+'" style="display:grid;grid-template-columns:1fr 90px 38px 28px;gap:7px;align-items:center;padding:6px 0">'+
-        '<input data-fld="name" type="text" value="'+esc(s.name)+'" placeholder="Nom origen" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:6px;padding:7px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none">'+
+        '<input data-fld="name" type="text" value="'+esc(s.name)+'" placeholder="Nombre origen" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:6px;padding:7px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none">'+
         '<div style="display:flex;align-items:center;gap:4px"><input data-fld="pct" type="number" min="0" max="100" step="1" value="'+(parseFloat(s.pct)||0)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:6px;padding:7px 8px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none;-moz-appearance:textfield"><span style="font-size:12px;color:var(--muted);flex-shrink:0">%</span></div>'+
         '<input data-fld="color" type="color" value="'+(s.color||'#94a3b8')+'" title="Color (opcional)" style="width:38px;height:34px;border:1px solid var(--bg4);border-radius:6px;background:var(--bg3);cursor:pointer;padding:2px;box-sizing:border-box">'+
         '<button data-del="'+i+'" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:18px;padding:4px;line-height:1;font-weight:700" title="Eliminar">×</button>'+
       '</div>';
     }).join('');
-    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:18px 0;text-align:center;font-style:italic">Cap origen personalitzat encara. Clica "+ Afegir origen" per començar.</div>';
+    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:18px 0;text-align:center;font-style:italic">Ningún origen personalizado todavía. Pulsa "+ Añadir origen" para empezar.</div>';
 
     bg.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:22px 24px;max-width:540px;width:92vw;max-height:82vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,0.6)">'+
       '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">'+
@@ -3520,12 +3520,12 @@ CAPACIDADES QUE TIENES:
       '</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-bottom:18px;line-height:1.55">Crea orígens personalitzats amb la comissió % que es queda el partner. Quan crees un nou client i selecciones aquest origen, el sistema calcularà el take-home automaticament.</div>'+
       '<div style="display:grid;grid-template-columns:1fr 90px 38px 28px;gap:7px;padding:0 0 8px;margin-bottom:4px;border-bottom:1px solid var(--bg4);font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);font-weight:700">'+
-        '<span>Nom origen</span><span>% partner</span><span>Color</span><span></span>'+
+        '<span>Nombre origen</span><span>% partner</span><span>Color</span><span></span>'+
       '</div>'+
       '<div id="_nf_src_rows">'+rows+'</div>'+
       '<div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid var(--bg3)">'+
-        '<button id="_nf_src_add" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">+ Afegir origen</button>'+
-        '<button id="_nf_src_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">✓ Desar i tancar</button>'+
+        '<button id="_nf_src_add" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">+ Añadir origen</button>'+
+        '<button id="_nf_src_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar y cerrar</button>'+
       '</div>'+
     '</div>';
     document.body.appendChild(bg);
@@ -3609,11 +3609,15 @@ CAPACIDADES QUE TIENES:
   };
 
   // ─── FLOATING BUTTON ───
+  function inDashboard(){return !!document.querySelector('nav');}
   function ensureButton(){
-    if(document.getElementById('_nf_src_btn'))return;
-    var btn=document.createElement('button');
+    var btn=document.getElementById('_nf_src_btn');
+    // Only show inside the app (never on the login / onboarding screens)
+    if(!inDashboard()){if(btn)btn.style.display='none';return;}
+    if(btn){btn.style.display='flex';return;}
+    btn=document.createElement('button');
     btn.id='_nf_src_btn';
-    btn.title='Configuració d origens';
+    btn.title='Configuración de orígenes';
     btn.innerHTML='🏷️';
     btn.style.cssText='position:fixed;bottom:18px;left:18px;z-index:798;background:rgba(15,23,42,0.94);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border:1px solid rgba(167,139,250,0.25);color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .15s ease';
     btn.onmouseenter=function(){btn.style.transform='scale(1.08)';};
@@ -3726,7 +3730,7 @@ CAPACIDADES QUE TIENES:
     });
 
     // Group filter chips
-    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Assignar / Tots</span>';
+    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Asignar / Todos</span>';
     chips+=groups.map(function(g){
       var on=_sel===g.name;
       return '<span data-gf="'+esc(g.name)+'" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap;background:'+g.color+(on?'':'22')+';color:'+(on?'#fff':g.color)+';border:1px solid '+g.color+(on?'':'44')+'">'+
@@ -3736,8 +3740,8 @@ CAPACIDADES QUE TIENES:
     }).join('');
 
     var addBtn=_adding
-      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nom del grup..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#4d9cf8;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
-      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#4d9cf8;border:1px dashed #4d9cf855">+ Nou grup</span>';
+      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nombre del grupo..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#4d9cf8;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
+      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#4d9cf8;border:1px dashed #4d9cf855">+ Nuevo grupo</span>';
 
     // Body: list of leads (all-active for assign view, filtered for a group)
     var listLeads;
@@ -3766,21 +3770,21 @@ CAPACIDADES QUE TIENES:
         '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:60%">'+tagPills+addMenu+'</div>'+
       '</div>';
     }).join('');
-    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center;font-style:italic">'+(_sel===null?'Cap lead actiu':'Cap lead en aquest grup encara')+'</div>';
+    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center;font-style:italic">'+(_sel===null?'Ningún lead activo':'Ningún lead en este grupo todavía')+'</div>';
 
     root.innerHTML=
       '<div style="margin-bottom:20px;background:var(--bg2);border-radius:14px;border:1px solid var(--border);overflow:hidden">'+
         '<div id="_nf_lg_hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none;border-bottom:'+(_open?'1px solid var(--border)':'none')+'">'+
           '<div style="display:flex;align-items:center;gap:10px">'+
             '<span style="font-size:16px">📋</span>'+
-            '<span style="font-size:13px;font-weight:700;color:var(--text)">Grups de leads</span>'+
+            '<span style="font-size:13px;font-weight:700;color:var(--text)">Grupos de leads</span>'+
             '<span style="background:#4d9cf822;color:#4d9cf8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+groups.length+'</span>'+
           '</div>'+
           '<span style="color:var(--muted);font-size:11px">'+(_open?'▾':'▸')+'</span>'+
         '</div>'+
         (_open?
           '<div style="padding:14px 20px">'+
-            '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Crea grups (ex: <b>Cerrar llamada</b>, <b>Cerrar venta</b>) i assigna’ls als leads. Clica un grup per veure només els leads d’aquell grup.</div>'+
+            '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Crea grupos (ej: <b>Cerrar llamada</b>, <b>Cerrar venta</b>) y asígnalos a los leads. Pulsa un grupo para ver solo los leads de ese grupo.</div>'+
             '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+chips+addBtn+'</div>'+
             '<div>'+rows+'</div>'+
           '</div>'
@@ -3802,7 +3806,7 @@ CAPACIDADES QUE TIENES:
         el.onclick=function(ev){
           ev.stopPropagation();
           var name=el.getAttribute('data-gdel');
-          if(!confirm('Eliminar el grup "'+name+'"? (els leads no s’esborren, només l’etiqueta)'))return;
+          if(!confirm('¿Eliminar el grupo "'+name+'"? (los leads no se borran, solo la etiqueta)'))return;
           var g=loadGroups().filter(function(x){return x.name!==name;});saveGroups(g);
           var t=loadTags();Object.keys(t).forEach(function(k){t[k]=(t[k]||[]).filter(function(n){return n!==name;});if(!t[k].length)delete t[k];});saveTags(t);
           if(_sel===name)_sel=null;
@@ -3829,10 +3833,10 @@ CAPACIDADES QUE TIENES:
     }
   }
 
-  // ── Floating button (only visible on Leads tab) + modal ──
+  // ── Floating button (only visible on the Leads tab) + modal ──
   function onLeadsTab(){
-    // Leads tab active if the leads source/kanban DOM markers exist OR nav 'Leads' active
-    return !!document.getElementById('_nf_followup_root')||/Fuentes de leads/.test(document.body.textContent||'');
+    // Reliable marker: our own root div is mounted by React only on the Leads tab.
+    return !!document.getElementById('_nf_leadgroups_root');
   }
   function openModal(){
     var bg=document.getElementById('_nf_lg_modal');if(bg){bg.style.display='flex';render();return;}
@@ -3857,7 +3861,7 @@ CAPACIDADES QUE TIENES:
     if(btn){btn.style.display='flex';return;}
     btn=document.createElement('button');
     btn.id='_nf_lg_btn';
-    btn.innerHTML='📋 Grups';
+    btn.innerHTML='📋 Grupos';
     btn.style.cssText='position:fixed;bottom:70px;left:18px;z-index:797;background:#4d9cf8;border:none;color:#fff;border-radius:22px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;gap:6px';
     btn.onclick=openModal;
     document.body.appendChild(btn);
