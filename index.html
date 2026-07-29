@@ -72,8 +72,9 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 
 <script>
 (function(){
-var SB='https://nrxltxmbpkplhgycodob.supabase.co',KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs',EM='jansadurni2005@gmail.com',PW='JanS@2005',UID='f209b91f-607b-4b14-9305-6a7d567b90b5';
-var PRE='nf_'+EM+'_';
+var SB='https://nrxltxmbpkplhgycodob.supabase.co',KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs';
+// Active user context — set dynamically once the logged-in user authenticates.
+var EM=null,UID=null,PRE=null;
 
 function fetch2(path,method,token,body){
   return new Promise(function(res,rej){
@@ -88,18 +89,57 @@ function fetch2(path,method,token,body){
   });
 }
 
-function getToken(){
-  var cached=null;
-  try{cached=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
-  if(cached&&cached.exp>Date.now()+60000)return Promise.resolve(cached.tok);
-  return fetch2('/auth/v1/token?grant_type=password','POST',null,{email:EM,password:PW})
-    .then(function(d){
-      if(d.access_token){
-        localStorage.setItem('_nf_sb_tok',JSON.stringify({tok:d.access_token,exp:Date.now()+(d.expires_in||3600)*1000}));
-        return d.access_token;
-      }
+// ── MULTI-USER AUTH: each app user gets their own Supabase account + isolated data ──
+function getSession(){try{return JSON.parse(localStorage.getItem('nf_session'));}catch(e){return null;}}
+// Use the EXACT session email (the app keys its data as nf_{email}_… with this exact case).
+function currentEmail(){var s=getSession();return (s&&s.email)?String(s.email):null;}
+function getUserPassword(email){
+  try{
+    var u=JSON.parse(localStorage.getItem('nf_users')||'{}');
+    for(var k in u){ if(k.toLowerCase()===String(email).toLowerCase()) return u[k]&&u[k].password; }
+  }catch(e){}
+  return null;
+}
+function tokKey(email){return '_nf_sb_tok_'+email;}
+function getCachedTok(email){try{return JSON.parse(localStorage.getItem(tokKey(email))||'null');}catch(e){return null;}}
+function storeTok(email,d){
+  if(!d||!d.access_token)return;
+  var prev=getCachedTok(email)||{};
+  var uid=(d.user&&d.user.id)||prev.uid;
+  localStorage.setItem(tokKey(email),JSON.stringify({tok:d.access_token,refresh:d.refresh_token||prev.refresh,uid:uid,exp:Date.now()+((d.expires_in||3600)*1000)}));
+}
+// Authenticate the given email with Supabase: log in, or sign up if new. → {token,uid,email} | null
+function authForEmail(email){
+  var pass=getUserPassword(email);
+  if(!pass)return Promise.resolve(null);
+  function login(){
+    return fetch2('/auth/v1/token?grant_type=password','POST',null,{email:email,password:pass}).then(function(d){
+      if(d&&d.access_token&&d.user){storeTok(email,d);return{token:d.access_token,uid:d.user.id,email:email};}
       return null;
-    }).catch(function(){return null;});
+    });
+  }
+  return login().then(function(r){
+    if(r)return r;
+    // Not registered yet → sign up, then log in
+    return fetch2('/auth/v1/signup','POST',null,{email:email,password:pass}).then(function(s){
+      if(s&&s.access_token&&s.user){storeTok(email,s);return{token:s.access_token,uid:s.user.id,email:email};}
+      return login(); // in case it auto-confirmed
+    });
+  }).catch(function(){return null;});
+}
+// Get a valid token for the CURRENT user (refresh if expired).
+function getToken(){
+  var email=EM||currentEmail();
+  if(!email)return Promise.resolve(null);
+  var cached=getCachedTok(email);
+  if(cached&&cached.tok&&cached.exp>Date.now()+60000)return Promise.resolve(cached.tok);
+  if(cached&&cached.refresh){
+    return fetch2('/auth/v1/token?grant_type=refresh_token','POST',null,{refresh_token:cached.refresh}).then(function(d){
+      if(d&&d.access_token){storeTok(email,d);return d.access_token;}
+      return authForEmail(email).then(function(x){return x?x.token:null;});
+    }).catch(function(){return authForEmail(email).then(function(x){return x?x.token:null;});});
+  }
+  return authForEmail(email).then(function(x){return x?x.token:null;});
 }
 
 // ── AUTO-BACKUP: keep last 3 snapshots of each data type in localStorage ──
@@ -424,13 +464,14 @@ window._nf_refreshFromCloud=refreshFromCloud;
 
 var _syncClientsTimer=null;
 // Remember which ids are currently in the cloud, so targeted deletes are precise.
+function syncedIdsKey(storageKey){return (PRE||'nf__')+'syncedids_'+storageKey;}
 function setSyncedIds(storageKey,arr){
-  try{localStorage.setItem('_nf_syncedids_'+storageKey,JSON.stringify((arr||[]).map(function(x){return x&&x.id;}).filter(Boolean)));}catch(e){}
+  try{localStorage.setItem(syncedIdsKey(storageKey),JSON.stringify((arr||[]).map(function(x){return x&&x.id;}).filter(Boolean)));}catch(e){}
 }
 // Seed synced-id sets from local data if not present yet (first run after this update).
 function seedSyncedIdsIfMissing(){
   ['clients','leads','antrop'].forEach(function(k){
-    if(localStorage.getItem('_nf_syncedids_'+k)!=null)return;
+    if(localStorage.getItem(syncedIdsKey(k))!=null)return;
     var arr=[];
     if(k==='clients'){
       var a=[],l=[];
@@ -453,7 +494,7 @@ function syncTable(table,records,storageKey,token){
   if(!records||!records.length){console.warn('[NF] syncTable '+table+': empty – skipping (never wipe cloud)');return;}
   var currentIds=records.map(function(r){return r.id;});
   var curSet={};currentIds.forEach(function(id){curSet[id]=1;});
-  var lastIds=[];try{lastIds=JSON.parse(localStorage.getItem('_nf_syncedids_'+storageKey)||'[]');}catch(e){}
+  var lastIds=[];try{lastIds=JSON.parse(localStorage.getItem(syncedIdsKey(storageKey))||'[]');}catch(e){}
   var toDelete=lastIds.filter(function(id){return !curSet[id];});
   // 1) UPSERT current records — no wipe window
   fetch(SB+'/rest/v1/'+table,{
@@ -469,7 +510,7 @@ function syncTable(table,records,storageKey,token){
       }).catch(function(){});
     }
     // Remember what we synced so future deletes are precise
-    try{localStorage.setItem('_nf_syncedids_'+storageKey,JSON.stringify(currentIds));}catch(e){}
+    try{localStorage.setItem(syncedIdsKey(storageKey),JSON.stringify(currentIds));}catch(e){}
     // Update the cloud snapshot (throttled) — last-resort backup
     pushSnapshot(token);
   }).catch(function(){});
@@ -533,7 +574,7 @@ function saveAntrop(val,token){
 }
 
 function isExtraKey(key){
-  if(key.indexOf(PRE)!==0)return false;
+  if(!PRE||key.indexOf(PRE)!==0)return false;
   var suf=key.slice(PRE.length);
   return EXTRA_SUF.indexOf(suf)>=0;
 }
@@ -541,6 +582,8 @@ function setupInterceptor(){
   var orig=Storage.prototype.setItem;
   Storage.prototype.setItem=function(key,value){
     orig.call(this,key,value);
+    // Not authenticated yet → never sync (avoids saving to the wrong/no account)
+    if(!EM||!UID||!PRE)return;
     var isCore=(key===PRE+'clients'||key===PRE+'lostClients'||key===PRE+'leads'||key===PRE+'antrop');
     var isExtra=isExtraKey(key);
     if(!isCore&&!isExtra)return;
@@ -548,8 +591,7 @@ function setupInterceptor(){
     if(window._nf_syncing)return;
     // Don't re-push extras while we're applying remote extras (avoids loops)
     if(isExtra&&window._nf_applyingExtras)return;
-    var tokData=null;
-    try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
+    var tokData=getCachedTok(EM);
     var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
     if(!tok){
       // token expired/missing — refresh then retry
@@ -569,37 +611,19 @@ function setupInterceptor(){
   };
 }
 
-if(!sessionStorage.getItem('_nf_sb_ok')){
+function okKey(email){return '_nf_sb_ok_'+email;}
+function showOverlay(){
+  if(document.getElementById('_nf_overlay'))return;
   var overlay=document.createElement('div');
   overlay.id='_nf_overlay';
   overlay.style.cssText='position:fixed;inset:0;background:#0d1117;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,system-ui,sans-serif;';
   overlay.innerHTML='<div style="text-align:center"><div style="width:36px;height:36px;border:3px solid #1a2540;border-top-color:#3b82f6;border-radius:50%;animation:nf_spin 0.7s linear infinite;margin:0 auto 12px"></div><div style="color:#4d9cf8;font-size:13px;letter-spacing:0.03em">Sincronizando datos...</div></div><style>@keyframes nf_spin{to{transform:rotate(360deg)}}</style>';
   document.body.appendChild(overlay);
-  setupInterceptor();
-  getToken().then(function(tok){
-    if(!tok){sessionStorage.setItem('_nf_sb_ok','1');overlay.remove();return;}
-    window._nf_syncing=true; // Block interceptor writes during initial sync
-    return syncRead(tok).then(function(){
-      window._nf_syncing=false;
-      sessionStorage.setItem('_nf_sb_ok','1');
-      window.location.reload();
-    });
-  }).catch(function(){
-    window._nf_syncing=false;
-    sessionStorage.setItem('_nf_sb_ok','1');
-    overlay.remove();
-  });
-}else{
-  setupInterceptor();
 }
+function hideOverlay(){var o=document.getElementById('_nf_overlay');if(o)o.remove();}
 
-// ── ONE-TIME REPAIR: if this device knows about clientes de baja (lostClients),
-// push the corrected state to the cloud so it stops storing them as active.
-// This runs from the device that has the truth (normally the desktop) and fixes
-// the corruption for everyone. Refreshes are held off until it completes.
 var _repairDone=false;
-// If a data type is empty in localStorage but the backup has it, restore it
-// (localStorage + React + cloud). Protects against an accidental wipe.
+// If a data type is empty in localStorage but the backup has it, restore it.
 function recoverFromBackupIfEmpty(token){
   function tryRestore(suf,bkSuf,setter,mapDb,table){
     var cur=[];try{cur=JSON.parse(localStorage.getItem(PRE+suf)||'[]');}catch(e){}
@@ -614,7 +638,7 @@ function recoverFromBackupIfEmpty(token){
     if(setter&&window[setter]){try{window[setter](data.slice());}catch(e){}}
     if(token&&mapDb&&table){
       var db=data.map(mapDb);
-      fetch(SB+'/rest/v1/'+table,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(db)}).catch(function(){});
+      fetch(SB+'/rest/v1/'+table,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(db)}).catch(function(){});
     }
   }
   tryRestore('leads','leads_bk','_nf_setLeads',function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};},'leads');
@@ -622,28 +646,69 @@ function recoverFromBackupIfEmpty(token){
 }
 
 function repairThenEnableRefresh(){
-  var tokData=null;try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
-  var tok=tokData&&tokData.exp>Date.now()+5000?tokData.tok:null;
-  var pt=tok?Promise.resolve(tok):getToken();
-  pt.then(function(token){
+  getToken().then(function(token){
     if(!token){_repairDone=true;return;}
     seedSyncedIdsIfMissing();
-    // Recover leads/antrop from local backup if they got wiped locally
     recoverFromBackupIfEmpty(token);
-    // Last-resort: recover anything still empty from the cloud snapshot
     restoreFromSnapshot(token);
-    // Keep a fresh cloud snapshot for the future
     pushSnapshot(token);
     var ll=[];try{ll=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
-    if(ll.length){ saveClients(token); } // fixed saveClients pushes correct de-duped state
-    // give the repair a moment to land before allowing cloud pulls
+    if(ll.length){ saveClients(token); }
     setTimeout(function(){_repairDone=true;},2500);
   }).catch(function(){_repairDone=true;});
 }
-if(sessionStorage.getItem('_nf_sb_ok')){repairThenEnableRefresh();}else{_repairDone=true;}
+
+// ── Boot the currently logged-in user: authenticate + sync (once per session). ──
+var _booting=false;
+function bootUser(){
+  var email=currentEmail();
+  if(!email||_booting)return; // not logged in yet, or already booting
+  if(sessionStorage.getItem(okKey(email))){
+    // Already synced this session for this user → just restore context + enable refresh
+    EM=email; PRE='nf_'+EM+'_';
+    var c=getCachedTok(email);
+    if(c&&c.uid){UID=c.uid;repairThenEnableRefresh();}
+    else{authForEmail(email).then(function(r){if(r){UID=r.uid;repairThenEnableRefresh();}else{_repairDone=true;}});}
+    return;
+  }
+  // First sync for this user this session
+  _booting=true;
+  showOverlay();
+  authForEmail(email).then(function(ctx){
+    if(!ctx){ // auth failed (no password / offline) → local-only, don't block the app
+      sessionStorage.setItem(okKey(email),'1'); hideOverlay(); _repairDone=true; _booting=false; return;
+    }
+    EM=ctx.email; UID=ctx.uid; PRE='nf_'+EM+'_';
+    window._nf_syncing=true;
+    syncRead(ctx.token).then(function(){
+      window._nf_syncing=false;
+      sessionStorage.setItem(okKey(email),'1');
+      _booting=false;
+      window.location.reload();
+    }).catch(function(){
+      window._nf_syncing=false;
+      sessionStorage.setItem(okKey(email),'1');
+      hideOverlay(); _repairDone=true; _booting=false;
+    });
+  });
+}
+
+setupInterceptor();
+bootUser();
+
+// Watch for login / logout / user switch (the app writes nf_session on login)
+var _lastEmail=currentEmail();
+setInterval(function(){
+  var e=currentEmail();
+  if(e!==_lastEmail){
+    _lastEmail=e;
+    if(e){ bootUser(); }
+    else { EM=null;UID=null;PRE=null;_repairDone=false; } // logged out
+  }
+},1000);
 
 // ── Keep every device in sync: re-pull cloud data on focus + periodically ──
-function safeRefresh(){if(_repairDone&&sessionStorage.getItem('_nf_sb_ok'))refreshFromCloud();}
+function safeRefresh(){if(_repairDone&&EM&&sessionStorage.getItem(okKey(EM)))refreshFromCloud();}
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
 setInterval(function(){if(!document.hidden)safeRefresh();},45000);
