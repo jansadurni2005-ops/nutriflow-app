@@ -3982,5 +3982,210 @@ CAPACIDADES QUE TIENES:
   },350);
 })();
 </script>
+<script>
+(function(){
+  function getEmail(){try{return JSON.parse(localStorage.getItem('nf_session')||'{}').email||'';}catch(e){return'';}}
+  function pre(){var e=getEmail();return e?'nf_'+e+'_':'';}
+  function load(suf,def){var p=pre();if(!p)return def;try{return JSON.parse(localStorage.getItem(p+suf)||JSON.stringify(def));}catch(e){return def;}}
+  function cfg(){return load('config',{});}
+  function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+  function fmt(v){v=parseFloat(v);if(isNaN(v))v=0;return v.toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' €';}
+  function billingMonths(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:1;}
+  var MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var _off=0;
+
+  function commissionPct(source){
+    var c=cfg();var sp=c.partnerSource||c.splitPartner||'GEIEG';var pct=(parseFloat(c.splitPercent)||70)/100;
+    if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return cp;}
+    if(source===sp)return Math.round((1-pct)*100);
+    return 0;
+  }
+  function R(amount,source){var p=commissionPct(source);return p>0?amount*(100-p)/100:amount;}
+  function dispSrc(s){return window._nf_displaySource?window._nf_displaySource(s):s;}
+
+  function monthData(yr,mo){
+    var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
+    var clients=load('clients',[]).filter(function(c){return c&&c.active!==false;});
+    var lost=load('lostClients',[]);
+    var payments=load('payments',[]);
+    var leads=load('leads',[]);
+    var antrop=load('antrop',[]);
+    var paused=load('paused',{});
+    var clientById={};clients.forEach(function(c){clientById[c.id]=c;});
+
+    // Payments that count this month: real payments dated in month + auto cycle for clients
+    // whose startDate is in this month and have no real payment that month (excl. paused).
+    var rows=[];
+    // real payments
+    payments.forEach(function(p){
+      if(!p.date||typeof p.date!=='string'||p.date.slice(0,7)!==mStr)return;
+      var c=clientById[p.clientId];
+      rows.push({name:c?c.name:'(cliente eliminado)',source:c?c.source:'',amount:parseFloat(p.amount)||0,method:p.method||'',date:p.date,real:true});
+    });
+    var realClientMonth={};payments.forEach(function(p){if(p.date&&p.date.slice(0,7)===mStr)realClientMonth[p.clientId]=true;});
+    // auto cycle
+    clients.forEach(function(c){
+      if(!c.startDate||(paused[c.id]&&paused[c.id].pausedAt))return;
+      if(c.startDate.slice(0,7)!==mStr)return;
+      if(realClientMonth[c.id])return;
+      var total=(parseFloat(c.price)||0)*billingMonths(c.billing);
+      if(total<=0)return;
+      rows.push({name:c.name,source:c.source,amount:total,method:'',date:c.startDate,real:false});
+    });
+
+    var antropMonth=antrop.filter(function(a){return a.date&&a.date.slice(0,7)===mStr;});
+    var antropSum=antropMonth.reduce(function(s,a){return s+(parseFloat(a.price)||0);},0);
+
+    var brutoClients=rows.reduce(function(s,r){return s+r.amount;},0);
+    var netoClients=rows.reduce(function(s,r){return s+(r.real?r.amount:R(r.amount,r.source));},0);
+    var bruto=brutoClients+antropSum;
+    var neto=netoClients+antropSum;
+    var comision=brutoClients-netoClients;
+
+    // por origen (take-home)
+    var byOrigin={};
+    rows.forEach(function(r){
+      var s=dispSrc(r.source)||'Sin origen';
+      var take=r.real?r.amount:R(r.amount,r.source);
+      if(!byOrigin[s])byOrigin[s]={count:0,take:0};
+      byOrigin[s].take+=take;byOrigin[s].count++;
+    });
+
+    // clientes
+    var nuevos=clients.filter(function(c){return c.startDate&&c.startDate.slice(0,7)===mStr;});
+    var bajas=lost.filter(function(c){var d=c.lostAt||c.date;return d&&String(d).slice(0,7)===mStr;});
+
+    // llamadas
+    var calls=load('calls',{});var cd=calls[mStr]||{total:0,closed:0};
+    var callRate=cd.total>0?Math.round((cd.closed/cd.total)*100):0;
+
+    // leads del mes
+    var leadsMonth=leads.filter(function(l){return l.date&&l.date.slice(0,7)===mStr;});
+    var leadsCerrados=leadsMonth.filter(function(l){return l.status==='Closed';}).length;
+    var leadsPerdidos=leadsMonth.filter(function(l){return l.status==='Lost';}).length;
+
+    return {mStr:mStr,label:MESL[mo]+' '+yr,rows:rows,bruto:bruto,neto:neto,comision:comision,antropSum:antropSum,
+      byOrigin:byOrigin,activos:clients.length,nuevos:nuevos,bajas:bajas,
+      calls:cd,callRate:callRate,leadsMonth:leadsMonth.length,leadsCerrados:leadsCerrados,leadsPerdidos:leadsPerdidos};
+  }
+
+  var METHOD={cash:'Efectivo',bizum:'Bizum',transfer:'Transferencia',card:'Tarjeta',other:'Otros'};
+
+  function reportInner(d){
+    var c=cfg();
+    var name=(function(){try{return JSON.parse(localStorage.getItem('nf_session')||'{}').name||'';}catch(e){return'';}})();
+    var prof=c.professionLabel||'';
+    var now=new Date();
+    var origins=Object.keys(d.byOrigin).sort(function(a,b){return d.byOrigin[b].take-d.byOrigin[a].take;});
+    function card(title,val,color){return '<div style="flex:1;min-width:130px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:10px;padding:12px 14px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;font-weight:700;margin-bottom:6px">'+title+'</div><div style="font-size:20px;font-weight:800;color:'+(color||'#111827')+'">'+val+'</div></div>';}
+    var h='';
+    h+='<div style="display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #111827;padding-bottom:12px;margin-bottom:18px">'+
+        '<div><div style="font-size:22px;font-weight:800;color:#111827;letter-spacing:-0.02em">Informe mensual</div>'+
+        '<div style="font-size:14px;font-weight:600;color:#374151;margin-top:2px">'+esc(d.label)+'</div>'+
+        '<div style="font-size:11px;color:#9ca3af;margin-top:2px">'+esc(name)+(prof?' · '+esc(prof):'')+'</div></div>'+
+        '<div style="text-align:right;font-size:10px;color:#9ca3af">Generado el<br>'+now.toLocaleDateString('es-ES')+'</div>'+
+      '</div>';
+    // Facturación
+    h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin-bottom:8px">Facturación</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:6px">'+
+        card('Bruto del mes',fmt(d.bruto),'#111827')+
+        card('Neto para ti',fmt(d.neto),'#2563eb')+
+        card('Comisión cedida',fmt(d.comision),'#d97706')+
+        card('Servicios extra',fmt(d.antropSum),'#059669')+
+      '</div>';
+    // Por origen
+    if(origins.length){
+      h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:16px 0 8px">Por origen</div><table style="width:100%;border-collapse:collapse;font-size:12px">';
+      origins.forEach(function(s){h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 4px;color:#374151">'+esc(s)+'</td><td style="padding:6px 4px;color:#6b7280;text-align:right">'+d.byOrigin[s].count+' cobro(s)</td><td style="padding:6px 4px;text-align:right;font-weight:700;color:#111827">'+fmt(d.byOrigin[s].take)+'</td></tr>';});
+      h+='</table>';
+    }
+    // Clientes
+    h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px">Clientes</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        card('Activos',d.activos,'#111827')+
+        card('Nuevos este mes',d.nuevos.length,'#059669')+
+        card('Bajas este mes',d.bajas.length,'#dc2626')+
+      '</div>';
+    // Pagos del mes
+    h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px">Cobros del mes ('+d.rows.length+')</div>';
+    if(d.rows.length){
+      h+='<table style="width:100%;border-collapse:collapse;font-size:12px"><tr style="border-bottom:2px solid #e5e7eb;color:#9ca3af;font-size:10px;text-transform:uppercase"><td style="padding:5px 4px">Cliente</td><td style="padding:5px 4px">Origen</td><td style="padding:5px 4px">Método</td><td style="padding:5px 4px">Fecha</td><td style="padding:5px 4px;text-align:right">Importe</td></tr>';
+      d.rows.sort(function(a,b){return (a.date||'').localeCompare(b.date||'');}).forEach(function(r){
+        var dd=(r.date||'').split('-');var ds=dd.length===3?dd[2]+'/'+dd[1]:'';
+        h+='<tr style="border-bottom:1px solid #f1f5f9"><td style="padding:6px 4px;color:#374151">'+esc(r.name)+(r.real?'':' <span style="color:#9ca3af;font-size:9px">(auto)</span>')+'</td><td style="padding:6px 4px;color:#6b7280">'+esc(dispSrc(r.source)||'—')+'</td><td style="padding:6px 4px;color:#6b7280">'+(METHOD[r.method]||'—')+'</td><td style="padding:6px 4px;color:#6b7280">'+ds+'</td><td style="padding:6px 4px;text-align:right;font-weight:700;color:#111827">'+fmt(r.amount)+'</td></tr>';
+      });
+      h+='</table>';
+    } else { h+='<div style="font-size:12px;color:#9ca3af;font-style:italic">Sin cobros registrados este mes.</div>'; }
+    // Llamadas
+    h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px">Llamadas</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        card('Llamadas hechas',d.calls.total||0,'#111827')+
+        card('Cerradas',d.calls.closed||0,'#059669')+
+        card('% de cierre',d.callRate+'%',(d.callRate>=50?'#059669':d.callRate>=25?'#d97706':'#dc2626'))+
+      '</div>';
+    // Leads
+    h+='<div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.06em;color:#6b7280;margin:18px 0 8px">Leads</div>'+
+      '<div style="display:flex;gap:10px;flex-wrap:wrap">'+
+        card('Nuevos',d.leadsMonth,'#111827')+
+        card('Cerrados',d.leadsCerrados,'#059669')+
+        card('Perdidos',d.leadsPerdidos,'#dc2626')+
+      '</div>';
+    h+='<div style="margin-top:24px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:9px;color:#cbd5e1;text-align:center">NutriFlow · Informe generado automáticamente</div>';
+    return h;
+  }
+
+  function render(){
+    var now=new Date();var tm=now.getFullYear()*12+now.getMonth()+_off;var yr=Math.floor(tm/12),mo=((tm%12)+12)%12;
+    var d=monthData(yr,mo);
+    var body=document.getElementById('_nf_rep_body');
+    if(body)body.innerHTML=reportInner(d);
+    var lbl=document.getElementById('_nf_rep_month');if(lbl)lbl.textContent=d.label;
+    var nx=document.getElementById('_nf_rep_next');if(nx)nx.style.visibility=_off>=0?'hidden':'visible';
+  }
+
+  function ensurePrintCSS(){
+    if(document.getElementById('_nf_rep_pcss'))return;
+    var st=document.createElement('style');st.id='_nf_rep_pcss';
+    st.textContent='@media print{body>*:not(#_nf_rep_overlay){display:none!important;}#_nf_rep_overlay{position:static!important;background:#fff!important;padding:0!important;display:block!important;overflow:visible!important;}#_nf_rep_overlay .nf-noprint{display:none!important;}#_nf_rep_card{box-shadow:none!important;max-height:none!important;max-width:100%!important;width:100%!important;border:none!important;border-radius:0!important;}}';
+    document.head.appendChild(st);
+  }
+
+  function open(){
+    ensurePrintCSS();
+    var bg=document.getElementById('_nf_rep_overlay');
+    if(bg){bg.style.display='flex';_off=0;render();return;}
+    bg=document.createElement('div');bg.id='_nf_rep_overlay';
+    bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:10000;display:flex;align-items:flex-start;justify-content:center;overflow-y:auto;padding:24px 12px;backdrop-filter:blur(4px)';
+    bg.innerHTML=
+      '<div id="_nf_rep_card" style="background:#fff;color:#111827;border-radius:14px;max-width:760px;width:100%;box-shadow:0 20px 60px rgba(0,0,0,.5)">'+
+        '<div class="nf-noprint" style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:12px 16px;border-bottom:1px solid #e5e7eb;position:sticky;top:0;background:#fff;border-radius:14px 14px 0 0;flex-wrap:wrap">'+
+          '<div style="display:flex;align-items:center;gap:6px">'+
+            '<button id="_nf_rep_prev" style="background:#f1f5f9;border:1px solid #e5e7eb;color:#374151;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px">‹</button>'+
+            '<span id="_nf_rep_month" style="font-size:13px;font-weight:700;color:#111827;min-width:120px;text-align:center"></span>'+
+            '<button id="_nf_rep_next" style="background:#f1f5f9;border:1px solid #e5e7eb;color:#374151;width:30px;height:30px;border-radius:7px;cursor:pointer;font-size:16px">›</button>'+
+          '</div>'+
+          '<div style="display:flex;gap:8px">'+
+            '<button id="_nf_rep_print" style="background:#2563eb;border:none;color:#fff;border-radius:8px;padding:8px 16px;font-size:12px;font-weight:700;cursor:pointer">📄 Guardar PDF</button>'+
+            '<button id="_nf_rep_close" style="background:none;border:none;color:#6b7280;font-size:22px;cursor:pointer;line-height:1;padding:0 4px">×</button>'+
+          '</div>'+
+        '</div>'+
+        '<div id="_nf_rep_body" style="padding:24px 28px"></div>'+
+      '</div>';
+    document.body.appendChild(bg);
+    bg.onclick=function(e){if(e.target===bg)bg.style.display='none';};
+    document.getElementById('_nf_rep_close').onclick=function(){bg.style.display='none';};
+    document.getElementById('_nf_rep_print').onclick=function(){window.print();};
+    document.getElementById('_nf_rep_prev').onclick=function(){_off--;render();};
+    document.getElementById('_nf_rep_next').onclick=function(){if(_off<0){_off++;render();}};
+    _off=0;render();
+  }
+
+  // Hijack the existing "Ver informe mensual PDF" button → open our full report
+  document.addEventListener('click',function(e){
+    var b=e.target&&e.target.closest?e.target.closest('button'):null;
+    if(b&&/informe mensual pdf/i.test(b.textContent||'')){e.preventDefault();e.stopPropagation();open();}
+  },true);
+})();
+</script>
 </body>
 </html>
