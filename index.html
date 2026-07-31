@@ -175,7 +175,7 @@ function backupAntrop(){makeBackup(PRE+'antrop',PRE+'antrop_bk');}
 // ── EXTRA DATA SYNC (payments, pauses, sources, lead groups, calls, goal, weights) ──
 // Stored in the authenticated user's Supabase user_metadata as a single JSON blob.
 // No extra tables needed. Last-write-wins across devices.
-var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov'];
+var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov','phones','wamsg'];
 function collectExtras(){
   var o={};
   EXTRA_SUF.forEach(function(s){var v=localStorage.getItem(PRE+s);if(v!=null)o[s]=v;});
@@ -461,6 +461,17 @@ function refreshFromCloud(){
    .catch(function(){window._nf_syncing=false;_refreshing=false;});
 }
 window._nf_refreshFromCloud=refreshFromCloud;
+
+// Save an email reminder to the cloud (read by the scheduled job that sends the email).
+// Fails silently if the 'reminders' table/backend isn't set up yet.
+window._nf_addReminder=function(rem){
+  if(!rem||!rem.date)return;
+  getToken().then(function(token){
+    if(!token||!UID)return;
+    var row={id:(Date.now().toString(36)+Math.random().toString(36).slice(2,8)),user_id:UID,email:EM,title:(rem.title||'Recordatorio'),remind_date:rem.date,remind_time:(rem.time||''),notes:(rem.desc||''),sent:false};
+    fetch(SB+'/rest/v1/reminders',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)}).catch(function(){});
+  });
+};
 
 var _syncClientsTimer=null;
 // Remember which ids are currently in the cloud, so targeted deletes are precise.
@@ -1265,10 +1276,15 @@ CAPACIDADES QUE TIENES:
   function el(id){return document.getElementById(id);}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-  function addEvent(title,date,t0,t1,desc,col){
-    S.events.push({id:genId(),title:title,date:date,t0:t0||'',t1:t1||'',desc:desc||'',col:col||'#4d9cf8'});
+  function addEvent(title,date,t0,t1,desc,col,email){
+    S.events.push({id:genId(),title:title,date:date,t0:t0||'',t1:t1||'',desc:desc||'',col:col||'#4d9cf8',email:!!email});
     S.events.sort(function(a,b){return(a.date+(a.t0||'00:00')).localeCompare(b.date+(b.t0||'00:00'));});
-    save();S.creating=false;render();toast('Evento creado','#34d399');
+    save();
+    if(email&&window._nf_addReminder){
+      try{window._nf_addReminder({title:title,date:date,time:(t0||''),desc:(desc||'')});}catch(e){}
+    }
+    S.creating=false;render();
+    toast(email?'Evento creado · te avisaremos por email':'Evento creado','#34d399');
   }
 
   function delEvent(id){
@@ -1376,6 +1392,8 @@ CAPACIDADES QUE TIENES:
               '<input id="_nf_ev_col" type="hidden" value="'+ECOLS[0]+'"></div>'+
             '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Descripción</label>'+
               '<textarea id="_nf_ev_desc" rows="2" placeholder="Notas..." style="width:100%;box-sizing:border-box;background:var(--bg3);border:1.5px solid var(--border2);border-radius:10px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;resize:none;font-family:inherit"></textarea></div>'+
+            '<label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:12.5px;color:var(--text2);background:var(--bg3);border:1.5px solid var(--border2);border-radius:10px;padding:11px 14px">'+
+              '<input id="_nf_ev_email" type="checkbox" style="width:17px;height:17px;accent-color:#4d9cf8;flex-shrink:0"> \ud83d\udce7 Recordarme por email ese día</label>'+
             '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:4px">'+
               '<button id="_nf_ev_cancel" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:12px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
               '<button id="_nf_ev_save" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(77,156,248,.4)">Crear evento</button>'+
@@ -1448,7 +1466,8 @@ CAPACIDADES QUE TIENES:
       el('_nf_ev_save').onclick=function(){
         var t=(el('_nf_ev_ttl').value||'').trim();
         if(!t){el('_nf_ev_ttl').style.borderColor='#f87171';el('_nf_ev_ttl').focus();return;}
-        addEvent(t,el('_nf_ev_dt').value,el('_nf_ev_t0').value,el('_nf_ev_t1').value,el('_nf_ev_desc').value,el('_nf_ev_col').value);
+        var emailChk=el('_nf_ev_email')&&el('_nf_ev_email').checked;
+        addEvent(t,el('_nf_ev_dt').value,el('_nf_ev_t0').value,el('_nf_ev_t1').value,el('_nf_ev_desc').value,el('_nf_ev_col').value,emailChk);
       };
       el('_nf_ev_ttl').onfocus=function(){this.style.borderColor='#4d9cf8';};
       el('_nf_ev_ttl').onblur=function(){this.style.borderColor='var(--border2)';};
