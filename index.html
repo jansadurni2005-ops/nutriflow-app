@@ -2271,9 +2271,9 @@ CAPACIDADES QUE TIENES:
       var tot=cd.total||0,clo=cd.closed||0;
       var rate=tot>0?Math.round(clo/tot*100):0;
       var rcol=rate>=50?'#34d399':rate>=25?'#f59e0b':'#f87171';
-      return '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px">'+
+      return '<div id="_nf_calls_panel" style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px">'+
         '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
-          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">📞</span><span style="font-size:13px;font-weight:700">Llamadas · '+selLbl+'</span></div>'+
+          '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:15px">📞</span><span style="font-size:13px;font-weight:700">Llamadas y cierre de ventas · '+selLbl+'</span></div>'+
           '<span style="display:inline-flex;align-items:center;gap:5px;background:'+rcol+'12;border:1px solid '+rcol+'30;border-radius:8px;padding:5px 11px">'+
             '<b style="font-size:17px;color:'+rcol+'">'+rate+'%</b>'+
             '<span style="font-size:9px;color:'+rcol+';font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.3">cierre</span>'+
@@ -2340,6 +2340,10 @@ CAPACIDADES QUE TIENES:
         })()+
       '</div>';
     })();
+
+    // Move the calls / close-rate panel to the top (most prominent, professional)
+    var _cp=root.querySelector('#_nf_calls_panel');
+    if(_cp&&root.firstChild&&_cp!==root.firstChild){root.insertBefore(_cp,root.firstChild);}
 
     // Bind nav buttons
     var hp=document.getElementById('_nf_hp'),hn=document.getElementById('_nf_hn');
