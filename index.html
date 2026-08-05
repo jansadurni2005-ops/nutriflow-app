@@ -3985,10 +3985,13 @@ CAPACIDADES QUE TIENES:
     var main=document.querySelector('main');if(!main)return;
     var nodes=main.querySelectorAll('div,span');
     var sub=null;
-    for(var i=0;i<nodes.length;i++){if((nodes[i].textContent||'').indexOf('Solo clientes cuyo per')===0){sub=nodes[i];break;}}
+    for(var i=0;i<nodes.length;i++){if((nodes[i].textContent||'').toLowerCase().indexOf('solo clientes cuyo per')===0){sub=nodes[i];break;}}
     if(!sub)return;
-    var el=sub;
-    for(var k=0;k<9&&el;k++){el=el.parentElement;if(el&&el!==main&&(el.textContent||'').indexOf('BRUTO REAL DEL MES')>=0){el.style.display='none';return;}}
+    var el=sub.parentElement;
+    for(var k=0;k<8&&el&&el!==main&&el.tagName==='DIV';k++){
+      if((el.textContent||'').toLowerCase().indexOf('bruto real del mes')>=0){el.style.display='none';return;}
+      el=el.parentElement;
+    }
   }
   function render(){
     var root=document.getElementById('_nf_hist_root');if(!root)return;
