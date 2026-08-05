@@ -723,6 +723,15 @@ function safeRefresh(){if(_repairDone&&EM&&sessionStorage.getItem(okKey(EM)))ref
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
 setInterval(function(){if(!document.hidden)safeRefresh();},45000);
+
+// ── TEAM / CLOSERS: helpers for the closer feature (SB/KEY/fetch2/getToken/currentEmail in scope) ──
+window._nf_sbEmail=function(){return EM||currentEmail();};
+window._nf_teamCheck=function(){var em=EM||currentEmail();if(!em)return Promise.resolve(null);return getToken().then(function(t){if(!t)return null;return fetch2('/rest/v1/nf_team?closer_email=eq.'+encodeURIComponent(em)+'&select=*','GET',t).then(function(rows){return (rows&&rows.length)?rows[0]:null;});}).catch(function(){return null;});};
+window._nf_teamList=function(){var em=EM||currentEmail();if(!em)return Promise.resolve([]);return getToken().then(function(t){if(!t)return [];return fetch2('/rest/v1/nf_team?owner_email=eq.'+encodeURIComponent(em)+'&select=*&order=created_at.desc','GET',t).then(function(rows){return rows||[];});}).catch(function(){return [];});};
+window._nf_teamAdd=function(closerEmail,closerName){var em=EM||currentEmail();if(!em)return Promise.resolve(false);var ce=String(closerEmail||'').toLowerCase().trim();if(!ce)return Promise.resolve(false);return getToken().then(function(t){if(!t)return false;return fetch2('/rest/v1/nf_team','POST',t,{closer_email:ce,owner_email:em,closer_name:closerName||''}).then(function(){return true;});}).catch(function(){return false;});};
+window._nf_teamRemove=function(closerEmail){return getToken().then(function(t){if(!t)return false;return fetch2('/rest/v1/nf_team?closer_email=eq.'+encodeURIComponent(closerEmail),'DELETE',t).then(function(){return true;});}).catch(function(){return false;});};
+window._nf_statsPush=function(month,calls,closed){var em=EM||currentEmail();if(!em)return;getToken().then(function(t){if(!t)return;fetch(SB+'/rest/v1/nf_closer_stats',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+t,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'},body:JSON.stringify({closer_email:em,month:month,calls:calls,closed:closed,updated_at:new Date().toISOString()})});}).catch(function(){});};
+window._nf_statsList=function(){return getToken().then(function(t){if(!t)return [];return fetch2('/rest/v1/nf_closer_stats?select=*','GET',t).then(function(rows){return rows||[];});}).catch(function(){return [];});};
 })();
 </script>
 
@@ -3994,6 +4003,83 @@ CAPACIDADES QUE TIENES:
     '</div>';
   }
   setInterval(function(){var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0&&window._nf_monthIncome)render();},900);
+})();
+</script>
+<script>
+(function(){
+  var role='unknown', switched=false, lastEm=null, checking=false;
+  function nav(){return [].slice.call(document.querySelectorAll('nav button'));}
+  function inDash(){return !!document.querySelector('nav');}
+  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
+
+  function enforceCloser(){
+    if(role!=='closer')return;
+    var btns=nav(); if(!btns.length)return;
+    var leads=null;
+    btns.forEach(function(b){
+      var t=b.textContent.trim();
+      if(t==='Leads'||t==='Ventas'){b.style.display='';if(t==='Leads')leads=b;}
+      else b.style.display='none';
+    });
+    var src=document.getElementById('_nf_src_btn'); if(src)src.style.display='none';
+    var tb=document.getElementById('_nf_team_btn'); if(tb)tb.style.display='none';
+    if(!switched&&leads){switched=true;try{leads.click();}catch(e){}}
+  }
+
+  function ensureTeamBtn(){
+    if(role!=='owner'||!inDash())return;
+    if(document.getElementById('_nf_team_btn'))return;
+    var b=document.createElement('button');
+    b.id='_nf_team_btn'; b.title='Mi equipo (closers)'; b.innerHTML='\ud83d\udc65';
+    b.style.cssText='position:fixed;bottom:18px;left:70px;z-index:798;background:rgba(15,23,42,0.94);backdrop-filter:blur(8px);border:1px solid rgba(77,156,248,0.3);color:#fff;width:44px;height:44px;border-radius:50%;font-size:18px;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;justify-content:center;padding:0';
+    b.onclick=openTeam;
+    document.body.appendChild(b);
+  }
+  function openTeam(){
+    var bg=document.getElementById('_nf_team_bg'); if(bg)bg.remove();
+    bg=document.createElement('div'); bg.id='_nf_team_bg';
+    bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:9999;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)';
+    bg.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:22px 24px;max-width:520px;width:92vw;max-height:82vh;overflow-y:auto;box-shadow:0 12px 40px rgba(0,0,0,.6)">'+
+      '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><h3 style="margin:0;font-size:17px;font-weight:700;color:var(--text)">\ud83d\udc65 Mi equipo de closers</h3><button id="_nf_team_x" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:22px">\xd7</button></div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-bottom:16px;line-height:1.55">A\u00f1ade el email de tu closer. Luego dile que entre en la app y pulse Reg\u00edstrate con ESE email. Al entrar solo ver\u00e1 sus Leads y sus Llamadas \u2014 nada de tus datos.</div>'+
+      '<div id="_nf_team_list" style="margin-bottom:14px"></div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
+        '<input id="_nf_tc_email" type="email" placeholder="email del closer" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
+        '<input id="_nf_tc_name" type="text" placeholder="nombre (opcional)" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
+      '</div>'+
+      '<button id="_nf_tc_add" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;width:100%">+ A\u00f1adir closer</button>'+
+    '</div>';
+    document.body.appendChild(bg);
+    document.getElementById('_nf_team_x').onclick=function(){bg.remove();};
+    bg.onclick=function(e){if(e.target===bg)bg.remove();};
+    document.getElementById('_nf_tc_add').onclick=function(){
+      var em=(document.getElementById('_nf_tc_email').value||'').trim();
+      var nm=(document.getElementById('_nf_tc_name').value||'').trim();
+      if(!em||!window._nf_teamAdd)return;
+      var btn=document.getElementById('_nf_tc_add'); btn.textContent='A\u00f1adiendo...'; btn.disabled=true;
+      window._nf_teamAdd(em,nm).then(function(){loadList();document.getElementById('_nf_tc_email').value='';document.getElementById('_nf_tc_name').value='';btn.textContent='+ A\u00f1adir closer';btn.disabled=false;});
+    };
+    loadList();
+  }
+  function loadList(){
+    var box=document.getElementById('_nf_team_list'); if(!box||!window._nf_teamList)return;
+    box.innerHTML='<div style="font-size:12px;color:var(--muted)">Cargando...</div>';
+    window._nf_teamList().then(function(rows){
+      if(!rows||!rows.length){box.innerHTML='<div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">Todav\u00eda no has a\u00f1adido ning\u00fan closer.</div>';return;}
+      box.innerHTML=rows.map(function(r){
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--bg3)"><div><div style="font-size:13px;font-weight:600;color:var(--text)">'+esc(r.closer_name||r.closer_email)+'</div><div style="font-size:11px;color:var(--muted)">'+esc(r.closer_email)+'</div></div><button data-rm="'+esc(r.closer_email)+'" style="background:none;border:none;color:#f87171;cursor:pointer;font-size:12px">Quitar</button></div>';
+      }).join('');
+      [].slice.call(box.querySelectorAll('[data-rm]')).forEach(function(b){b.onclick=function(){if(window._nf_teamRemove)window._nf_teamRemove(b.getAttribute('data-rm')).then(loadList);};});
+    });
+  }
+
+  setInterval(function(){
+    var em=(window._nf_sbEmail?window._nf_sbEmail():null);
+    if(em!==lastEm){lastEm=em;role='unknown';switched=false;checking=false;document.documentElement.removeAttribute('data-nfc');var tb=document.getElementById('_nf_team_btn');if(tb)tb.remove();}
+    if(role==='unknown'&&em&&window._nf_teamCheck&&!checking){checking=true;window._nf_teamCheck().then(function(row){checking=false;role=row?'closer':'owner';if(role==='closer')document.documentElement.setAttribute('data-nfc','1');}).catch(function(){checking=false;});}
+    if(role==='closer')enforceCloser();
+    if(role==='owner')ensureTeamBtn();
+  },700);
 })();
 </script>
 </body>
