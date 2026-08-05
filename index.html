@@ -3974,35 +3974,50 @@ CAPACIDADES QUE TIENES:
 </script>
 <script>
 (function(){
+  function pre(){var e;try{e=JSON.parse(localStorage.getItem('nf_session')||'{}').email;}catch(x){}if(e)return 'nf_'+e+'_';var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
+  function getClients(){var p=pre();try{return JSON.parse(localStorage.getItem(p+'clients')||'[]');}catch(e){return[];}}
+  function getCfg(){var p=pre();try{return JSON.parse(localStorage.getItem(p+'config')||'{}');}catch(e){return{};}}
   function fmt(n){try{return (Math.round((n||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20ac';}catch(e){return (n||0).toFixed(2)+' \u20ac';}}
   var MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  var off=0;
+  function monthCob(yr,mo){
+    var clients=getClients();var cf=getCfg();
+    var sp=cf.partnerSource||cf.splitPartner||'GEIEG';var pct=(cf.splitPercent||70)/100;
+    var bruto=0,neto=0,n=0;
+    clients.forEach(function(c){
+      if(c.active===false||!c.startDate)return;
+      var d=new Date(c.startDate);
+      if(d.getFullYear()!==yr||d.getMonth()!==mo)return;
+      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
+      var g=(parseFloat(c.price)||0)*bm;
+      var com=window._nf_getSourcePct?window._nf_getSourcePct(c.source):null;
+      var take=g;
+      if(com!=null&&com>0)take=g*(100-com)/100;else if(c.source===sp)take=g*pct;
+      bruto+=g;neto+=take;n++;
+    });
+    return {bruto:bruto,neto:neto,n:n};
+  }
   function render(){
     var root=document.getElementById('_nf_hist_root');if(!root)return;
-    if(!window._nf_monthIncome){return;}
-    var now=new Date();var rows=[];var max=0;
-    for(var i=0;i<12;i++){
-      var d=new Date(now.getFullYear(),now.getMonth()-i,1);
-      var inc=window._nf_monthIncome(d.getFullYear(),d.getMonth());
-      var tot=inc&&inc.total?inc.total:0;
-      if(tot>max)max=tot;
-      rows.push({yr:d.getFullYear(),mo:d.getMonth(),total:tot,cur:i===0});
-    }
-    var bars=rows.map(function(r){
-      var pct=max>0?Math.max(Math.round(r.total/max*100),2):2;
-      var col=r.cur?'#4d9cf8':'#34d399';
-      return '<div style="display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
-        '<div style="width:96px;font-size:12px;color:'+(r.cur?'#4d9cf8':'var(--text2)')+';font-weight:'+(r.cur?'700':'500')+'">'+MESL[r.mo]+' '+r.yr+'</div>'+
-        '<div style="flex:1;height:16px;background:var(--bg3);border-radius:5px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+col+';border-radius:5px"></div></div>'+
-        '<div style="width:96px;text-align:right;font-size:13px;font-weight:700;color:var(--text)">'+fmt(r.total)+'</div>'+
-      '</div>';
-    }).join('');
-    root.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:16px 20px;margin-bottom:4px">'+
-      '<div style="font-size:13px;font-weight:800;color:var(--text);margin-bottom:3px">\ud83d\udcc5 Historial de ingresos \u2014 \u00faltimos 12 meses</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-bottom:12px">Take-home neto por mes (registrado + estimado, igual que \"Facturaci\u00f3n mensual\")</div>'+
-      bars+
+    var now=new Date();var d=new Date(now.getFullYear(),now.getMonth()-off,1);
+    var r=monthCob(d.getFullYear(),d.getMonth());
+    var lbl=MESL[d.getMonth()]+' '+d.getFullYear();
+    root.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px;margin-bottom:4px">'+
+      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'+
+        '<button id="_nf_h_prev" title="Mes anterior" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:36px;height:36px;border-radius:9px;font-size:22px;cursor:pointer;line-height:1;flex-shrink:0">\u2039</button>'+
+        '<div style="text-align:center;flex:1;min-width:0">'+
+          '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700">Ingresos del mes</div>'+
+          '<div style="font-size:16px;font-weight:800;color:var(--text);margin:2px 0">'+lbl+'</div>'+
+          '<div style="font-size:23px;font-weight:800;color:#34d399">'+fmt(r.neto)+'</div>'+
+          '<div style="font-size:11px;color:var(--muted);margin-top:3px">Bruto '+fmt(r.bruto)+' \u00b7 '+r.n+' cliente'+(r.n===1?'':'s')+' este mes</div>'+
+        '</div>'+
+        '<button id="_nf_h_next" title="Mes siguiente" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:36px;height:36px;border-radius:9px;font-size:22px;cursor:pointer;line-height:1;flex-shrink:0;'+(off<=0?'opacity:.3;pointer-events:none':'')+'">\u203a</button>'+
+      '</div>'+
     '</div>';
+    var p=document.getElementById('_nf_h_prev');if(p)p.onclick=function(){off++;render();};
+    var nx=document.getElementById('_nf_h_next');if(nx)nx.onclick=function(){if(off>0){off--;render();}};
   }
-  setInterval(function(){var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0&&window._nf_monthIncome)render();},900);
+  setInterval(function(){var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0)render();},900);
 })();
 </script>
 <script>
