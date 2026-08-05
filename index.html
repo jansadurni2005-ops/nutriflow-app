@@ -3982,11 +3982,13 @@ CAPACIDADES QUE TIENES:
   var off=0;
   // Hide the native "Cobrado este mes" box (we replace it with this navigable one)
   function hideNative(){
-    var boxes=document.querySelectorAll('main div[style*="var(--blue2)"]');
-    for(var i=0;i<boxes.length;i++){
-      if(boxes[i].closest&&boxes[i].closest('#_nf_hist_root'))continue;
-      if((boxes[i].textContent||'').indexOf('COBRADO ESTE MES')>=0){boxes[i].style.display='none';return;}
-    }
+    var main=document.querySelector('main');if(!main)return;
+    var nodes=main.querySelectorAll('div,span');
+    var sub=null;
+    for(var i=0;i<nodes.length;i++){if((nodes[i].textContent||'').indexOf('Solo clientes cuyo per')===0){sub=nodes[i];break;}}
+    if(!sub)return;
+    var el=sub;
+    for(var k=0;k<9&&el;k++){el=el.parentElement;if(el&&el!==main&&(el.textContent||'').indexOf('BRUTO REAL DEL MES')>=0){el.style.display='none';return;}}
   }
   function render(){
     var root=document.getElementById('_nf_hist_root');if(!root)return;
