@@ -3980,44 +3980,42 @@ CAPACIDADES QUE TIENES:
   function fmt(n){try{return (Math.round((n||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20ac';}catch(e){return (n||0).toFixed(2)+' \u20ac';}}
   var MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var off=0;
-  function monthCob(yr,mo){
-    var clients=getClients();var cf=getCfg();
-    var sp=cf.partnerSource||cf.splitPartner||'GEIEG';var pct=(cf.splitPercent||70)/100;
-    var bruto=0,neto=0,n=0;
-    clients.forEach(function(c){
-      if(c.active===false||!c.startDate)return;
-      var d=new Date(c.startDate);
-      if(d.getFullYear()!==yr||d.getMonth()!==mo)return;
-      var bm=c.billing==='quarterly'?3:c.billing==='semiannual'?6:c.billing==='annual'?12:1;
-      var g=(parseFloat(c.price)||0)*bm;
-      var com=window._nf_getSourcePct?window._nf_getSourcePct(c.source):null;
-      var take=g;
-      if(com!=null&&com>0)take=g*(100-com)/100;else if(c.source===sp)take=g*pct;
-      bruto+=g;neto+=take;n++;
-    });
-    return {bruto:bruto,neto:neto,n:n};
+  // Hide the native "Cobrado este mes" box (we replace it with this navigable one)
+  function hideNative(){
+    var boxes=document.querySelectorAll('main div[style*="var(--blue2)"]');
+    for(var i=0;i<boxes.length;i++){
+      if(boxes[i].closest&&boxes[i].closest('#_nf_hist_root'))continue;
+      if((boxes[i].textContent||'').indexOf('COBRADO ESTE MES')>=0){boxes[i].style.display='none';return;}
+    }
   }
   function render(){
     var root=document.getElementById('_nf_hist_root');if(!root)return;
+    if(!window._nf_cashForMonth)return;
+    var clients=getClients();var cf=getCfg();
+    var sp=cf.partnerSource||cf.splitPartner||'GEIEG';var pct=(cf.splitPercent||70)/100;
+    function myR(amt,src){var com=window._nf_getSourcePct?window._nf_getSourcePct(src):null;if(com!=null&&com>0)return amt*(100-com)/100;if(src===sp)return amt*pct;return amt;}
     var now=new Date();var d=new Date(now.getFullYear(),now.getMonth()-off,1);
-    var r=monthCob(d.getFullYear(),d.getMonth());
-    var lbl=MESL[d.getMonth()]+' '+d.getFullYear();
-    root.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 20px;margin-bottom:4px">'+
-      '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px">'+
-        '<button id="_nf_h_prev" title="Mes anterior" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:36px;height:36px;border-radius:9px;font-size:22px;cursor:pointer;line-height:1;flex-shrink:0">\u2039</button>'+
-        '<div style="text-align:center;flex:1;min-width:0">'+
-          '<div style="font-size:10px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700">Ingresos del mes</div>'+
-          '<div style="font-size:16px;font-weight:800;color:var(--text);margin:2px 0">'+lbl+'</div>'+
-          '<div style="font-size:23px;font-weight:800;color:#34d399">'+fmt(r.neto)+'</div>'+
-          '<div style="font-size:11px;color:var(--muted);margin-top:3px">Bruto '+fmt(r.bruto)+' \u00b7 '+r.n+' cliente'+(r.n===1?'':'s')+' este mes</div>'+
-        '</div>'+
-        '<button id="_nf_h_next" title="Mes siguiente" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:36px;height:36px;border-radius:9px;font-size:22px;cursor:pointer;line-height:1;flex-shrink:0;'+(off<=0?'opacity:.3;pointer-events:none':'')+'">\u203a</button>'+
+    var yr=d.getFullYear(),mo=d.getMonth();
+    var bruto=window._nf_cashForMonth(clients,null,yr,mo,true)||0;
+    var neto=window._nf_cashForMonth(clients,myR,yr,mo,false)||0;
+    var payN=0;clients.forEach(function(c){if(c.active===false||!c.startDate)return;if((window._nf_cashForMonth([c],null,yr,mo,true)||0)>0)payN++;});
+    var lbl=MESL[mo]+' de '+yr;
+    root.innerHTML='<div style="background:var(--bg2);border:2px solid var(--blue2);border-radius:14px;padding:18px 22px;margin-bottom:4px">'+
+      '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">'+
+        '<button id="_nf_h_prev" title="Mes anterior" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:32px;height:32px;border-radius:8px;font-size:19px;cursor:pointer;line-height:1;flex-shrink:0">\u2039</button>'+
+        '<div style="font-size:12px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;color:var(--blue)">Cobrado \u2014 '+lbl+'</div>'+
+        '<button id="_nf_h_next" title="Mes siguiente" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:32px;height:32px;border-radius:8px;font-size:19px;cursor:pointer;line-height:1;flex-shrink:0;'+(off<=0?'opacity:.3;pointer-events:none':'')+'">\u203a</button>'+
+        '<span style="margin-left:auto;font-size:12px;color:var(--muted)">'+payN+' cliente'+(payN===1?'':'s')+' pagan este mes</span>'+
+      '</div>'+
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:16px">'+
+        '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px">Bruto real del mes</div><div style="font-size:26px;font-weight:800;color:var(--text)">'+fmt(bruto)+'</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Antes de splits y comisiones</div></div>'+
+        '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px">Neto para ti</div><div style="font-size:26px;font-weight:800;color:#4d9cf8">'+fmt(neto)+'</div><div style="font-size:11px;color:var(--muted);margin-top:3px">Despu\u00e9s de comisiones</div></div>'+
       '</div>'+
     '</div>';
     var p=document.getElementById('_nf_h_prev');if(p)p.onclick=function(){off++;render();};
     var nx=document.getElementById('_nf_h_next');if(nx)nx.onclick=function(){if(off>0){off--;render();}};
   }
-  setInterval(function(){var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0)render();},900);
+  setInterval(function(){hideNative();var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0)render();},900);
 })();
 </script>
 <script>
