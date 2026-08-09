@@ -4026,7 +4026,8 @@ CAPACIDADES QUE TIENES:
     var bestLbl=hasBest?MESL[best.mo]+' '+best.yr:'\u2014';
     var bestPctOf=best.neto>0?Math.round(neto/best.neto*100):(neto>0?100:0);
     var mStr=String(yr)+'-'+(mo<9?'0':'')+(mo+1);
-    var pays=getLS('payments');var daysM=new Date(yr,mo+1,0).getDate();var nW=Math.ceil(daysM/7);
+    var pays=[];try{pays=JSON.parse(localStorage.getItem(pre()+'payments')||'[]');}catch(e){}
+    var daysM=new Date(yr,mo+1,0).getDate();var nW=Math.ceil(daysM/7);
     var wk=[];for(var wq=0;wq<nW;wq++)wk.push(0);
     function wIdx(ds){var dd=parseInt(String(ds).slice(8,10))||1;return Math.min(nW-1,Math.floor((dd-1)/7));}
     clients.forEach(function(c){
