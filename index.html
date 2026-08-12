@@ -175,7 +175,7 @@ function backupAntrop(){makeBackup(PRE+'antrop',PRE+'antrop_bk');}
 // ── EXTRA DATA SYNC (payments, pauses, sources, lead groups, calls, goal, weights) ──
 // Stored in the authenticated user's Supabase user_metadata as a single JSON blob.
 // No extra tables needed. Last-write-wins across devices.
-var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov','phones','wamsg'];
+var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov','phones','wamsg','paiddates'];
 function collectExtras(){
   var o={};
   EXTRA_SUF.forEach(function(s){var v=localStorage.getItem(PRE+s);if(v!=null)o[s]=v;});
@@ -1820,9 +1820,10 @@ CAPACIDADES QUE TIENES:
       if(pausedMap[c.id]&&pausedMap[c.id].pausedAt)return;
       // Auto fires ONLY if the client's startDate is literally in the target month
       // (i.e. you manually clicked Renova this month or just signed them up)
-      // Count in the month the client PAID (paidDate) — the counter/renewal uses startDate.
-      // Fallback to startDate for clients created before paidDate existed.
-      var _pm=(c.paidDate&&String(c.paidDate).length>=7)?String(c.paidDate).slice(0,7):c.startDate.slice(0,7);
+      // Count in the month the client PAID — read from the synced paidDate map (survives cloud sync),
+      // then the client object, then fall back to startDate. The counter/renewal uses startDate.
+      var _pd=(window._nf_paidMap&&window._nf_paidMap[c.id])||c.paidDate;
+      var _pm=(_pd&&String(_pd).length>=7)?String(_pd).slice(0,7):c.startDate.slice(0,7);
       if(_pm!==mStr)return;
       var bm=billingMonths(c.billing);
       var cycleTotal=(parseFloat(c.price)||0)*bm;
@@ -4263,6 +4264,26 @@ CAPACIDADES QUE TIENES:
     '</div>';
   }
   setInterval(function(){var root=document.getElementById('_nf_embudo_root');if(root&&root.children.length===0)render();},900);
+})();
+</script>
+<script>
+(function(){
+  function pre(){var e;try{e=JSON.parse(localStorage.getItem('nf_session')||'{}').email;}catch(x){}if(e)return 'nf_'+e+'_';var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
+  function loadMap(){var p=pre();try{return JSON.parse(localStorage.getItem(p+'paiddates')||'{}');}catch(e){return{};}}
+  function saveMap(o){var p=pre();if(p)localStorage.setItem(p+'paiddates',JSON.stringify(o));}
+  function loadClients(){var p=pre();try{return JSON.parse(localStorage.getItem(p+'clients')||'[]');}catch(e){return[];}}
+  function tick(){
+    if(!pre()){window._nf_paidMap=window._nf_paidMap||{};return;}
+    var map=loadMap();var changed=false;var t=new Date().toISOString().slice(0,10);var clients=loadClients();
+    clients.forEach(function(c){
+      if(!c||!c.id)return;
+      if(c.paidDate){ if(map[c.id]!==c.paidDate){map[c.id]=c.paidDate;changed=true;} return; }
+      if(!map[c.id]&&c.startDate&&c.active!==false&&String(c.startDate).slice(0,10)>t){map[c.id]=t;changed=true;}
+    });
+    if(changed)saveMap(map);
+    window._nf_paidMap=map;
+  }
+  setInterval(tick,1000);tick();
 })();
 </script>
 </body>
