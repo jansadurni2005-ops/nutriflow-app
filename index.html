@@ -4085,10 +4085,10 @@ CAPACIDADES QUE TIENES:
     var nx=document.getElementById('_nf_h_next');if(nx)nx.onclick=function(){if(off>0){off--;render();}};
   }
   function sync(){var root=document.getElementById('_nf_hist_root');if(!root)return;hideNative();if(root.children.length===0)render();}
-  // MutationObserver: hide native + render our panel in the SAME frame the tab appears (no flash of the old panel)
-  var _sch=false;
-  try{new MutationObserver(function(){if(_sch)return;_sch=true;requestAnimationFrame(function(){_sch=false;sync();});}).observe(document.body,{childList:true,subtree:true});}catch(e){}
-  setInterval(sync,600);sync();
+  // MutationObserver runs SYNCHRONOUSLY (microtask, before paint) so the native panel is hidden
+  // and ours is drawn before anything shows on screen — no flash of the old panel.
+  try{new MutationObserver(function(){sync();}).observe(document.body,{childList:true,subtree:true});}catch(e){}
+  setInterval(sync,500);sync();
 })();
 </script>
 <script>
