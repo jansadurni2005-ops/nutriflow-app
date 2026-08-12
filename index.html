@@ -4084,7 +4084,11 @@ CAPACIDADES QUE TIENES:
     var p=document.getElementById('_nf_h_prev');if(p)p.onclick=function(){off++;render();};
     var nx=document.getElementById('_nf_h_next');if(nx)nx.onclick=function(){if(off>0){off--;render();}};
   }
-  setInterval(function(){hideNative();var root=document.getElementById('_nf_hist_root');if(root&&root.children.length===0)render();},900);
+  function sync(){var root=document.getElementById('_nf_hist_root');if(!root)return;hideNative();if(root.children.length===0)render();}
+  // MutationObserver: hide native + render our panel in the SAME frame the tab appears (no flash of the old panel)
+  var _sch=false;
+  try{new MutationObserver(function(){if(_sch)return;_sch=true;requestAnimationFrame(function(){_sch=false;sync();});}).observe(document.body,{childList:true,subtree:true});}catch(e){}
+  setInterval(sync,600);sync();
 })();
 </script>
 <script>
