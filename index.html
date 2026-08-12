@@ -3446,7 +3446,7 @@ CAPACIDADES QUE TIENES:
   function activeLeads(){return getLeads().filter(function(l){return l.status!=='Closed'&&l.status!=='Lost';});}
 
   function render(){
-    var root=document.getElementById('_nf_lg_body');if(!root)return;
+    var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
     var groups=loadGroups();
     var tags=loadTags();
     var leads=getLeads();
@@ -3460,7 +3460,7 @@ CAPACIDADES QUE TIENES:
     });
 
     // Group filter chips
-    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Asignar / Todos</span>';
+    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Todos ('+activeLeads().length+')</span>';
     chips+=groups.map(function(g){
       var on=_sel===g.name;
       return '<span data-gf="'+esc(g.name)+'" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap;background:'+g.color+(on?'':'22')+';color:'+(on?'#fff':g.color)+';border:1px solid '+g.color+(on?'':'44')+'">'+
@@ -3490,7 +3490,7 @@ CAPACIDADES QUE TIENES:
       var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" style="cursor:pointer;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+c+'22;color:'+c+';border:1px solid '+c+'44;white-space:nowrap">'+esc(n)+' ×</span>';}).join(' ');
       // available groups to add (not already assigned)
       var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
-      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:3px 6px;color:var(--muted);font-size:10px;outline:none;cursor:pointer"><option value="">+ etiqueta</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
+      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:3px 6px;color:var(--muted);font-size:10px;outline:none;cursor:pointer"><option value="">+ añadir a grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
       var st=l.status||'';var stl=ST_LBL[st]||st;
       return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
         '<div style="flex:1;min-width:0">'+
@@ -3514,7 +3514,7 @@ CAPACIDADES QUE TIENES:
         '</div>'+
         (_open?
           '<div style="padding:14px 20px">'+
-            '<div style="font-size:10px;color:var(--muted);margin-bottom:10px;line-height:1.5">Crea grupos (ej: <b>Cerrar llamada</b>, <b>Cerrar venta</b>) y asígnalos a los leads. Pulsa un grupo para ver solo los leads de ese grupo.</div>'+
+            '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.55"><b style="color:var(--text2)">1.</b> Crea un grupo (ej: <b>Cerrar llamada</b>, <b>VIP</b>). &nbsp; <b style="color:var(--text2)">2.</b> En cada lead pulsa <b>“+ añadir a grupo”</b> para clasificarlo. &nbsp; <b style="color:var(--text2)">3.</b> Pulsa un grupo de arriba para ver solo esos leads.</div>'+
             '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+chips+addBtn+'</div>'+
             '<div>'+rows+'</div>'+
           '</div>'
@@ -3598,14 +3598,13 @@ CAPACIDADES QUE TIENES:
   }
   var _lastHash='';
   function hash(){var p=getPre();if(!p)return '';return (localStorage.getItem(p+'leads')||'').length+':'+(localStorage.getItem(p+'leadgroups')||'').length+':'+(localStorage.getItem(p+'leadtags')||'').length+':'+_sel+':'+_adding;}
+  var _lgBtnHide=document.getElementById('_nf_lg_btn');if(_lgBtnHide)_lgBtnHide.style.display='none';
   setInterval(function(){
-    ensureBtn();
-    var body=document.getElementById('_nf_lg_body');
-    var modal=document.getElementById('_nf_lg_modal');
-    if(body&&modal&&modal.style.display!=='none'){
-      var h=hash();
-      if(!body.innerHTML.trim()||h!==_lastHash){_lastHash=h;render();}
-    }
+    var b=document.getElementById('_nf_lg_btn');if(b)b.style.display='none';
+    var root=document.getElementById('_nf_leadgroups_root');
+    if(!root)return;
+    var h=hash();
+    if(!root.innerHTML.trim()||h!==_lastHash){_lastHash=h;render();}
   },400);
 })();
 </script>
