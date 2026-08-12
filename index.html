@@ -4062,13 +4062,22 @@ CAPACIDADES QUE TIENES:
     var poly=pts.join(' ');var area='0,'+H+' '+poly+' '+(n>1?W:0)+','+H;
     var svg=n>1?'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:64px;display:block"><polygon points="'+area+'" fill="rgba(77,156,248,.13)"/><polyline points="'+poly+'" fill="none" stroke="#4d9cf8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>':'<div style="font-size:11px;color:var(--muted);padding:8px 0">A\u00fan solo hay un mes de datos.</div>';
     var mEvo=[];var mMax=1;
-    for(var mei=11;mei>=0;mei--){var med=new Date(yr,mo-mei,1);var mn=inc(med.getFullYear(),med.getMonth(),false);mEvo.push({lbl:MES[med.getMonth()],neto:mn,cur:mei===0});if(mn>mMax)mMax=mn;}
-    var LW=320,LH=70,mLen=mEvo.length,lpts=[];
-    for(var lpi=0;lpi<mLen;lpi++){var lx=(mLen>1?lpi/(mLen-1):0)*LW;var ly=LH-(mEvo[lpi].neto/mMax)*(LH-10)-5;lpts.push(lx.toFixed(1)+','+ly.toFixed(1));}
-    var lpoly=lpts.join(' ');var larea='0,'+LH+' '+lpoly+' '+LW+','+LH;
-    var mEvoSvg='<svg viewBox="0 0 '+LW+' '+LH+'" preserveAspectRatio="none" style="width:100%;height:70px;display:block"><polygon points="'+larea+'" fill="rgba(52,211,153,.13)"/><polyline points="'+lpoly+'" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/><line x1="'+LW+'" y1="0" x2="'+LW+'" y2="'+LH+'" stroke="#4d9cf8" stroke-width="1.5" stroke-dasharray="3,3" vector-effect="non-scaling-stroke" opacity="0.7"/></svg>';
-    var mLabels='<div style="display:flex;margin-top:6px">'+mEvo.map(function(m){return '<span style="font-size:8px;color:'+(m.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+';flex:1;text-align:center">'+m.lbl+'</span>';}).join('')+'</div>';
-    var mEvoHtml='<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Evoluci\u00f3n mensual \u00b7 neto</div><div style="font-size:11px;color:var(--muted)">M\u00e1x: <b style="color:#34d399">'+fmt(mMax)+'</b></div></div>'+mEvoSvg+mLabels+'</div>';
+    for(var mei=11;mei>=0;mei--){var med=new Date(yr,mo-mei,1);var mn=inc(med.getFullYear(),med.getMonth(),false);mEvo.push({lbl:MES[med.getMonth()],yr:med.getFullYear(),neto:mn,cur:mei===0});if(mn>mMax)mMax=mn;}
+    var mLen=mEvo.length,_pt=12,_pb=14;
+    var evoPts=mEvo.map(function(m,i){var x=mLen>1?(i/(mLen-1))*100:50;var y=_pt+(1-(m.neto/mMax))*(100-_pt-_pb);return {x:x,y:y,lbl:m.lbl,yr:m.yr,neto:m.neto,cur:m.cur};});
+    var _lp=evoPts.map(function(p){return p.x.toFixed(2)+','+p.y.toFixed(2);}).join(' ');
+    var _ar='0,100 '+_lp+' 100,100';
+    var _grid='';for(var gg=1;gg<=3;gg++){_grid+='<line x1="0" y1="'+(gg*25)+'" x2="100" y2="'+(gg*25)+'" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
+    var _dots=evoPts.map(function(p,i){return '<div data-dot="'+i+'" style="position:absolute;left:'+p.x+'%;top:'+p.y+'%;width:'+(p.cur?9:6)+'px;height:'+(p.cur?9:6)+'px;border-radius:50%;background:'+(p.cur?'#4d9cf8':'#34d399')+';border:2px solid var(--bg3);transform:translate(-50%,-50%);transition:transform .1s ease"></div>';}).join('');
+    var mEvoHtml='<div style="background:var(--bg3);border-radius:12px;padding:16px 18px 12px;margin-bottom:16px">'+
+      '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--text)">Ingresos por mes <span style="color:var(--muted);font-weight:500">(neto)</span></div><div style="font-size:11px;color:var(--muted)">M\u00e1x <b style="color:#34d399">'+fmt(mMax)+'</b></div></div>'+
+      '<div id="_nf_evochart" style="position:relative;height:150px;cursor:crosshair">'+
+        '<svg viewBox="0 0 100 100" preserveAspectRatio="none" style="position:absolute;inset:0;width:100%;height:100%"><defs><linearGradient id="_nfevog" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#34d399" stop-opacity="0.32"/><stop offset="1" stop-color="#34d399" stop-opacity="0"/></linearGradient></defs>'+_grid+'<polygon points="'+_ar+'" fill="url(#_nfevog)"/><polyline points="'+_lp+'" fill="none" stroke="#34d399" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>'+
+        '<div id="_nf_evoVL" style="position:absolute;top:0;bottom:0;width:1px;background:var(--blue);opacity:0;pointer-events:none;transition:opacity .1s"></div>'+_dots+
+        '<div id="_nf_evoTip" style="position:absolute;opacity:0;pointer-events:none;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.45;white-space:nowrap;transform:translate(-50%,calc(-100% - 12px));box-shadow:0 8px 20px rgba(0,0,0,.5);z-index:6"></div>'+
+      '</div>'+
+      '<div style="display:flex;margin-top:8px">'+mEvo.map(function(m){return '<span style="font-size:9px;color:'+(m.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+';flex:1;text-align:center">'+m.lbl+'</span>';}).join('')+'</div>'+
+    '</div>';
     var payHtml=payers.length?payers.map(function(p){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.04)"><span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;background:'+srcCol(p.src)+';flex-shrink:0"></span><span style="font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</span></span><span style="font-size:12px;white-space:nowrap"><span style="color:var(--muted)">'+fmt(p.bruto)+' \u2192 </span><b style="color:#4d9cf8">'+fmt(p.neto)+'</b></span></div>';}).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">Nadie paga este mes.</div>';
     root.innerHTML='<div style="background:var(--bg2);border:2px solid var(--blue2);border-radius:14px;padding:18px 22px;margin-bottom:4px">'+
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">'+
@@ -4092,6 +4101,11 @@ CAPACIDADES QUE TIENES:
     '</div>';
     var p=document.getElementById('_nf_h_prev');if(p)p.onclick=function(){off++;render();};
     var nx=document.getElementById('_nf_h_next');if(nx)nx.onclick=function(){if(off>0){off--;render();}};
+    var _ec=document.getElementById('_nf_evochart');
+    if(_ec){var _tip=document.getElementById('_nf_evoTip'),_vl=document.getElementById('_nf_evoVL'),_dd=[].slice.call(_ec.querySelectorAll('[data-dot]'));
+      _ec.onmousemove=function(e){var rr=_ec.getBoundingClientRect();if(!rr.width)return;var mx=(e.clientX-rr.left)/rr.width*100;var bi=0;for(var ii=1;ii<evoPts.length;ii++){if(Math.abs(evoPts[ii].x-mx)<Math.abs(evoPts[bi].x-mx))bi=ii;}var pp=evoPts[bi];_vl.style.left=pp.x+'%';_vl.style.opacity='0.45';_tip.style.left=Math.max(8,Math.min(92,pp.x))+'%';_tip.style.top=pp.y+'%';_tip.style.opacity='1';_tip.innerHTML='<b style="color:var(--text)">'+pp.lbl+' '+pp.yr+'</b><br><span style="color:#34d399;font-weight:700">'+fmt(pp.neto)+'</span>';_dd.forEach(function(dn,i){dn.style.transform=i===bi?'translate(-50%,-50%) scale(1.5)':'translate(-50%,-50%) scale(1)';});};
+      _ec.onmouseleave=function(){_tip.style.opacity='0';_vl.style.opacity='0';_dd.forEach(function(dn){dn.style.transform='translate(-50%,-50%) scale(1)';});};
+    }
   }
   function sync(){var root=document.getElementById('_nf_hist_root');if(!root)return;hideNative();if(root.children.length===0)render();}
   // MutationObserver runs SYNCHRONOUSLY (microtask, before paint) so the native panel is hidden
