@@ -3433,6 +3433,7 @@ CAPACIDADES QUE TIENES:
   var _sel=null;      // selected group filter (null = all / assign view)
   var _open=true;     // panel expanded
   var _adding=false;  // showing new-group input
+  var _q='';          // search query
 
   function gColor(name){var g=loadGroups();for(var i=0;i<g.length;i++){if(g[i].name===name)return g[i].color;}return '#94a3b8';}
   function leadGroups(id){var t=loadTags();return t[id]||[];}
@@ -3445,6 +3446,48 @@ CAPACIDADES QUE TIENES:
   }
 
   function activeLeads(){return getLeads().filter(function(l){return l.status!=='Closed'&&l.status!=='Lost';});}
+
+  var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
+  function matchLead(l,q){
+    if(!q)return true;q=q.toLowerCase();
+    return String(leadLabel(l)).toLowerCase().indexOf(q)>=0 || String(l.note||'').toLowerCase().indexOf(q)>=0 || String(l.source||'').toLowerCase().indexOf(q)>=0;
+  }
+  function renderList(){
+    var box=document.getElementById('_nf_lg_list');if(!box)return;
+    var groups=loadGroups();var tags=loadTags();var leads=getLeads();
+    var base;
+    if(_sel===null){base=activeLeads();}
+    else{base=leads.filter(function(l){return (tags[l.id]||[]).indexOf(_sel)>=0;});}
+    var listLeads=base.filter(function(l){return matchLead(l,_q);});
+    listLeads.sort(function(a,b){return (leadLabel(a)||'').localeCompare(leadLabel(b)||'');});
+    var rows=listLeads.map(function(l){
+      var myTags=(tags[l.id]||[]);
+      var lbl=leadLabel(l);
+      var initial=esc((String(lbl).trim().charAt(0)||'?').toUpperCase());
+      var ac=PALETTE[(String(l.id||lbl).charCodeAt(0)||0)%PALETTE.length];
+      var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" title="Quitar de '+esc(n)+'" style="cursor:pointer;font-size:10px;font-weight:700;padding:2px 8px;border-radius:11px;background:'+c+'22;color:'+c+';border:1px solid '+c+'55;white-space:nowrap">'+esc(n)+' \xd7</span>';}).join('');
+      var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
+      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:5px 8px;color:#4d9cf8;font-size:11px;font-weight:600;outline:none;cursor:pointer"><option value="">+ a\xf1adir a grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
+      var st=l.status||'';var stl=ST_LBL[st]||st;
+      return '<div class="nf-lg-row" style="display:flex;align-items:center;gap:11px;padding:8px 10px;border-radius:10px">'+
+        '<span style="width:32px;height:32px;flex-shrink:0;border-radius:50%;background:'+ac+'22;color:'+ac+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px">'+initial+'</span>'+
+        '<div style="flex:1;min-width:0">'+
+          '<div style="font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(lbl)+'</div>'+
+          '<div style="font-size:10.5px;color:var(--muted);margin-top:1px">'+esc(stl)+(l.source?' \xb7 '+esc(l.source):'')+'</div>'+
+        '</div>'+
+        '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;max-width:58%">'+tagPills+addMenu+'</div>'+
+      '</div>';
+    }).join('');
+    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:22px 0;text-align:center;font-style:italic">'+(_q?'Sin resultados para “'+esc(_q)+'”':(_sel===null?'Ning\xfan lead activo':'Ning\xfan lead en este grupo todav\xeda'))+'</div>';
+    var head=_q?'<div style="font-size:10px;color:var(--muted);padding:0 10px 8px;font-weight:600">'+listLeads.length+' resultado'+(listLeads.length===1?'':'s')+'</div>':'';
+    box.innerHTML=head+rows;
+    Array.prototype.forEach.call(box.querySelectorAll('[data-untag]'),function(el){
+      el.onclick=function(){var parts=el.getAttribute('data-untag').split('|');toggleTag(parts[0],parts[1]);render();};
+    });
+    Array.prototype.forEach.call(box.querySelectorAll('[data-addsel]'),function(sel){
+      sel.onchange=function(){var id=sel.getAttribute('data-addsel');var v=sel.value;if(v){toggleTag(id,v);render();}};
+    });
+  }
 
   function render(){
     var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
@@ -3474,36 +3517,10 @@ CAPACIDADES QUE TIENES:
       ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nombre del grupo..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#4d9cf8;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
       : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#4d9cf8;border:1px dashed #4d9cf855">+ Nuevo grupo</span>';
 
-    // Body: list of leads (all-active for assign view, filtered for a group)
-    var listLeads;
-    if(_sel===null){
-      listLeads=activeLeads();
-    }else{
-      listLeads=leads.filter(function(l){return (tags[l.id]||[]).indexOf(_sel)>=0;});
-    }
-    // Sort by name
-    listLeads.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
-
-    var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
-
-    var rows=listLeads.map(function(l){
-      var myTags=(tags[l.id]||[]);
-      var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" style="cursor:pointer;font-size:9px;font-weight:700;padding:2px 7px;border-radius:10px;background:'+c+'22;color:'+c+';border:1px solid '+c+'44;white-space:nowrap">'+esc(n)+' ×</span>';}).join(' ');
-      // available groups to add (not already assigned)
-      var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
-      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:3px 6px;color:var(--muted);font-size:10px;outline:none;cursor:pointer"><option value="">+ añadir a grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
-      var st=l.status||'';var stl=ST_LBL[st]||st;
-      return '<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(leadLabel(l))+'</div>'+
-          '<div style="font-size:10px;color:var(--muted);margin-top:1px">'+esc(stl)+(l.source?' · '+esc(l.source):'')+'</div>'+
-        '</div>'+
-        '<div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;justify-content:flex-end;max-width:60%">'+tagPills+addMenu+'</div>'+
-      '</div>';
-    }).join('');
-    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:14px 0;text-align:center;font-style:italic">'+(_sel===null?'Ningún lead activo':'Ningún lead en este grupo todavía')+'</div>';
+    // (lead list is rendered by renderList() into #_nf_lg_list)
 
     root.innerHTML=
+      '<style>.nf-lg-row{transition:background .12s}.nf-lg-row:hover{background:rgba(255,255,255,.04)}#_nf_lg_search::placeholder{color:var(--muted)}#_nf_lg_list::-webkit-scrollbar{width:8px}#_nf_lg_list::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:8px}</style>'+
       '<div style="margin-bottom:20px;background:var(--bg2);border-radius:14px;border:1px solid var(--border);overflow:hidden">'+
         '<div id="_nf_lg_hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none;border-bottom:'+(_open?'1px solid var(--border)':'none')+'">'+
           '<div style="display:flex;align-items:center;gap:10px">'+
@@ -3516,8 +3533,13 @@ CAPACIDADES QUE TIENES:
         (_open?
           '<div style="padding:14px 20px">'+
             '<div style="font-size:11px;color:var(--muted);margin-bottom:12px;line-height:1.55"><b style="color:var(--text2)">1.</b> Crea un grupo (ej: <b>Cerrar llamada</b>, <b>VIP</b>). &nbsp; <b style="color:var(--text2)">2.</b> En cada lead pulsa <b>“+ añadir a grupo”</b> para clasificarlo. &nbsp; <b style="color:var(--text2)">3.</b> Pulsa un grupo de arriba para ver solo esos leads.</div>'+
-            '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:14px">'+chips+addBtn+'</div>'+
-            '<div>'+rows+'</div>'+
+            '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px">'+chips+addBtn+'</div>'+
+            '<div style="position:relative;margin-bottom:10px">'+
+              '<span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.65;pointer-events:none">🔍</span>'+
+              '<input id="_nf_lg_search" type="text" autocomplete="off" placeholder="Buscar lead por nombre..." value="'+esc(_q)+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:11px;padding:10px 34px 10px 38px;color:var(--text);font-size:13px;outline:none">'+
+              '<span id="_nf_lg_clear" title="Limpiar" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:17px;line-height:1;display:'+(_q?'block':'none')+'">\xd7</span>'+
+            '</div>'+
+            '<div id="_nf_lg_list" style="max-height:430px;overflow-y:auto;margin:0 -4px;padding:0 2px"></div>'+
           '</div>'
         :'')+
       '</div>';
@@ -3555,12 +3577,14 @@ CAPACIDADES QUE TIENES:
       }
       if(newOk)newOk.onclick=commitNew;
       if(newInp)newInp.onkeydown=function(e){if(e.key==='Enter')commitNew();if(e.key==='Escape'){_adding=false;render();}};
-      Array.prototype.forEach.call(root.querySelectorAll('[data-untag]'),function(el){
-        el.onclick=function(){var parts=el.getAttribute('data-untag').split('|');toggleTag(parts[0],parts[1]);render();};
-      });
-      Array.prototype.forEach.call(root.querySelectorAll('[data-addsel]'),function(sel){
-        sel.onchange=function(){var id=sel.getAttribute('data-addsel');var v=sel.value;if(v){toggleTag(id,v);render();}};
-      });
+      var sInp=document.getElementById('_nf_lg_search');
+      if(sInp){
+        sInp.oninput=function(){_q=this.value;var c=document.getElementById('_nf_lg_clear');if(c)c.style.display=this.value?'block':'none';renderList();};
+        sInp.onkeydown=function(e){if(e.key==='Escape'){_q='';render();}};
+      }
+      var clrEl=document.getElementById('_nf_lg_clear');
+      if(clrEl)clrEl.onclick=function(){_q='';render();setTimeout(function(){var i=document.getElementById('_nf_lg_search');if(i)i.focus();},20);};
+      renderList();
     }
   }
 
