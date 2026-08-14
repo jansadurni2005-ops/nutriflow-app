@@ -3450,7 +3450,7 @@ CAPACIDADES QUE TIENES:
   function pe(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
   function todayStr(){return new Date().toISOString().slice(0,10);}
   function saveLeadsArr(a){var p=getPre();if(p)localStorage.setItem(p+'leads',JSON.stringify(a));}
-  function getSourcesList(){var def=['Instagram','GEIEG','Webinar','Referral','Àurea','Ads','Other'];try{var s=JSON.parse(localStorage.getItem(getPre()+'sources')||'[]');var n=s.map(function(x){return x&&x.name;}).filter(Boolean);if(n.length)return n;}catch(e){}return def;}
+  function getSourcesList(){var out=[],seen={};function add(n){n=(n||'').toString().trim();if(n&&!seen[n.toLowerCase()]){seen[n.toLowerCase()]=1;out.push(n);}}['Instagram','GEIEG','Webinar','Referral','Àurea','Ads','Other'].forEach(add);try{JSON.parse(localStorage.getItem(getPre()+'sources')||'[]').forEach(function(x){if(x&&x.name)add(x.name);});}catch(e){}try{getLeads().forEach(function(l){if(l&&l.source)add(l.source);});}catch(e){}return out;}
   function addLead(o){var ls=getLeads();ls.unshift({id:pe(),name:o.name,source:o.source||'Instagram',status:o.status||'New',note:o.note||'',date:o.date||todayStr()});saveLeadsArr(ls);}
   function updateLead(id,o){saveLeadsArr(getLeads().map(function(l){return l.id===id?{id:l.id,name:o.name,source:o.source,status:o.status,note:o.note,date:o.date||l.date}:l;}));}
   function deleteLead(id){saveLeadsArr(getLeads().filter(function(l){return l.id!==id;}));var t=loadTags();if(t[id]){delete t[id];saveTags(t);}}
