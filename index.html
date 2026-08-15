@@ -4049,6 +4049,8 @@ CAPACIDADES QUE TIENES:
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
   function uid(){return 'c'+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function getLeads(){try{return JSON.parse(localStorage.getItem(getPre()+'leads')||'[]');}catch(e){return[];}}
+  function getClients(){try{return JSON.parse(localStorage.getItem(getPre()+'clients')||'[]');}catch(e){return[];}}
+  function getCfg(){try{return JSON.parse(localStorage.getItem(getPre()+'config')||'{}');}catch(e){return{};}}
   function saveLeadsArr(a){var p=getPre();if(p)localStorage.setItem(p+'leads',JSON.stringify(a));}
   function pe(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
   function todayStr(){return new Date().toISOString().slice(0,10);}
@@ -4094,7 +4096,48 @@ CAPACIDADES QUE TIENES:
       histHtml='<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Evolución · % cierre por mes</div><div style="display:flex;gap:5px;align-items:flex-end;height:70px">'+rowsH+'</div></div>';
     }
     var srcOptions=getSourcesList().map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
-    root.innerHTML='<div style="background:var(--bg2);border-radius:14px;border:2px solid '+rcol+'55;padding:16px 20px">'+
+    // ── Business-health stats for the selected month ──
+    var clientsB=getClients();var cfB=getCfg();
+    var spB=cfB.partnerSource||cfB.splitPartner||'GEIEG';var spctB=(cfB.splitPercent||70)/100;
+    function myR(amt,src){var com=window._nf_getSourcePct?window._nf_getSourcePct(src):null;if(com!=null&&com>0)return amt*(100-com)/100;if(src===spB)return amt*spctB;return amt;}
+    function incM(y,m){return (window._nf_cashForMonth?window._nf_cashForMonth(clientsB,myR,y,m,false):0)||0;}
+    function inMonth(dstr,yy,mm){if(!dstr)return false;var dt=new Date(String(dstr).slice(0,10));if(isNaN(dt.getTime()))return false;return dt.getFullYear()===yy&&dt.getMonth()===mm;}
+    var sy=sel.yr,sm=sel.mo;var pmn=sm-1,pyn=sy;if(pmn<0){pmn=11;pyn--;}
+    var netThis=incM(sy,sm),netPrev=incM(pyn,pmn);
+    var diffN=netThis-netPrev;var goodN=diffN>=0;
+    var pctN=netPrev>0?Math.round(diffN/netPrev*100):(netThis>0?100:0);
+    var newThis=clientsB.filter(function(c){return inMonth(c.startDate,sy,sm);}).length;
+    var newPrev=clientsB.filter(function(c){return inMonth(c.startDate,pyn,pmn);}).length;
+    var activeC=clientsB.filter(function(c){return c.active!==false;});
+    var mrr=0;activeC.forEach(function(c){if(c.billing==='onetime')return;var pr=parseFloat(c.price)||0;if(pr>0)mrr+=myR(pr,c.source);});
+    var payers=0;clientsB.forEach(function(c){if(c.active===false||!c.startDate)return;var b=(window._nf_cashForMonth?window._nf_cashForMonth([c],null,sy,sm,true):0)||0;if(b>0)payers++;});
+    var ticket=payers>0?netThis/payers:0;
+    var leadsThis=getLeads().filter(function(l){return inMonth(l.date,sy,sm);}).length;
+    var incPerCall=tot>0?netThis/tot:0;
+    function eur(n){n=Math.round(n||0);try{return n.toLocaleString('es-ES')+' €';}catch(e){return n+' €';}}
+    function rdelta(d){if(!d)return '<span style="color:var(--muted)">= igual que el mes anterior</span>';var up=d>=0;return '<span style="color:'+(up?'#34d399':'#f87171')+';font-weight:700">'+(up?'▲ +':'▼ −')+eur(Math.abs(d))+'</span> vs mes ant.';}
+    function cdelta(d){if(!d)return 'igual que el mes ant.';var up=d>=0;return '<span style="color:'+(up?'#34d399':'#f87171')+';font-weight:700">'+(up?'▲ +':'▼ −')+Math.abs(d)+'</span> vs mes ant.';}
+    function scard(label,value,sub,accent){return '<div style="background:var(--bg3);border-radius:10px;padding:12px 14px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700;margin-bottom:6px">'+label+'</div><div style="font-size:21px;font-weight:800;color:'+(accent||'var(--text)')+';line-height:1.1">'+value+'</div>'+(sub?'<div style="font-size:10px;color:var(--muted);margin-top:4px;line-height:1.35">'+sub+'</div>':'')+'</div>';}
+    var bannerCol=goodN?'#34d399':'#f87171';
+    var bannerHtml='<div style="display:flex;align-items:center;gap:13px;background:'+bannerCol+'14;border:1px solid '+bannerCol+'40;border-radius:12px;padding:14px 16px;margin-bottom:14px">'+
+      '<span style="font-size:26px">'+(goodN?'📈':'📉')+'</span>'+
+      '<div style="flex:1;min-width:0"><div style="font-size:14px;font-weight:800;color:'+bannerCol+'">'+((netPrev===0&&netThis===0)?'Aún sin datos de este mes':(goodN?'Vas mejor que el mes pasado':'Por debajo del mes pasado'))+'</div>'+
+      '<div style="font-size:12px;color:var(--text2);margin-top:2px">'+eur(netThis)+' netos · '+(goodN?'+':'−')+eur(Math.abs(diffN))+' ('+(goodN?'+':'')+pctN+'%) · '+newThis+' cliente'+(newThis===1?'':'s')+' nuevo'+(newThis===1?'':'s')+'</div></div>'+
+    '</div>';
+    var gridHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">'+
+      scard('Ingresos netos',eur(netThis),rdelta(diffN),'#34d399')+
+      scard('Recurrente / mes (MRR)',eur(mrr),'de '+activeC.length+' clientes activos','#4d9cf8')+
+      scard('Clientes nuevos',String(newThis),cdelta(newThis-newPrev),'var(--text)')+
+      scard('Ticket medio',payers>0?eur(ticket):'—',payers>0?payers+' pagando este mes':'sin cobros','var(--text)')+
+      scard('Ingreso / llamada',tot>0?eur(incPerCall):'—',tot>0?clo+' cerradas de '+tot:'sin llamadas','var(--text)')+
+      scard('Leads nuevos',String(leadsThis),'captados este mes','var(--text)')+
+    '</div>';
+    function fstep(lbl,val,col){return '<div style="flex:1;text-align:center;min-width:0"><div style="font-size:20px;font-weight:800;color:'+col+'">'+val+'</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:2px">'+lbl+'</div></div>';}
+    var arw='<span style="color:var(--muted);font-size:14px;flex-shrink:0">›</span>';
+    var funnelHtml='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 18px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Embudo del mes</div><div style="display:flex;align-items:center;gap:6px">'+fstep('Leads',leadsThis,'#4d9cf8')+arw+fstep('Llamadas',tot,'#a78bfa')+arw+fstep('Cerradas',clo,'#34d399')+arw+fstep('Clientes',newThis,'#f59e0b')+'</div></div>';
+    var statsTitle='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:17px">📊</span><span style="font-size:14px;font-weight:800;color:var(--text)">Salud del negocio · '+selLbl+'</span></div>';
+    var statsHtml=statsTitle+bannerHtml+gridHtml+funnelHtml;
+    root.innerHTML=statsHtml+'<div style="background:var(--bg2);border-radius:14px;border:2px solid '+rcol+'55;padding:16px 20px">'+
       '<div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin-bottom:14px">'+
         '<div style="display:flex;align-items:center;gap:10px">'+
           '<button id="_nfci_p" style="background:var(--bg3);border:none;color:var(--text2);width:26px;height:26px;border-radius:7px;font-size:15px;cursor:pointer;line-height:1">‹</button>'+
