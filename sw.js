@@ -1,5 +1,5 @@
 // NutriFlow service worker — offline app shell + always-fresh HTML/data
-var CACHE='nutriflow-v1';
+var CACHE='nutriflow-v2';
 var ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',function(e){
