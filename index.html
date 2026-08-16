@@ -66,7 +66,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
   main div[style*="grid-template-columns:1fr 1fr"][style*="minmax(130"]{grid-template-columns:1fr !important;}
   #_nf_lg_btn span,#_nf_lg_btn{font-size:10px !important;}
 }
-</style><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#0d1117"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NutriFlow"><link rel="apple-touch-icon" href="icon-192.png"><script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script></head>
+</style><link rel="manifest" href="manifest.json"><meta name="theme-color" content="#000000"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"><meta name="apple-mobile-web-app-title" content="NutriFlow"><link rel="apple-touch-icon" href="icon-192.png"><script>if("serviceWorker" in navigator){window.addEventListener("load",function(){navigator.serviceWorker.register("sw.js").catch(function(){});});}</script><style id="nf-black-theme">:root{--bg:#000000!important;--bg2:#0c0d11!important;--bg3:#15171d!important;--bg4:#23262e!important;--bg5:#2c303a!important;--border:#ffffff12!important;--border2:#ffffff20!important;--text:#f3f4f6!important;--text2:#aeb4bf!important;--muted:#7b818d!important;--blue:#a3e635!important;--blue2:#84cc16!important;--blue3:#4d7c0f!important;}html,body{background:#000!important;}::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#26262e;border-radius:8px}::-webkit-scrollbar-track{background:transparent}[style*="background:#a3e635"],[style*="background: #a3e635"],[style*="background:#84cc16"],[style*="background: #84cc16"],[style*="background:var(--blue)"],[style*="background: var(--blue)"],[style*="background:var(--blue2)"],[style*="background: var(--blue2)"]{color:#0e1a05!important;}</style></head>
 <body>
 <div id="root"></div>
 
@@ -1089,9 +1089,9 @@ CAPACIDADES QUE TIENES:
       return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'+
         '<div style="font-size:9px;font-weight:600;color:'+(d.v>0?'var(--text2)':'var(--muted)')+'">'+fmtE(d.v)+'</div>'+
         '<div style="flex:1;width:100%;display:flex;align-items:flex-end;min-height:60px">'+
-          '<div style="width:100%;background:'+(isT?'#4d9cf8':'rgba(77,156,248,0.28)')+';border-radius:4px 4px 0 0;height:'+pct+'%;min-height:'+(d.v>0?'4':'1')+'px"></div>'+
+          '<div style="width:100%;background:'+(isT?'#a3e635':'rgba(77,156,248,0.28)')+';border-radius:4px 4px 0 0;height:'+pct+'%;min-height:'+(d.v>0?'4':'1')+'px"></div>'+
         '</div>'+
-        '<div style="font-size:10px;color:'+(isT?'#4d9cf8':'var(--muted)')+';font-weight:'+(isT?700:400)+';margin-top:2px">'+d.label+'</div>'+
+        '<div style="font-size:10px;color:'+(isT?'#a3e635':'var(--muted)')+';font-weight:'+(isT?700:400)+';margin-top:2px">'+d.label+'</div>'+
       '</div>';
     }).join('');
 
@@ -1103,7 +1103,7 @@ CAPACIDADES QUE TIENES:
           '<button id="_nfwp" style="background:var(--bg4);border:none;color:var(--text2);width:26px;height:26px;border-radius:7px;cursor:pointer;font-size:15px;display:flex;align-items:center;justify-content:center">&#8249;</button>'+
           '<div style="text-align:center;min-width:110px">'+
             '<div style="font-size:11px;color:var(--muted)">'+wlabel+'</div>'+
-            '<div style="font-size:18px;font-weight:800;color:#4d9cf8;margin-top:1px">'+fmtE(total)+'</div>'+
+            '<div style="font-size:18px;font-weight:800;color:#a3e635;margin-top:1px">'+fmtE(total)+'</div>'+
           '</div>'+
           '<button id="_nfwn" style="background:var(--bg4);border:none;color:'+(off<0?'var(--text2)':'var(--muted)')+';width:26px;height:26px;border-radius:7px;cursor:'+(off<0?'pointer':'not-allowed')+';font-size:15px;display:flex;align-items:center;justify-content:center">&#8250;</button>'+
         '</div>'+
@@ -1133,7 +1133,7 @@ CAPACIDADES QUE TIENES:
   var SID='_nf_lstats';
   var kanbanActive=false;
   var STATUSES=[
-    {id:'New',      label:'Nuevo',      col:'#4d9cf8'},
+    {id:'New',      label:'Nuevo',      col:'#a3e635'},
     {id:'Contacted',label:'Contactado', col:'#a78bfa'},
     {id:'Call',     label:'Llamada',    col:'#fbbf24'},
     {id:'Closed',   label:'Cerrado',    col:'#34d399'},
@@ -1171,7 +1171,7 @@ CAPACIDADES QUE TIENES:
     var totalC=leads.filter(function(l){return l.status==='Closed';}).length;
     var cards=entries.map(function(s){
       var d=src[s],pct=Math.round(d.c/d.t*100);
-      var col=pct>=50?'#34d399':pct>=25?'#fbbf24':'#4d9cf8';
+      var col=pct>=50?'#34d399':pct>=25?'#fbbf24':'#a3e635';
       return '<div style="background:var(--bg4);border-radius:8px;padding:12px 14px;flex:1;min-width:90px">'+
         '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:var(--muted);margin-bottom:5px">'+s+'</div>'+
         '<div style="font-size:20px;font-weight:800;color:var(--text)">'+d.t+'</div>'+
@@ -1188,7 +1188,7 @@ CAPACIDADES QUE TIENES:
         '<div style="font-size:13px;font-weight:700">Fuentes de leads</div>'+
         '<div style="display:flex;align-items:center;gap:10px">'+
           '<div style="font-size:11px;color:var(--muted)">'+total+' leads &middot; '+(total?Math.round(totalC/total*100):0)+'% cierre</div>'+
-          '<button onclick="window._nfKanbanToggle()" style="background:#4d9cf822;border:1px solid #4d9cf844;color:#4d9cf8;padding:4px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">&#9638; Kanban</button>'+
+          '<button onclick="window._nfKanbanToggle()" style="background:#a3e63522;border:1px solid #a3e63544;color:#a3e635;padding:4px 12px;border-radius:7px;font-size:11px;font-weight:600;cursor:pointer">&#9638; Kanban</button>'+
         '</div>'+
       '</div>'+
       '<div style="display:flex;gap:8px;flex-wrap:wrap">'+cards+'</div>';
@@ -1296,7 +1296,7 @@ CAPACIDADES QUE TIENES:
   var LS='_nf_agenda_evs';
   var MES=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var DS_F=['Domingo','Lunes','Martes','Miércoles','Jueves','Viernes','Sábado'];
-  var ECOLS=['#4d9cf8','#34d399','#f59e0b','#f87171','#a78bfa','#06b6d4','#f97316','#ec4899'];
+  var ECOLS=['#a3e635','#34d399','#f59e0b','#f87171','#a78bfa','#06b6d4','#f97316','#ec4899'];
   var NCOLS=['#fef08a','#fca5a5','#86efac','#93c5fd','#d8b4fe','#fdba74','#fde68a','#6ee7b7'];
 
   var S={off:0,events:[],creating:false,createDate:''};
@@ -1314,7 +1314,7 @@ CAPACIDADES QUE TIENES:
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
   function addEvent(title,date,t0,t1,desc,col,email){
-    S.events.push({id:genId(),title:title,date:date,t0:t0||'',t1:t1||'',desc:desc||'',col:col||'#4d9cf8',email:!!email});
+    S.events.push({id:genId(),title:title,date:date,t0:t0||'',t1:t1||'',desc:desc||'',col:col||'#a3e635',email:!!email});
     S.events.sort(function(a,b){return(a.date+(a.t0||'00:00')).localeCompare(b.date+(b.t0||'00:00'));});
     save();
     if(email&&window._nf_addReminder){
@@ -1430,10 +1430,10 @@ CAPACIDADES QUE TIENES:
             '<div><label style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;display:block;margin-bottom:6px">Descripción</label>'+
               '<textarea id="_nf_ev_desc" rows="2" placeholder="Notas..." style="width:100%;box-sizing:border-box;background:var(--bg3);border:1.5px solid var(--border2);border-radius:10px;padding:11px 14px;color:var(--text);font-size:13px;outline:none;resize:none;font-family:inherit"></textarea></div>'+
             '<label style="display:flex;align-items:center;gap:9px;cursor:pointer;font-size:12.5px;color:var(--text2);background:var(--bg3);border:1.5px solid var(--border2);border-radius:10px;padding:11px 14px">'+
-              '<input id="_nf_ev_email" type="checkbox" style="width:17px;height:17px;accent-color:#4d9cf8;flex-shrink:0"> \ud83d\udce7 Recordarme por email ese día</label>'+
+              '<input id="_nf_ev_email" type="checkbox" style="width:17px;height:17px;accent-color:#a3e635;flex-shrink:0"> \ud83d\udce7 Recordarme por email ese día</label>'+
             '<div style="display:grid;grid-template-columns:1fr 2fr;gap:10px;margin-top:4px">'+
               '<button id="_nf_ev_cancel" style="background:var(--bg3);border:1px solid var(--border);color:var(--text2);padding:12px;border-radius:10px;font-size:13px;font-weight:600;cursor:pointer">Cancelar</button>'+
-              '<button id="_nf_ev_save" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(77,156,248,.4)">Crear evento</button>'+
+              '<button id="_nf_ev_save" style="background:linear-gradient(135deg,#a3e635,#3b82f6);border:none;color:#fff;padding:12px;border-radius:10px;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(77,156,248,.4)">Crear evento</button>'+
             '</div>'+
           '</div>'+
         '</div></div>';
@@ -1457,7 +1457,7 @@ CAPACIDADES QUE TIENES:
       }).join('');
       return '<div style="padding:18px 0;border-bottom:1px solid rgba(255,255,255,.04)">'+
         '<div style="display:flex;align-items:center;gap:12px;margin-bottom:'+(evs.length?'12':'0')+'px">'+
-          (isT?'<span style="background:#4d9cf8;color:#fff;border-radius:7px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;flex-shrink:0">HOY</span>':
+          (isT?'<span style="background:#a3e635;color:#fff;border-radius:7px;padding:3px 10px;font-size:10px;font-weight:800;letter-spacing:.07em;text-transform:uppercase;flex-shrink:0">HOY</span>':
                '<span style="width:7px;height:7px;border-radius:50%;background:'+(evs.length?'var(--text2)':'var(--bg4)')+';flex-shrink:0;display:inline-block"></span>')+
           '<span style="font-size:14px;font-weight:'+(isT?'700':'500')+';color:'+(isT?'var(--text)':'var(--text2)')+'">'+DS_F[d.getDay()]+', '+d.getDate()+' '+MES[d.getMonth()]+'</span>'+
           (evs.length
@@ -1480,7 +1480,7 @@ CAPACIDADES QUE TIENES:
           navBtn('_nf_ag_t','Hoy','padding:0 16px')+
           navBtn('_nf_ag_n','&#8250;','width:36px')+
           '<div style="width:1px;height:22px;background:var(--bg4);margin:0 4px"></div>'+
-          '<button id="_nf_ag_new" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:0 20px;height:36px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 3px 12px rgba(77,156,248,.4);letter-spacing:.02em">+ Nuevo evento</button>'+
+          '<button id="_nf_ag_new" style="background:linear-gradient(135deg,#a3e635,#3b82f6);border:none;color:#fff;padding:0 20px;height:36px;border-radius:9px;cursor:pointer;font-size:12px;font-weight:700;box-shadow:0 3px 12px rgba(77,156,248,.4);letter-spacing:.02em">+ Nuevo evento</button>'+
         '</div>'+
       '</div>'+
       '<div style="background:var(--bg3);border-radius:14px;padding:0 20px;border:1px solid rgba(255,255,255,.04)">'+rows+'</div>';
@@ -1506,7 +1506,7 @@ CAPACIDADES QUE TIENES:
         var emailChk=el('_nf_ev_email')&&el('_nf_ev_email').checked;
         addEvent(t,el('_nf_ev_dt').value,el('_nf_ev_t0').value,el('_nf_ev_t1').value,el('_nf_ev_desc').value,el('_nf_ev_col').value,emailChk);
       };
-      el('_nf_ev_ttl').onfocus=function(){this.style.borderColor='#4d9cf8';};
+      el('_nf_ev_ttl').onfocus=function(){this.style.borderColor='#a3e635';};
       el('_nf_ev_ttl').onblur=function(){this.style.borderColor='var(--border2)';};
       var colInp=el('_nf_ev_col');
       el('_nf_ev_colpick').querySelectorAll('[data-col]').forEach(function(dot,i){
@@ -1558,7 +1558,7 @@ CAPACIDADES QUE TIENES:
   function goTab(label){document.querySelectorAll('nav button').forEach(function(b){if(b.textContent.trim()===label)b.click();});}
   function el(id){return document.getElementById(id);}
   var SQ='';
-  var stCol={New:'#4d9cf8',Contacted:'#a78bfa',Call:'#f59e0b',Closed:'#34d399',Lost:'#f87171'};
+  var stCol={New:'#a3e635',Contacted:'#a78bfa',Call:'#f59e0b',Closed:'#34d399',Lost:'#f87171'};
   var stLbl={New:'Nuevo',Contacted:'Contactado',Call:'Llamada',Closed:'Cerrado',Lost:'Perdido'};
 
   function doSearch(q){
@@ -1704,7 +1704,7 @@ CAPACIDADES QUE TIENES:
   function daysAgo(ds){var d=new Date(ds);d.setHours(0,0,0,0);var n=new Date();n.setHours(0,0,0,0);return Math.round((n-d)/864e5);}
   var TERMINAL={Closed:1,Lost:1};
   var ST_LBL={New:'Nuevo',Contacted:'Contactado',Call:'Llamada'};
-  var ST_COL={New:'#4d9cf8',Contacted:'#a78bfa',Call:'#f59e0b'};
+  var ST_COL={New:'#a3e635',Contacted:'#a78bfa',Call:'#f59e0b'};
   var open=true;
 
   function render(){
@@ -1972,7 +1972,7 @@ CAPACIDADES QUE TIENES:
     var retRate=list.length?Math.round(retained/list.length*100):0;
     var avgM=list.length?(list.reduce(function(s,c){return s+c.months;},0)/list.length).toFixed(1):'0';
     var rCol=retRate>=80?'#34d399':retRate>=50?'#f59e0b':'#f87171';
-    var CATS=[{l:'Nuevo',c:'#4d9cf8',min:0,max:3},{l:'En curso',c:'#a78bfa',min:3,max:6},{l:'Fiel',c:'#34d399',min:6,max:12},{l:'VIP',c:'#f59e0b',min:12,max:999}];
+    var CATS=[{l:'Nuevo',c:'#a3e635',min:0,max:3},{l:'En curso',c:'#a78bfa',min:3,max:6},{l:'Fiel',c:'#34d399',min:6,max:12},{l:'VIP',c:'#f59e0b',min:12,max:999}];
     function catFor(m){for(var i=0;i<CATS.length;i++){if(m>=CATS[i].min&&m<CATS[i].max)return CATS[i];}return CATS[0];}
 
     var momHtml='';
@@ -1980,18 +1980,18 @@ CAPACIDADES QUE TIENES:
 
     var barsHtml=bars.map(function(b){
       var h=b.rev>0?Math.max(Math.round(b.rev/maxB*100),4):0;
-      var col=b.sel?'#4d9cf8':b.rev>=avg6?'rgba(77,156,248,0.5)':'rgba(77,156,248,0.25)';
+      var col=b.sel?'#a3e635':b.rev>=avg6?'rgba(77,156,248,0.5)':'rgba(77,156,248,0.25)';
       return'<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;min-width:0">'+
-        '<div style="font-size:9px;font-weight:700;color:'+(b.sel?'#4d9cf8':b.rev>0?'var(--text2)':'var(--muted)')+';white-space:nowrap">'+(b.rev>0?fmt(b.rev):'')+'</div>'+
+        '<div style="font-size:9px;font-weight:700;color:'+(b.sel?'#a3e635':b.rev>0?'var(--text2)':'var(--muted)')+';white-space:nowrap">'+(b.rev>0?fmt(b.rev):'')+'</div>'+
         '<div style="flex:1;width:100%;display:flex;align-items:flex-end;min-height:44px">'+
           (h>0?'<div style="width:100%;border-radius:4px 4px 0 0;background:'+col+';height:'+h+'%;transition:height .4s ease"></div>':'<div style="width:100%;height:2px;background:rgba(255,255,255,.06);border-radius:2px;align-self:flex-end"></div>')+
         '</div>'+
-        '<div style="font-size:9px;color:'+(b.sel?'#4d9cf8':'var(--muted)')+';font-weight:'+(b.sel?'700':'500')+'">'+b.lbl+'</div>'+
+        '<div style="font-size:9px;color:'+(b.sel?'#a3e635':'var(--muted)')+';font-weight:'+(b.sel?'700':'500')+'">'+b.lbl+'</div>'+
       '</div>';
     }).join('');
 
     // Color per source (defaults + custom hash-based)
-    var DEF_SRC={'GEIEG':'#4d9cf8','Instagram':'#ec4899','Webinar':'#34d399','Referral':'#f59e0b','Àurea':'#f97316','Ads':'#06b6d4','Other':'#94a3b8','':'#94a3b8'};
+    var DEF_SRC={'GEIEG':'#a3e635','Instagram':'#ec4899','Webinar':'#34d399','Referral':'#f59e0b','Àurea':'#f97316','Ads':'#06b6d4','Other':'#94a3b8','':'#94a3b8'};
     function srcColor(name){if(window._nf_getSourceColor){var c=window._nf_getSourceColor(name);if(c)return c;}if(DEF_SRC[name])return DEF_SRC[name];return '#94a3b8';}
     function srcCommission(source){if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return cp;}if(source===sp)return Math.round((1-pct)*100);return 0;}
 
@@ -2098,8 +2098,8 @@ CAPACIDADES QUE TIENES:
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:8px;margin-bottom:16px">'+
 
         '<div style="background:rgba(77,156,248,.08);border:1px solid rgba(77,156,248,.2);border-radius:10px;padding:12px 14px">'+
-          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#4d9cf8;font-weight:700;margin-bottom:7px">'+selLbl+'</div>'+
-          '<div style="font-size:24px;font-weight:800;color:#4d9cf8;line-height:1;letter-spacing:-0.5px">'+fmt(selData.total)+'</div>'+
+          '<div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#a3e635;font-weight:700;margin-bottom:7px">'+selLbl+'</div>'+
+          '<div style="font-size:24px;font-weight:800;color:#a3e635;line-height:1;letter-spacing:-0.5px">'+fmt(selData.total)+'</div>'+
           '<div style="font-size:10px;color:var(--muted);margin-top:5px">'+(isCur?'confirmado':'estimado')+'</div>'+
         '</div>'+
 
@@ -2177,10 +2177,10 @@ CAPACIDADES QUE TIENES:
         '</div>'+
         '<div style="height:7px;background:var(--bg3);border-radius:4px;overflow:hidden;position:relative">'+
           '<div style="position:absolute;inset:0;width:'+potPct+'%;background:rgba(52,211,153,.18);border-radius:4px"></div>'+
-          '<div style="position:absolute;inset:0;width:'+goalPct+'%;background:linear-gradient(90deg,#4d9cf8,#60a5fa);border-radius:4px;transition:width .6s ease"></div>'+
+          '<div style="position:absolute;inset:0;width:'+goalPct+'%;background:linear-gradient(90deg,#a3e635,#84cc16);border-radius:4px;transition:width .6s ease"></div>'+
         '</div>'+
         '<div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">'+
-          '<span style="font-size:10px;color:#4d9cf8;font-weight:600">'+fmt(selData.total)+' confirmado</span>'+
+          '<span style="font-size:10px;color:#a3e635;font-weight:600">'+fmt(selData.total)+' confirmado</span>'+
           '<span style="font-size:10px;color:var(--muted)">media '+fmt(avg6)+'/mes</span>'+
           '<span style="font-size:10px;color:rgba(52,211,153,.8);font-weight:600">'+fmt(potential)+' potencial</span>'+
         '</div>':'') +
@@ -2228,7 +2228,7 @@ CAPACIDADES QUE TIENES:
       var goal=loadGoal();
       var thisMonthInc=monthRev(cy,cm,clients,antrop,sp,pct,true).total;
       var goalPct=goal>0?Math.min(100,Math.round(thisMonthInc/goal*100)):0;
-      var goalCol=goalPct>=100?'#34d399':goalPct>=60?'#4d9cf8':'#f59e0b';
+      var goalCol=goalPct>=100?'#34d399':goalPct>=60?'#a3e635':'#f59e0b';
       var maxFc=Math.max.apply(null,fc.map(function(f){return f.inc;}).concat([1]));
 
       return '<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:16px 20px">'+
@@ -2257,7 +2257,7 @@ CAPACIDADES QUE TIENES:
           '<div style="font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">📈 Previsión próximos 3 meses</div>'+
           '<div style="display:flex;gap:8px">'+
             fc.map(function(f){var h=Math.max(f.inc>0?Math.round(f.inc/maxFc*100):0,4);return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:4px">'+
-              '<div style="font-size:12px;font-weight:800;color:#4d9cf8">'+fmt(f.inc)+'</div>'+
+              '<div style="font-size:12px;font-weight:800;color:#a3e635">'+fmt(f.inc)+'</div>'+
               '<div style="width:100%;height:34px;display:flex;align-items:flex-end"><div style="width:100%;border-radius:4px 4px 0 0;background:rgba(77,156,248,.5);height:'+h+'%"></div></div>'+
               '<div style="font-size:10px;color:var(--muted);font-weight:600">'+f.lbl+'</div>'+
             '</div>';}).join('')+
@@ -2326,7 +2326,7 @@ CAPACIDADES QUE TIENES:
             '<div style="display:flex;align-items:center;justify-content:space-between">'+
               '<button data-call="total-" style="background:var(--bg4);border:none;color:var(--text2);width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1">−</button>'+
               '<span style="font-size:26px;font-weight:800;color:var(--text)">'+tot+'</span>'+
-              '<button data-call="total+" style="background:#4d9cf8;border:none;color:#fff;width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1">+</button>'+
+              '<button data-call="total+" style="background:#a3e635;border:none;color:#fff;width:30px;height:30px;border-radius:8px;font-size:18px;cursor:pointer;line-height:1">+</button>'+
             '</div>'+
           '</div>'+
           '<div style="background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.18);border-radius:10px;padding:12px 14px">'+
@@ -2343,7 +2343,7 @@ CAPACIDADES QUE TIENES:
           var earned=selData.total||0;
           if(earned>0){
             return '<div style="margin-top:12px;padding:10px 12px;background:rgba(77,156,248,.08);border:1px solid rgba(77,156,248,.2);border-radius:9px;font-size:12px;color:var(--text2)">'+
-              '💰 Este mes has ganado <b style="color:#4d9cf8">'+fmt(earned)+'</b>'+
+              '💰 Este mes has ganado <b style="color:#a3e635">'+fmt(earned)+'</b>'+
             '</div>';
           }
           return '<div style="font-size:10px;color:var(--muted);margin-top:10px">Marca las llamadas del mes y las que cierras. El % de cierre se calcula solo.</div>';
@@ -2370,7 +2370,7 @@ CAPACIDADES QUE TIENES:
             return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0">'+
               '<div style="font-size:9px;font-weight:700;color:'+(m.total>0?rc:'var(--muted)')+'">'+(m.total>0?r+'%':'—')+'</div>'+
               '<div style="width:100%;height:40px;display:flex;align-items:flex-end"><div style="width:100%;border-radius:4px 4px 0 0;background:'+(m.total>0?rc:'var(--bg4)')+';height:'+h+'%;'+(m.cur?'box-shadow:0 0 8px '+rc+'88':'')+'"></div></div>'+
-              '<div style="font-size:9px;color:'+(m.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+'">'+m.lbl+'</div>'+
+              '<div style="font-size:9px;color:'+(m.cur?'#a3e635':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+'">'+m.lbl+'</div>'+
               '<div style="font-size:8px;color:var(--muted)">'+m.closed+'/'+m.total+'</div>'+
             '</div>';
           }).join('');
@@ -2472,7 +2472,7 @@ CAPACIDADES QUE TIENES:
     var dPath='M'+xs[0]+','+ys[0];
     for(var i=1;i<xs.length;i++)dPath+='L'+xs[i]+','+ys[i];
     var fill=dPath+'L'+xs[xs.length-1]+','+H+'L'+xs[0]+','+H+'Z';
-    var col='#4d9cf8';
+    var col='#a3e635';
     var dots=xs.map(function(x,i){
       var isLast=i===xs.length-1;
       return '<circle cx="'+x+'" cy="'+ys[i]+'" r="'+(isLast?4.5:3)+'" fill="'+(isLast?col:'var(--bg2)')+'" stroke="'+col+'" stroke-width="1.5"/>'+
@@ -2486,8 +2486,8 @@ CAPACIDADES QUE TIENES:
   }
 
   // ── Render weight section into the React-managed _nf_wt_section div ──
-  var INP_S='background:var(--bg2);border:1.5px solid #4d9cf8;border-radius:7px;padding:5px 8px;color:var(--text);font-size:17px;font-weight:700;outline:none;-moz-appearance:textfield;-webkit-appearance:none;box-sizing:border-box';
-  var OK_S='background:#4d9cf8;border:none;color:#fff;border-radius:6px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap';
+  var INP_S='background:var(--bg2);border:1.5px solid #a3e635;border-radius:7px;padding:5px 8px;color:var(--text);font-size:17px;font-weight:700;outline:none;-moz-appearance:textfield;-webkit-appearance:none;box-sizing:border-box';
+  var OK_S='background:#a3e635;border:none;color:#fff;border-radius:6px;padding:4px 11px;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap';
   var CX_S='background:none;border:none;color:var(--muted);font-size:15px;cursor:pointer;padding:2px 6px;line-height:1';
 
   function renderWeightSection(wEl){
@@ -2518,7 +2518,7 @@ CAPACIDADES QUE TIENES:
           '<div style="padding:14px 16px;border-right:1px solid var(--border)">'+
             '<div style="font-size:9px;color:var(--muted);font-weight:700;letter-spacing:.1em;text-transform:uppercase;margin-bottom:6px">Porta amb tu</div>'+
             '<div id="_nf_pm_wrap" style="display:flex;align-items:center;gap:5px;flex-wrap:wrap">'+
-              '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#4d9cf8;cursor:pointer;line-height:1">'+months+'</span>'+
+              '<span id="_nf_pm" style="font-size:22px;font-weight:800;color:#a3e635;cursor:pointer;line-height:1">'+months+'</span>'+
               '<span style="font-size:12px;color:var(--muted)">meses</span>'+
               '<button id="_nf_pme" style="background:none;border:none;color:var(--muted);font-size:12px;cursor:pointer;padding:2px;opacity:.8;line-height:1">&#9998;</button>'+
             '</div>'+
@@ -2552,7 +2552,7 @@ CAPACIDADES QUE TIENES:
             '<div style="font-size:10px;color:var(--muted);font-weight:600;margin-bottom:4px">Pes (kg)</div>'+
             '<input id="_nf_wk" type="number" step="0.1" min="1" max="999" placeholder="70" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1.5px solid var(--border2);border-radius:8px;padding:8px 10px;color:var(--text);font-size:13px;outline:none">'+
           '</div>'+
-          '<button id="_nf_wa" style="background:linear-gradient(135deg,#4d9cf8,#3b82f6);border:none;color:#fff;padding:9px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.3)">+ Afegir</button>'+
+          '<button id="_nf_wa" style="background:linear-gradient(135deg,#a3e635,#3b82f6);border:none;color:#fff;padding:9px 13px;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;flex-shrink:0;box-shadow:0 2px 8px rgba(77,156,248,.3)">+ Afegir</button>'+
         '</div>'+
         (weights.length?
           '<div style="max-height:140px;overflow-y:auto;margin-bottom:4px">'+wRows+'</div>':
@@ -2774,7 +2774,7 @@ CAPACIDADES QUE TIENES:
     var paid=thisCycle.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
     var remaining=Math.max(0,totalDue-paid);
     var pct=totalDue>0?Math.min(100,Math.round(paid/totalDue*100)):0;
-    var barCol=pct>=100?'#34d399':pct>=50?'#4d9cf8':'#f59e0b';
+    var barCol=pct>=100?'#34d399':pct>=50?'#a3e635':'#f59e0b';
     var endDate=client.renewalDate||cycleEnd(cycle,client.billing);
 
     var METHOD_LABELS={cash:'Efectiu',bizum:'Bizum',transfer:'Transferència',card:'Targeta',other:'Altres'};
@@ -2802,7 +2802,7 @@ CAPACIDADES QUE TIENES:
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
           '<div><label style="font-size:10px;color:var(--muted);display:block;margin-bottom:3px">Import (€)</label>'+
             '<input id="_nf_pn_amt" type="number" step="0.01" min="0" placeholder="'+remaining.toFixed(2)+'" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
-          '<div><label style="font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>Data del cobrament</span><button type="button" id="_nf_pn_today" style="background:#4d9cf8;border:none;color:#fff;border-radius:4px;padding:1px 8px;font-size:9px;font-weight:700;cursor:pointer;letter-spacing:.04em">AVUI</button></label>'+
+          '<div><label style="font-size:10px;color:var(--muted);display:flex;justify-content:space-between;align-items:center;margin-bottom:3px"><span>Data del cobrament</span><button type="button" id="_nf_pn_today" style="background:#a3e635;border:none;color:#fff;border-radius:4px;padding:1px 8px;font-size:9px;font-weight:700;cursor:pointer;letter-spacing:.04em">AVUI</button></label>'+
             '<input id="_nf_pn_dt" type="date" value="'+ymd()+'" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '</div>'+
         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">'+
@@ -2821,12 +2821,12 @@ CAPACIDADES QUE TIENES:
           '<input id="_nf_pn_rem" type="date" style="background:var(--bg3);border:1.5px solid var(--bg4);border-radius:6px;padding:6px 9px;color:var(--text);font-size:13px;width:100%;box-sizing:border-box;outline:none"></div>'+
         '<div style="display:flex;gap:6px;justify-content:flex-end">'+
           '<button id="_nf_pn_cx" style="background:none;border:1px solid var(--bg4);color:var(--muted);border-radius:6px;padding:6px 14px;font-size:12px;cursor:pointer">Cancelar</button>'+
-          '<button id="_nf_pn_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar</button>'+
+          '<button id="_nf_pn_ok" style="background:#a3e635;border:none;color:#fff;border-radius:6px;padding:6px 16px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar</button>'+
         '</div>'+
       '</div>'
     :
       '<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">'+
-        '<button id="_nf_pa" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">+ Añadir pago</button>'+
+        '<button id="_nf_pa" style="background:#a3e635;border:none;color:#fff;border-radius:7px;padding:7px 14px;font-size:12px;font-weight:700;cursor:pointer">+ Añadir pago</button>'+
         (remaining>0?'<button id="_nf_pfull" style="background:var(--bg2);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:7px 14px;font-size:12px;font-weight:600;cursor:pointer">✓ Marcar como pagado todo ('+fmtE(remaining)+')</button>':'')+
       '</div>';
 
@@ -2994,7 +2994,7 @@ CAPACIDADES QUE TIENES:
     var more=pending.length>4?'<span style="opacity:.6;font-size:11px;color:#94a3b8">+'+(pending.length-4)+' més</span>':'';
     if(!bar){bar=document.createElement('div');bar.id='_nf_pend_bar';document.body.appendChild(bar);}
     bar.innerHTML='<div style="position:fixed;top:155px;left:50%;transform:translateX(-50%);z-index:798;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(96,165,250,0.4);color:#cbd5e1;padding:9px 14px;border-radius:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:92vw;font-size:12px">'+
-      '<span style="color:#60a5fa;font-weight:700;white-space:nowrap;letter-spacing:.02em">💰 Pagaments pendents:</span>'+
+      '<span style="color:#84cc16;font-weight:700;white-space:nowrap;letter-spacing:.02em">💰 Pagaments pendents:</span>'+
       chips+more+
       '<span style="color:#94a3b8;font-size:11px;border-left:1px solid rgba(255,255,255,.1);padding-left:8px;margin-left:2px;white-space:nowrap">Total <strong style="color:#fbbf24">'+fmtE(totalPending)+'</strong></span>'+
       '<button id="_nf_pend_x" style="background:rgba(255,255,255,.05);border:none;color:#94a3b8;width:20px;height:20px;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;margin-left:4px" title="Tancar fins demà">×</button>'+
@@ -3024,7 +3024,7 @@ CAPACIDADES QUE TIENES:
       help.setAttribute('data-nf-formhelp','1');
       help.style.cssText='margin-top:10px;padding:10px 12px;background:rgba(96,165,250,.08);border:1px solid rgba(96,165,250,.22);border-radius:8px;font-size:11px;color:#cbd5e1;line-height:1.55;display:flex;gap:8px;align-items:flex-start';
       help.innerHTML='<span style="font-size:14px;flex-shrink:0">💳</span>'+
-        '<div><strong style="color:#60a5fa">Pagaments per a aquest client</strong><br>'+
+        '<div><strong style="color:#84cc16">Pagaments per a aquest client</strong><br>'+
         'Cuando guardes el cliente, podrás registrar pagos parciales desde su <b>perfil</b> (botones + Añadir pago / ✓ Marcar como pagado todo). Aparecerá una <b>alerta azul</b> arriba mientras quede importe por cobrar.</div>';
       parent.appendChild(help);
       return;
@@ -3283,7 +3283,7 @@ CAPACIDADES QUE TIENES:
       '<div id="_nf_src_rows">'+rows+'</div>'+
       '<div style="display:flex;gap:8px;justify-content:space-between;margin-top:18px;padding-top:14px;border-top:1px solid var(--bg3)">'+
         '<button id="_nf_src_add" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:7px;padding:8px 14px;font-size:12px;font-weight:600;cursor:pointer">+ Añadir origen</button>'+
-        '<button id="_nf_src_ok" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar y cerrar</button>'+
+        '<button id="_nf_src_ok" style="background:#a3e635;border:none;color:#fff;border-radius:7px;padding:8px 20px;font-size:12px;font-weight:700;cursor:pointer">✓ Guardar y cerrar</button>'+
       '</div>'+
     '</div>';
     document.body.appendChild(bg);
@@ -3457,7 +3457,7 @@ CAPACIDADES QUE TIENES:
   function saveTags(o){var p=getPre();if(p)localStorage.setItem(p+'leadtags',JSON.stringify(o));}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
-  var PALETTE=['#4d9cf8','#34d399','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#ef4444','#10b981','#8b5cf6'];
+  var PALETTE=['#a3e635','#34d399','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#ef4444','#10b981','#8b5cf6'];
   var _sel=null;      // selected group filter (null = all / assign view)
   var _open=true;     // panel expanded
   var _adding=false;  // showing new-group input
@@ -3489,7 +3489,7 @@ CAPACIDADES QUE TIENES:
   function coldCount(){return getLeads().filter(isCold).length;}
 
   var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
-  var ST_COL={New:'#4d9cf8',Contacted:'#f59e0b','Call scheduled':'#a78bfa',Closed:'#34d399',Lost:'#f87171'};
+  var ST_COL={New:'#a3e635',Contacted:'#f59e0b','Call scheduled':'#a78bfa',Closed:'#34d399',Lost:'#f87171'};
   var ST_ORDER=['New','Contacted','Call scheduled','Closed','Lost'];
   var _selStatus=null,_formOpen=false,_editId=null;
   function matchLead(l,q){
@@ -3515,7 +3515,7 @@ CAPACIDADES QUE TIENES:
       var stSel='<select data-stsel="'+esc(l.id)+'" title="Cambiar estado" style="background:'+stcol+'22;border:1px solid '+stcol+'55;border-radius:9px;padding:3px 6px;color:'+stcol+';font-size:10px;font-weight:800;outline:none;cursor:pointer">'+ST_ORDER.map(function(s){return '<option value="'+s+'"'+(s===st?' selected':'')+'>'+esc(ST_LBL[s])+'</option>';}).join('')+'</select>';
       var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" title="Quitar de '+esc(n)+'" style="cursor:pointer;font-size:10px;font-weight:700;padding:2px 8px;border-radius:11px;background:'+c+'22;color:'+c+';border:1px solid '+c+'55;white-space:nowrap">'+esc(n)+' ×</span>';}).join('');
       var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
-      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:4px 7px;color:#4d9cf8;font-size:10.5px;font-weight:600;outline:none;cursor:pointer"><option value="">+ grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
+      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:4px 7px;color:#a3e635;font-size:10.5px;font-weight:600;outline:none;cursor:pointer"><option value="">+ grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
       var note=l.note?'<div style="font-size:10.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85">'+esc(l.note)+'</div>':'';
       return '<div class="nf-lg-row" style="display:flex;align-items:flex-start;gap:11px;padding:10px">'+
         '<span style="width:34px;height:34px;flex-shrink:0;border-radius:50%;background:'+ac+'22;color:'+ac+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;margin-top:1px">'+initial+'</span>'+
@@ -3584,8 +3584,8 @@ CAPACIDADES QUE TIENES:
     }).join('');
 
     var addBtn=_adding
-      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nombre del grupo..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#4d9cf8;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
-      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#4d9cf8;border:1px dashed #4d9cf855">+ Nuevo grupo</span>';
+      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nombre del grupo..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#a3e635;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
+      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#a3e635;border:1px dashed #a3e63555">+ Nuevo grupo</span>';
 
     // Status filter chips
     var sc=statusCounts();
@@ -3603,7 +3603,7 @@ CAPACIDADES QUE TIENES:
     '</div>';
 
     // New-lead button
-    var newLeadBtn=_formOpen?'':'<button id="_nf_lf_new" style="width:100%;box-sizing:border-box;background:#4d9cf8;border:none;color:#fff;border-radius:11px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;margin-bottom:10px">+ Nuevo lead</button>';
+    var newLeadBtn=_formOpen?'':'<button id="_nf_lf_new" style="width:100%;box-sizing:border-box;background:#a3e635;border:none;color:#fff;border-radius:11px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;margin-bottom:10px">+ Nuevo lead</button>';
 
     // Add / edit form
     var ed=_editId?getLeadById(_editId):null;
@@ -3621,7 +3621,7 @@ CAPACIDADES QUE TIENES:
         '<textarea id="_nf_lf_note" placeholder="Nota (opcional)" rows="2" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px 11px;color:var(--text);font-size:12px;outline:none;resize:vertical;margin-bottom:10px">'+esc(ed?ed.note:'')+'</textarea>'+
         '<div style="display:flex;gap:8px">'+
           '<button id="_nf_lf_cancel" style="flex:1;background:var(--bg2);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>'+
-          '<button id="_nf_lf_save" style="flex:2;background:#4d9cf8;border:none;color:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:800;cursor:pointer">'+(_editId?'Guardar cambios':'Añadir lead')+'</button>'+
+          '<button id="_nf_lf_save" style="flex:2;background:#a3e635;border:none;color:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:800;cursor:pointer">'+(_editId?'Guardar cambios':'Añadir lead')+'</button>'+
         '</div>'+
       '</div>'
     ):'';
@@ -3635,7 +3635,7 @@ CAPACIDADES QUE TIENES:
           '<div style="display:flex;align-items:center;gap:10px">'+
             '<span style="font-size:16px">📋</span>'+
             '<span style="font-size:13px;font-weight:700;color:var(--text)">Leads</span>'+
-            '<span style="background:#4d9cf822;color:#4d9cf8;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+leads.length+'</span>'+
+            '<span style="background:#a3e63522;color:#a3e635;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+leads.length+'</span>'+
           '</div>'+
           '<span style="color:var(--muted);font-size:11px">'+(_open?'▾':'▸')+'</span>'+
         '</div>'+
@@ -3745,7 +3745,7 @@ CAPACIDADES QUE TIENES:
     btn=document.createElement('button');
     btn.id='_nf_lg_btn';
     btn.innerHTML='📋 Grupos';
-    btn.style.cssText='position:fixed;bottom:70px;left:18px;z-index:797;background:#4d9cf8;border:none;color:#fff;border-radius:22px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;gap:6px';
+    btn.style.cssText='position:fixed;bottom:70px;left:18px;z-index:797;background:#a3e635;border:none;color:#fff;border-radius:22px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;gap:6px';
     btn.onclick=openModal;
     document.body.appendChild(btn);
   }
@@ -4085,7 +4085,7 @@ CAPACIDADES QUE TIENES:
   var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
   function getSourcesList(){var out=[],seen={};function add(n){n=(n||'').toString().trim();if(n&&!seen[n.toLowerCase()]){seen[n.toLowerCase()]=1;out.push(n);}}['Instagram','GEIEG','Webinar','Referral','Àurea','Ads','Other'].forEach(add);try{JSON.parse(localStorage.getItem(getPre()+'sources')||'[]').forEach(function(x){if(x&&x.name)add(x.name);});}catch(e){}try{getLeads().forEach(function(l){if(l&&l.source)add(l.source);});}catch(e){}return out;}
   function findLeadByName(nm){nm=(nm||'').trim().toLowerCase();if(!nm)return null;var ls=getLeads();for(var i=0;i<ls.length;i++){if(String(ls[i].name||'').trim().toLowerCase()===nm)return ls[i];}return null;}
-  function checkCallMatch(){var i=document.getElementById('_nfcall_name');var m=document.getElementById('_nfcall_match');var sw=document.getElementById('_nfcall_srcwrap');if(!i||!m||!sw)return;var nm=(i.value||'').trim();if(!nm){m.innerHTML='';sw.style.display='none';return;}var ex=findLeadByName(nm);if(ex){m.innerHTML='<span style="color:#34d399">✓ Ya está en tus leads'+(ex.status?' · '+(ST_LBL[ex.status]||ex.status):'')+'</span>';sw.style.display='none';}else{m.innerHTML='<span style="color:#4d9cf8">🆕 No está en Leads — se creará automáticamente</span>';sw.style.display='block';}}
+  function checkCallMatch(){var i=document.getElementById('_nfcall_name');var m=document.getElementById('_nfcall_match');var sw=document.getElementById('_nfcall_srcwrap');if(!i||!m||!sw)return;var nm=(i.value||'').trim();if(!nm){m.innerHTML='';sw.style.display='none';return;}var ex=findLeadByName(nm);if(ex){m.innerHTML='<span style="color:#34d399">✓ Ya está en tus leads'+(ex.status?' · '+(ST_LBL[ex.status]||ex.status):'')+'</span>';sw.style.display='none';}else{m.innerHTML='<span style="color:#a3e635">🆕 No está en Leads — se creará automáticamente</span>';sw.style.display='block';}}
   var MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   var MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var off=0;
@@ -4120,7 +4120,7 @@ CAPACIDADES QUE TIENES:
     var anyData=hist.some(function(m){return m.total>0||m.closed>0;});
     var histHtml='';
     if(anyData){
-      var rowsH=hist.map(function(m){var r=m.total>0?Math.round(m.closed/m.total*100):0;var rc=r>=50?'#34d399':r>=25?'#f59e0b':'#f87171';var h=Math.max(r,3);return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0"><div style="font-size:9px;font-weight:700;color:'+(m.total>0?rc:'var(--muted)')+'">'+(m.total>0?r+'%':'—')+'</div><div style="width:100%;height:40px;display:flex;align-items:flex-end"><div style="width:100%;border-radius:4px 4px 0 0;background:'+(m.total>0?rc:'var(--bg4)')+';height:'+h+'%;'+(m.cur?'box-shadow:0 0 8px '+rc+'88':'')+'"></div></div><div style="font-size:9px;color:'+(m.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+'">'+m.lbl+'</div><div style="font-size:8px;color:var(--muted)">'+m.closed+'/'+m.total+'</div></div>';}).join('');
+      var rowsH=hist.map(function(m){var r=m.total>0?Math.round(m.closed/m.total*100):0;var rc=r>=50?'#34d399':r>=25?'#f59e0b':'#f87171';var h=Math.max(r,3);return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;min-width:0"><div style="font-size:9px;font-weight:700;color:'+(m.total>0?rc:'var(--muted)')+'">'+(m.total>0?r+'%':'—')+'</div><div style="width:100%;height:40px;display:flex;align-items:flex-end"><div style="width:100%;border-radius:4px 4px 0 0;background:'+(m.total>0?rc:'var(--bg4)')+';height:'+h+'%;'+(m.cur?'box-shadow:0 0 8px '+rc+'88':'')+'"></div></div><div style="font-size:9px;color:'+(m.cur?'#a3e635':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+'">'+m.lbl+'</div><div style="font-size:8px;color:var(--muted)">'+m.closed+'/'+m.total+'</div></div>';}).join('');
       histHtml='<div style="margin-top:14px;padding-top:12px;border-top:1px solid rgba(255,255,255,.06)"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Evolución · % cierre por mes</div><div style="display:flex;gap:5px;align-items:flex-end;height:70px">'+rowsH+'</div></div>';
     }
     var srcOptions=getSourcesList().map(function(s){return '<option value="'+esc(s)+'">'+esc(s)+'</option>';}).join('');
@@ -4154,7 +4154,7 @@ CAPACIDADES QUE TIENES:
     '</div>';
     var gridHtml='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:14px">'+
       scard('Ingresos netos',eur(netThis),rdelta(diffN),'#34d399')+
-      scard('Recurrente / mes (MRR)',eur(mrr),'de '+activeC.length+' clientes activos','#4d9cf8')+
+      scard('Recurrente / mes (MRR)',eur(mrr),'de '+activeC.length+' clientes activos','#a3e635')+
       scard('Clientes nuevos',String(newThis),cdelta(newThis-newPrev),'var(--text)')+
       scard('Ticket medio',payers>0?eur(ticket):'—',payers>0?payers+' pagando este mes':'sin cobros','var(--text)')+
       scard('Ingreso / llamada',tot>0?eur(incPerCall):'—',tot>0?clo+' cerradas de '+tot:'sin llamadas','var(--text)')+
@@ -4162,7 +4162,7 @@ CAPACIDADES QUE TIENES:
     '</div>';
     function fstep(lbl,val,col){return '<div style="flex:1;text-align:center;min-width:0"><div style="font-size:20px;font-weight:800;color:'+col+'">'+val+'</div><div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;font-weight:700;margin-top:2px">'+lbl+'</div></div>';}
     var arw='<span style="color:var(--muted);font-size:14px;flex-shrink:0">›</span>';
-    var funnelHtml='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 18px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Embudo del mes</div><div style="display:flex;align-items:center;gap:6px">'+fstep('Leads',leadsThis,'#4d9cf8')+arw+fstep('Llamadas',tot,'#a78bfa')+arw+fstep('Cerradas',clo,'#34d399')+arw+fstep('Clientes',newThis,'#f59e0b')+'</div></div>';
+    var funnelHtml='<div style="background:var(--bg2);border-radius:14px;border:1px solid var(--border);padding:14px 18px;margin-bottom:14px"><div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px">Embudo del mes</div><div style="display:flex;align-items:center;gap:6px">'+fstep('Leads',leadsThis,'#a3e635')+arw+fstep('Llamadas',tot,'#a78bfa')+arw+fstep('Cerradas',clo,'#34d399')+arw+fstep('Clientes',newThis,'#f59e0b')+'</div></div>';
     var statsTitle='<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px"><span style="font-size:17px">📊</span><span style="font-size:14px;font-weight:800;color:var(--text)">Salud del negocio · '+selLbl+'</span></div>';
     var statsHtml=statsTitle+bannerHtml+gridHtml+funnelHtml;
     root.innerHTML=statsHtml+'<div style="background:var(--bg2);border-radius:14px;border:2px solid '+rcol+'55;padding:16px 20px">'+
@@ -4175,7 +4175,7 @@ CAPACIDADES QUE TIENES:
         '<span style="display:inline-flex;align-items:center;gap:6px;background:'+rcol+'14;border:1px solid '+rcol+'33;border-radius:9px;padding:6px 13px"><b style="font-size:20px;color:'+rcol+'">'+rate+'%</b><span style="font-size:9px;color:'+rcol+';font-weight:700;text-transform:uppercase;letter-spacing:.05em;line-height:1.3">cierre</span></span>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">'+
-        '<div style="background:var(--bg3);border-radius:10px;padding:13px 15px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:7px">Llamadas hechas</div><div style="display:flex;align-items:center;justify-content:space-between"><button data-ci="total-" style="background:var(--bg4);border:none;color:var(--text2);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">−</button><span style="font-size:30px;font-weight:800;color:var(--text)">'+tot+'</span><button data-ci="total+" style="background:#4d9cf8;border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">+</button></div></div>'+
+        '<div style="background:var(--bg3);border-radius:10px;padding:13px 15px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:7px">Llamadas hechas</div><div style="display:flex;align-items:center;justify-content:space-between"><button data-ci="total-" style="background:var(--bg4);border:none;color:var(--text2);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">−</button><span style="font-size:30px;font-weight:800;color:var(--text)">'+tot+'</span><button data-ci="total+" style="background:#a3e635;border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">+</button></div></div>'+
         '<div style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:13px 15px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:7px">Cerradas</div><div style="display:flex;align-items:center;justify-content:space-between"><button data-ci="closed-" style="background:var(--bg4);border:none;color:var(--text2);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">−</button><span style="font-size:30px;font-weight:800;color:#34d399">'+clo+'</span><button data-ci="closed+" style="background:#34d399;border:none;color:#06231a;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">+</button></div></div>'+
       '</div>'+
       '<div style="font-size:11px;color:var(--muted);margin-top:11px;line-height:1.5">Pulsa <b style="color:var(--text2)">+</b> en «Llamadas hechas» y escribe el nombre del cliente al que llamaste. Se guarda el registro y el % de cierre se calcula solo.</div>'+
@@ -4196,7 +4196,7 @@ CAPACIDADES QUE TIENES:
           '<label style="display:flex;align-items:center;gap:8px;margin-top:13px;cursor:pointer;font-size:13px;color:var(--text2)"><input id="_nfcall_closed" type="checkbox" style="width:16px;height:16px;cursor:pointer">Cerré la venta en esta llamada</label>'+
           '<div style="display:flex;gap:8px;margin-top:18px">'+
             '<button id="_nfcall_cancel" style="flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">Cancelar</button>'+
-            '<button id="_nfcall_save" style="flex:2;background:#4d9cf8;border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer">Guardar llamada</button>'+
+            '<button id="_nfcall_save" style="flex:2;background:#a3e635;border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer">Guardar llamada</button>'+
           '</div>'+
         '</div>'+
       '</div>'+
@@ -4307,7 +4307,7 @@ CAPACIDADES QUE TIENES:
     var srcArr=Object.keys(bySrc).map(function(s){return {src:s,neto:bySrc[s],pct:neto>0?Math.round(bySrc[s]/neto*100):0};}).sort(function(a,b){return b.neto-a.neto;});
     var cum=[];var run=0;for(var mi=0;mi<=mo;mi++){run+=inc(yr,mi,false);cum.push(run);}
     var yearTotal=run;var cumMax=1;for(var ci=0;ci<cum.length;ci++){if(cum[ci]>cumMax)cumMax=cum[ci];}
-    function srcCol(s){var mp={'GEIEG':'#4d9cf8','Instagram':'#e1306c','Webinar':'#f5b73c','Referral':'#34d399','Other':'#94a3b8','Otros':'#94a3b8'};return mp[s]||'#38bdf8';}
+    function srcCol(s){var mp={'GEIEG':'#a3e635','Instagram':'#e1306c','Webinar':'#f5b73c','Referral':'#34d399','Other':'#94a3b8','Otros':'#94a3b8'};return mp[s]||'#38bdf8';}
     var lbl=MESL[mo]+' de '+yr;
     var pd=new Date(yr,mo-1,1);var prevNeto=inc(pd.getFullYear(),pd.getMonth(),false);
     var delta=neto-prevNeto;var pctc=prevNeto>0?Math.round(delta/prevNeto*100):(neto>0?100:0);
@@ -4339,15 +4339,15 @@ CAPACIDADES QUE TIENES:
     var curW=off===0?Math.min(nW-1,Math.floor((now.getDate()-1)/7)):-1;
     var wkBars=wk.map(function(v,i){
       var h=Math.max(Math.round(v/wkMax*100),2);
-      var isBest=i===bestW&&bestVal>0;var col=isBest?'#f5b73c':'#4d9cf8';
-      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;'+(i===curW?'background:rgba(77,156,248,.1);border-radius:6px;padding-top:2px':'')+'"><div style="font-size:10px;font-weight:700;color:'+(isBest?'#f5b73c':'var(--muted)')+';white-space:nowrap">'+Math.round(v)+'</div><div style="width:100%;height:40px;display:flex;align-items:flex-end"><div style="width:100%;background:'+col+';border-radius:4px 4px 0 0;height:'+h+'%;'+(isBest?'box-shadow:0 0 8px rgba(245,183,60,.5)':'')+'"></div></div><div style="font-size:10px;color:'+(i===curW?'#4d9cf8':(isBest?'#f5b73c':'var(--muted)'))+';font-weight:'+(isBest||i===curW?'700':'500')+'">S'+(i+1)+'</div></div>';
+      var isBest=i===bestW&&bestVal>0;var col=isBest?'#f5b73c':'#a3e635';
+      return '<div style="flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;'+(i===curW?'background:rgba(77,156,248,.1);border-radius:6px;padding-top:2px':'')+'"><div style="font-size:10px;font-weight:700;color:'+(isBest?'#f5b73c':'var(--muted)')+';white-space:nowrap">'+Math.round(v)+'</div><div style="width:100%;height:40px;display:flex;align-items:flex-end"><div style="width:100%;background:'+col+';border-radius:4px 4px 0 0;height:'+h+'%;'+(isBest?'box-shadow:0 0 8px rgba(245,183,60,.5)':'')+'"></div></div><div style="font-size:10px;color:'+(i===curW?'#a3e635':(isBest?'#f5b73c':'var(--muted)'))+';font-weight:'+(isBest||i===curW?'700':'500')+'">S'+(i+1)+'</div></div>';
     }).join('');
-    var wkHtml='<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:4px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Semana a semana \u00b7 '+MESL[mo]+'</div><div style="font-size:11px;color:var(--muted)">\ud83c\udfc5 Mejor: <b style="color:#f5b73c">S'+(bestW+1)+' \u00b7 '+fmt(bestVal)+'</b></div></div><div style="display:flex;gap:8px;align-items:flex-end">'+wkBars+'</div><div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Media <b style="color:var(--text)">'+fmt(avgW)+'</b>/semana'+(curW>=0?' \u00b7 vas por la <b style="color:#4d9cf8">S'+(curW+1)+'</b>':'')+'</div></div>';
-    var donut='conic-gradient(#4d9cf8 0 '+netoPct+'%, #475569 '+netoPct+'% 100%)';
+    var wkHtml='<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px;flex-wrap:wrap;gap:4px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Semana a semana \u00b7 '+MESL[mo]+'</div><div style="font-size:11px;color:var(--muted)">\ud83c\udfc5 Mejor: <b style="color:#f5b73c">S'+(bestW+1)+' \u00b7 '+fmt(bestVal)+'</b></div></div><div style="display:flex;gap:8px;align-items:flex-end">'+wkBars+'</div><div style="font-size:11px;color:var(--muted);margin-top:8px;text-align:center">Media <b style="color:var(--text)">'+fmt(avgW)+'</b>/semana'+(curW>=0?' \u00b7 vas por la <b style="color:#a3e635">S'+(curW+1)+'</b>':'')+'</div></div>';
+    var donut='conic-gradient(#a3e635 0 '+netoPct+'%, #475569 '+netoPct+'% 100%)';
     var srcHtml=srcArr.length?srcArr.map(function(s){return '<div style="margin-bottom:9px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:3px"><span style="color:var(--text2);font-weight:600">'+esc(s.src)+'</span><span style="color:var(--muted)">'+fmt(s.neto)+' \u00b7 '+s.pct+'%</span></div><div style="height:8px;background:var(--bg4);border-radius:4px;overflow:hidden"><div style="height:100%;width:'+Math.max(s.pct,2)+'%;background:'+srcCol(s.src)+';border-radius:4px"></div></div></div>';}).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic">Sin datos este mes.</div>';
     var W=300,H=64,n=cum.length,pts=[];for(var qi=0;qi<n;qi++){var px=n>1?(qi/(n-1))*W:0;var py=H-(cum[qi]/cumMax)*(H-8)-4;pts.push(px.toFixed(1)+','+py.toFixed(1));}
     var poly=pts.join(' ');var area='0,'+H+' '+poly+' '+(n>1?W:0)+','+H;
-    var svg=n>1?'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:64px;display:block"><polygon points="'+area+'" fill="rgba(77,156,248,.13)"/><polyline points="'+poly+'" fill="none" stroke="#4d9cf8" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>':'<div style="font-size:11px;color:var(--muted);padding:8px 0">A\u00fan solo hay un mes de datos.</div>';
+    var svg=n>1?'<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="none" style="width:100%;height:64px;display:block"><polygon points="'+area+'" fill="rgba(77,156,248,.13)"/><polyline points="'+poly+'" fill="none" stroke="#a3e635" stroke-width="2.5" stroke-linejoin="round" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>':'<div style="font-size:11px;color:var(--muted);padding:8px 0">A\u00fan solo hay un mes de datos.</div>';
     var mEvo=[];var mMax=1;
     for(var mei=11;mei>=0;mei--){var med=new Date(yr,mo-mei,1);var mn=inc(med.getFullYear(),med.getMonth(),false);mEvo.push({lbl:MES[med.getMonth()],yr:med.getFullYear(),neto:mn,cur:mei===0});if(mn>mMax)mMax=mn;}
     var mLen=mEvo.length,_pt=12,_pb=14;
@@ -4355,7 +4355,7 @@ CAPACIDADES QUE TIENES:
     var _lp=evoPts.map(function(p){return p.x.toFixed(2)+','+p.y.toFixed(2);}).join(' ');
     var _ar='0,100 '+_lp+' 100,100';
     var _grid='';for(var gg=1;gg<=3;gg++){_grid+='<line x1="0" y1="'+(gg*25)+'" x2="100" y2="'+(gg*25)+'" stroke="var(--border)" stroke-width="1" vector-effect="non-scaling-stroke"/>';}
-    var _dots=evoPts.map(function(p,i){return '<div data-dot="'+i+'" style="position:absolute;left:'+p.x+'%;top:'+p.y+'%;width:'+(p.cur?9:6)+'px;height:'+(p.cur?9:6)+'px;border-radius:50%;background:'+(p.cur?'#4d9cf8':'#34d399')+';border:2px solid var(--bg3);transform:translate(-50%,-50%);transition:transform .1s ease"></div>';}).join('');
+    var _dots=evoPts.map(function(p,i){return '<div data-dot="'+i+'" style="position:absolute;left:'+p.x+'%;top:'+p.y+'%;width:'+(p.cur?9:6)+'px;height:'+(p.cur?9:6)+'px;border-radius:50%;background:'+(p.cur?'#a3e635':'#34d399')+';border:2px solid var(--bg3);transform:translate(-50%,-50%);transition:transform .1s ease"></div>';}).join('');
     var mEvoHtml='<div style="background:var(--bg3);border-radius:12px;padding:16px 18px 12px;margin-bottom:16px">'+
       '<div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:14px"><div style="font-size:12px;font-weight:700;color:var(--text)">Ingresos por mes <span style="color:var(--muted);font-weight:500">(neto)</span></div><div style="font-size:11px;color:var(--muted)">M\u00e1x <b style="color:#34d399">'+fmt(mMax)+'</b></div></div>'+
       '<div id="_nf_evochart" style="position:relative;height:150px;cursor:crosshair">'+
@@ -4363,9 +4363,9 @@ CAPACIDADES QUE TIENES:
         '<div id="_nf_evoVL" style="position:absolute;top:0;bottom:0;width:1px;background:var(--blue);opacity:0;pointer-events:none;transition:opacity .1s"></div>'+_dots+
         '<div id="_nf_evoTip" style="position:absolute;opacity:0;pointer-events:none;background:var(--bg);border:1px solid var(--border2);border-radius:8px;padding:6px 10px;font-size:12px;line-height:1.45;white-space:nowrap;transform:translate(-50%,calc(-100% - 12px));box-shadow:0 8px 20px rgba(0,0,0,.5);z-index:6"></div>'+
       '</div>'+
-      '<div style="display:flex;margin-top:8px">'+mEvo.map(function(m){return '<span style="font-size:9px;color:'+(m.cur?'#4d9cf8':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+';flex:1;text-align:center">'+m.lbl+'</span>';}).join('')+'</div>'+
+      '<div style="display:flex;margin-top:8px">'+mEvo.map(function(m){return '<span style="font-size:9px;color:'+(m.cur?'#a3e635':'var(--muted)')+';font-weight:'+(m.cur?'700':'500')+';flex:1;text-align:center">'+m.lbl+'</span>';}).join('')+'</div>'+
     '</div>';
-    var payHtml=payers.length?payers.map(function(p){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.04)"><span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;background:'+srcCol(p.src)+';flex-shrink:0"></span><span style="font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</span></span><span style="font-size:12px;white-space:nowrap"><span style="color:var(--muted)">'+fmt(p.bruto)+' \u2192 </span><b style="color:#4d9cf8">'+fmt(p.neto)+'</b></span></div>';}).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">Nadie paga este mes.</div>';
+    var payHtml=payers.length?payers.map(function(p){return '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;padding:7px 2px;border-bottom:1px solid rgba(255,255,255,.04)"><span style="display:flex;align-items:center;gap:8px;min-width:0"><span style="width:8px;height:8px;border-radius:50%;background:'+srcCol(p.src)+';flex-shrink:0"></span><span style="font-size:13px;color:var(--text);font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(p.name)+'</span></span><span style="font-size:12px;white-space:nowrap"><span style="color:var(--muted)">'+fmt(p.bruto)+' \u2192 </span><b style="color:#a3e635">'+fmt(p.neto)+'</b></span></div>';}).join(''):'<div style="font-size:12px;color:var(--muted);font-style:italic;padding:8px 0">Nadie paga este mes.</div>';
     root.innerHTML='<div style="background:var(--bg2);border:2px solid var(--blue2);border-radius:14px;padding:18px 22px;margin-bottom:4px">'+
       '<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px">'+
         '<button id="_nf_h_prev" title="Mes anterior" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:32px;height:32px;border-radius:8px;font-size:19px;cursor:pointer;line-height:1;flex-shrink:0">\u2039</button>'+
@@ -4374,15 +4374,15 @@ CAPACIDADES QUE TIENES:
         '<span style="margin-left:auto;font-size:12px;color:var(--muted)">'+payers.length+' cliente'+(payers.length===1?'':'s')+' pagan</span>'+
       '</div>'+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:18px;align-items:center;margin-bottom:20px">'+
-        '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Neto para ti</div><div style="font-size:34px;font-weight:800;color:#4d9cf8;line-height:1.1">'+fmt(neto)+'</div><div style="font-size:12px;color:var(--muted);margin-top:4px">de '+fmt(bruto)+' bruto</div></div>'+
+        '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Neto para ti</div><div style="font-size:34px;font-weight:800;color:#a3e635;line-height:1.1">'+fmt(neto)+'</div><div style="font-size:12px;color:var(--muted);margin-top:4px">de '+fmt(bruto)+' bruto</div></div>'+
         '<div style="display:flex;align-items:center;gap:14px">'+
           '<div style="position:relative;width:94px;height:94px;flex-shrink:0"><div style="width:94px;height:94px;border-radius:50%;background:'+donut+'"></div><div style="position:absolute;inset:13px;background:var(--bg2);border-radius:50%;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="font-size:20px;font-weight:800;color:var(--text)">'+netoPct+'%</div><div style="font-size:9px;color:var(--muted)">tuyo</div></div></div>'+
-          '<div style="font-size:11px;line-height:1.9"><div style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#4d9cf8;margin-right:6px"></span>Neto '+fmt(neto)+'</div><div style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#475569;margin-right:6px"></span>Comisiones '+fmt(comis)+'</div></div>'+
+          '<div style="font-size:11px;line-height:1.9"><div style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#a3e635;margin-right:6px"></span>Neto '+fmt(neto)+'</div><div style="white-space:nowrap"><span style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#475569;margin-right:6px"></span>Comisiones '+fmt(comis)+'</div></div>'+
         '</div>'+
       '</div>'+
       cmpHtml+wkHtml+
       '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:12px">De d\u00f3nde viene (por origen)</div>'+srcHtml+'</div>'+
-      '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Acumulado '+yr+' (neto)</div><div style="font-size:14px;font-weight:800;color:#4d9cf8">'+fmt(yearTotal)+'</div></div>'+svg+'<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:4px"><span>Ene</span><span>'+MES[mo]+'</span></div></div>'+
+      '<div style="background:var(--bg3);border-radius:10px;padding:14px 16px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:10px"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700">Acumulado '+yr+' (neto)</div><div style="font-size:14px;font-weight:800;color:#a3e635">'+fmt(yearTotal)+'</div></div>'+svg+'<div style="display:flex;justify-content:space-between;font-size:9px;color:var(--muted);margin-top:4px"><span>Ene</span><span>'+MES[mo]+'</span></div></div>'+
       mEvoHtml+
       '<div><div style="font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:4px">Clientes que pagan ('+payers.length+')</div>'+payHtml+'</div>'+
     '</div>';
@@ -4443,7 +4443,7 @@ CAPACIDADES QUE TIENES:
         '<input id="_nf_tc_email" type="email" placeholder="email del closer" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
         '<input id="_nf_tc_name" type="text" placeholder="nombre (opcional)" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:7px;padding:9px 11px;color:var(--text);font-size:13px;outline:none">'+
       '</div>'+
-      '<button id="_nf_tc_add" style="background:#4d9cf8;border:none;color:#fff;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;width:100%">+ A\u00f1adir closer</button>'+
+      '<button id="_nf_tc_add" style="background:#a3e635;border:none;color:#fff;border-radius:7px;padding:9px 16px;font-size:13px;font-weight:700;cursor:pointer;width:100%">+ A\u00f1adir closer</button>'+
     '</div>';
     document.body.appendChild(bg);
     document.getElementById('_nf_team_x').onclick=function(){bg.remove();};
@@ -4499,7 +4499,7 @@ CAPACIDADES QUE TIENES:
       '<input id="_nf_goal_c" type="number" min="1" value="'+gc+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:10px 12px;color:var(--text);font-size:15px;margin-bottom:16px;outline:none">'+
       '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px">Objetivo de ingresos (\u20ac/mes)</label>'+
       '<input id="_nf_goal_r" type="number" min="0" value="'+gr+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:8px;padding:10px 12px;color:var(--text);font-size:15px;margin-bottom:20px;outline:none">'+
-      '<button id="_nf_goal_save" style="background:#4d9cf8;border:none;color:#fff;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%">Guardar objetivos</button>'+
+      '<button id="_nf_goal_save" style="background:#a3e635;border:none;color:#fff;border-radius:8px;padding:11px 16px;font-size:14px;font-weight:700;cursor:pointer;width:100%">Guardar objetivos</button>'+
     '</div>';
     document.body.appendChild(bg);
     document.getElementById('_nf_goal_x').onclick=function(){bg.remove();};
@@ -4529,7 +4529,7 @@ CAPACIDADES QUE TIENES:
   function getCfg(){var p=pre();try{return JSON.parse(localStorage.getItem(p+'config')||'{}');}catch(e){return{};}}
   function fmt(n){try{return (Math.round((n||0)*100)/100).toLocaleString('es-ES',{minimumFractionDigits:2,maximumFractionDigits:2})+' \u20ac';}catch(e){return (n||0).toFixed(2)+' \u20ac';}}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
-  function srcCol(s){var mp={'GEIEG':'#4d9cf8','Instagram':'#e1306c','Webinar':'#f5b73c','Referral':'#34d399','Other':'#94a3b8','Otros':'#94a3b8'};return mp[s]||'#38bdf8';}
+  function srcCol(s){var mp={'GEIEG':'#a3e635','Instagram':'#e1306c','Webinar':'#f5b73c','Referral':'#34d399','Other':'#94a3b8','Otros':'#94a3b8'};return mp[s]||'#38bdf8';}
   function tile(l,v,c){return '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 15px"><div style="font-size:10px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700;margin-bottom:6px">'+l+'</div><div style="font-size:20px;font-weight:800;color:'+(c||'var(--text)')+'">'+v+'</div></div>';}
   function render(){
     var root=document.getElementById('_nf_embudo_root');if(!root)return;
@@ -4552,7 +4552,7 @@ CAPACIDADES QUE TIENES:
     var totalClients=clients.filter(function(c){return c.active!==false;}).length;
     if(totalLeads===0&&totalClients===0){root.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">A\u00fan no hay leads ni clientes para analizar el embudo.</div>';return;}
     var stages=[{l:'Leads totales',n:totalLeads,p:100},{l:'Contactados',n:contacted,p:totalLeads?Math.round(contacted/totalLeads*100):0},{l:'Cerrados (clientes)',n:closed,p:conv}];
-    var funnel=stages.map(function(s,i){var col=i===0?'#38bdf8':i===1?'#4d9cf8':'#34d399';return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:600">'+s.l+'</span><span style="color:var(--muted)"><b style="color:var(--text)">'+s.n+'</b> \u00b7 '+s.p+'%</span></div><div style="height:26px;background:var(--bg4);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.max(s.p,3)+'%;background:'+col+';border-radius:6px"></div></div></div>';}).join('');
+    var funnel=stages.map(function(s,i){var col=i===0?'#38bdf8':i===1?'#a3e635':'#34d399';return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:600">'+s.l+'</span><span style="color:var(--muted)"><b style="color:var(--text)">'+s.n+'</b> \u00b7 '+s.p+'%</span></div><div style="height:26px;background:var(--bg4);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.max(s.p,3)+'%;background:'+col+';border-radius:6px"></div></div></div>';}).join('');
     var cards=arr.map(function(o){
       var cvr=o.leads?Math.round(o.clients/o.leads*100):null;
       var cac=o.clients&&o.spend?o.spend/o.clients:0;
@@ -4572,7 +4572,7 @@ CAPACIDADES QUE TIENES:
     }).join('');
     root.innerHTML='<div style="display:flex;flex-direction:column;gap:16px">'+
       '<div><div style="font-size:18px;font-weight:800;color:var(--text)">Embudo de conversi\u00f3n</div><div style="font-size:12px;color:var(--muted);margin-top:2px">De lead a cliente, y qu\u00e9 canal te sale m\u00e1s rentable</div></div>'+
-      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">'+tile('Leads totales',totalLeads)+tile('Conversi\u00f3n global',conv+'%','#34d399')+tile('Gasto en Ads',fmt(totalSpend))+tile('Coste/cliente',totalSpend>0&&totalClients?fmt(totalSpend/totalClients):'\u2014')+tile('Ingreso/mes',fmt(totalRev),'#4d9cf8')+'</div>'+
+      '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">'+tile('Leads totales',totalLeads)+tile('Conversi\u00f3n global',conv+'%','#34d399')+tile('Gasto en Ads',fmt(totalSpend))+tile('Coste/cliente',totalSpend>0&&totalClients?fmt(totalSpend/totalClients):'\u2014')+tile('Ingreso/mes',fmt(totalRev),'#a3e635')+'</div>'+
       '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:14px">Embudo global</div>'+funnel+'<div style="font-size:12px;color:var(--muted);margin-top:8px">Tasa de cierre global: <b style="color:#34d399">'+conv+'%</b> \u00b7 Leads perdidos: <b style="color:#f87171">'+lost+'</b></div></div>'+
       '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:14px">Rendimiento por canal (ROI)</div>'+cards+'</div>'+
     '</div>';
@@ -4680,7 +4680,7 @@ CAPACIDADES QUE TIENES:
     '</div>';
     function fmtv(v,u){return u==='€'?eur(v):String(Math.round(v));}
     function goalBar(label,cur,goal,unit,col){var p=goal>0?Math.min(100,Math.round(cur/goal*100)):0;var rem=Math.max(0,goal-cur);return '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:13px;font-weight:700;color:var(--text)">'+label+'</span><span style="font-family:'+MONO+';font-size:12px;color:var(--text2)"><b style="color:'+col+'">'+fmtv(cur,unit)+'</b> / '+fmtv(goal,unit)+' · '+p+'%</span></div><div style="height:8px;background:var(--bg4);border-radius:20px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:linear-gradient(90deg,'+col+'88,'+col+');border-radius:20px"></div></div>'+(rem>0?'<div style="font-family:'+MONO+';font-size:10px;color:var(--muted);margin-top:5px">faltan '+fmtv(rem,unit)+' para el objetivo</div>':'<div style="font-family:'+MONO+';font-size:10px;color:'+col+';margin-top:5px;font-weight:700">objetivo alcanzado</div>')+'</div>';}
-    var goals='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:17px 18px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Objetivos · '+esc(mesY)+'</span><button id="_nf_ovgoal_edit" style="font-family:'+MONO+';background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer">Editar</button></div>'+goalBar('Ingresos',netThis,goalRev,'€',LIME)+goalBar('Clientes activos',active.length,goalCli,'','#60a5fa')+'</div>';
+    var goals='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:17px 18px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Objetivos · '+esc(mesY)+'</span><button id="_nf_ovgoal_edit" style="font-family:'+MONO+';background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer">Editar</button></div>'+goalBar('Ingresos',netThis,goalRev,'€',LIME)+goalBar('Clientes activos',active.length,goalCli,'','#84cc16')+'</div>';
     function fstep(lbl,val){return '<div style="flex:1;text-align:center;min-width:0"><div style="font-size:22px;font-weight:800;color:var(--text)">'+val+'</div><div style="font-family:'+MONO+';font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-top:3px">'+lbl+'</div></div>';}
     var arw='<span style="color:var(--bg4);font-size:16px;flex-shrink:0">→</span>';
     var funnel='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px 18px;margin-bottom:16px"><div style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px">Embudo · este mes</div><div style="display:flex;align-items:center;gap:8px">'+fstep('Leads',leadsThis)+arw+fstep('Llamadas',cd.total||0)+arw+fstep('Cerradas',cd.closed||0)+arw+fstep('Clientes',newThis)+'</div></div>';
@@ -4700,7 +4700,7 @@ CAPACIDADES QUE TIENES:
       '<input id="_nf_ovgoal_c" type="number" min="1" value="'+gc+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 12px;color:var(--text);font-size:15px;margin-bottom:16px;outline:none">'+
       '<label style="display:block;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:700;margin-bottom:6px">Objetivo de ingresos (€/mes)</label>'+
       '<input id="_nf_ovgoal_r" type="number" min="0" value="'+gr+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 12px;color:var(--text);font-size:15px;margin-bottom:20px;outline:none">'+
-      '<button id="_nf_ovgoal_save" style="background:#4d9cf8;border:none;color:#fff;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;cursor:pointer;width:100%">Guardar objetivos</button>'+
+      '<button id="_nf_ovgoal_save" style="background:#a3e635;border:none;color:#fff;border-radius:10px;padding:11px 16px;font-size:14px;font-weight:800;cursor:pointer;width:100%">Guardar objetivos</button>'+
     '</div>';
     document.body.appendChild(bg);
     document.getElementById('_nf_ovgoal_x').onclick=function(){bg.remove();};
