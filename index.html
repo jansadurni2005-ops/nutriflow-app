@@ -633,6 +633,9 @@ function showOverlay(){
   overlay.style.cssText='position:fixed;inset:0;background:#0d1117;z-index:99999;display:flex;align-items:center;justify-content:center;font-family:-apple-system,system-ui,sans-serif;';
   overlay.innerHTML='<div style="text-align:center"><div style="width:36px;height:36px;border:3px solid #1a2540;border-top-color:#3b82f6;border-radius:50%;animation:nf_spin 0.7s linear infinite;margin:0 auto 12px"></div><div style="color:#4d9cf8;font-size:13px;letter-spacing:0.03em">Sincronizando datos...</div></div><style>@keyframes nf_spin{to{transform:rotate(360deg)}}</style>';
   document.body.appendChild(overlay);
+  // Safety net: never let the overlay block the app. If sync is slow/stuck, clear it
+  // after 8s — the app stays usable and refreshFromCloud keeps updating in the background.
+  setTimeout(function(){hideOverlay();},8000);
 }
 function hideOverlay(){var o=document.getElementById('_nf_overlay');if(o)o.remove();}
 
@@ -672,6 +675,19 @@ function repairThenEnableRefresh(){
   }).catch(function(){_repairDone=true;});
 }
 
+// Push freshly-pulled localStorage data into React state (no page reload needed).
+function applyLocalToReact(){
+  try{
+    var c=[],lc=[],ld=[];
+    try{c=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
+    try{lc=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
+    try{ld=JSON.parse(localStorage.getItem(PRE+'leads')||'[]');}catch(e){}
+    if(window._nf_setClients){try{window._nf_setClients(c.slice());}catch(e){}}
+    if(window._nf_setLostClients){try{window._nf_setLostClients(lc.slice());}catch(e){}}
+    if(window._nf_setLeads){try{window._nf_setLeads(ld.slice());}catch(e){}}
+  }catch(e){}
+}
+
 // ── Boot the currently logged-in user: authenticate + sync (once per session). ──
 var _booting=false;
 function bootUser(){
@@ -695,10 +711,19 @@ function bootUser(){
     EM=ctx.email; UID=ctx.uid; PRE='nf_'+EM+'_';
     window._nf_syncing=true;
     syncRead(ctx.token).then(function(){
-      window._nf_syncing=false;
       sessionStorage.setItem(okKey(email),'1');
-      _booting=false;
-      window.location.reload();
+      _booting=false; _repairDone=true;
+      if(window._nf_setClients){
+        // Update the UI in place — no reload (reliable on mobile Safari)
+        applyLocalToReact();
+        window._nf_syncing=false;
+        hideOverlay();
+        setTimeout(function(){try{refreshFromCloud();}catch(e){}},1500);
+      } else {
+        // Fallback: React setters not available → reload so it re-reads localStorage
+        window._nf_syncing=false;
+        window.location.reload();
+      }
     }).catch(function(){
       window._nf_syncing=false;
       sessionStorage.setItem(okKey(email),'1');
