@@ -96,8 +96,11 @@ function currentEmail(){var s=getSession();return (s&&s.email)?String(s.email):n
 function getUserPassword(email){
   try{
     var u=JSON.parse(localStorage.getItem('nf_users')||'{}');
-    for(var k in u){ if(k.toLowerCase()===String(email).toLowerCase()) return u[k]&&u[k].password; }
+    for(var k in u){ if(k.toLowerCase()===String(email).toLowerCase()){ if(u[k]&&u[k].password) return u[k].password; } }
   }catch(e){}
+  // Fallback: the owner's embedded credential, so ANY device can authenticate and
+  // pull the latest cloud data even when nf_users isn't present on that device.
+  if(String(email||'').toLowerCase()===String(APP_EMAIL).toLowerCase()) return APP_PASS;
   return null;
 }
 function tokKey(email){return '_nf_sb_tok_'+email;}
@@ -678,8 +681,8 @@ function bootUser(){
     // Already synced this session for this user → just restore context + enable refresh
     EM=email; PRE='nf_'+EM+'_';
     var c=getCachedTok(email);
-    if(c&&c.uid){UID=c.uid;repairThenEnableRefresh();}
-    else{authForEmail(email).then(function(r){if(r){UID=r.uid;repairThenEnableRefresh();}else{_repairDone=true;}});}
+    if(c&&c.uid){UID=c.uid;repairThenEnableRefresh();refreshFromCloud();}
+    else{authForEmail(email).then(function(r){if(r){UID=r.uid;repairThenEnableRefresh();refreshFromCloud();}else{_repairDone=true;}});}
     return;
   }
   // First sync for this user this session
