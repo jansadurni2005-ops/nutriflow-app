@@ -98,9 +98,9 @@ function getUserPassword(email){
     var u=JSON.parse(localStorage.getItem('nf_users')||'{}');
     for(var k in u){ if(k.toLowerCase()===String(email).toLowerCase()){ if(u[k]&&u[k].password) return u[k].password; } }
   }catch(e){}
-  // Fallback: the owner's embedded credential, so ANY device can authenticate and
-  // pull the latest cloud data even when nf_users isn't present on that device.
-  if(String(email||'').toLowerCase()===String(APP_EMAIL).toLowerCase()) return APP_PASS;
+  // Fallback: the owner's embedded credential (interpolated as literal values at build time),
+  // so ANY device can authenticate + pull the latest cloud data even without nf_users present.
+  if(String(email||'').toLowerCase()==='jansadurni2005@gmail.com'.toLowerCase()) return 'JanS@2005';
   return null;
 }
 function tokKey(email){return '_nf_sb_tok_'+email;}
@@ -2928,7 +2928,7 @@ CAPACIDADES QUE TIENES:
   function daysTo(s){if(!s)return 999;var d=new Date(s),n=new Date();d.setHours(0,0,0,0);n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
 
   function renderReminders(){
-    if(sessionStorage.getItem('_nf_pay_rem_dis'))return;
+    if(sessionStorage.getItem('_nf_pay_rem_dis')){var _rb=document.getElementById('_nf_pay_rem_bar');if(_rb)_rb.remove();return;}
     var all=loadAll();
     var clients=getClients();
     var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
@@ -2956,7 +2956,7 @@ CAPACIDADES QUE TIENES:
       '<span style="white-space:nowrap">🔔 Cobraments pendents:</span>'+chips+more+
       '<button id="_nf_pay_rem_x" style="background:rgba(0,0,0,.2);border:none;color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;margin-left:4px">×</button>'+
     '</div>';
-    document.getElementById('_nf_pay_rem_x').onclick=function(){sessionStorage.setItem('_nf_pay_rem_dis','1');renderReminders();};
+    document.getElementById('_nf_pay_rem_x').onclick=function(e){if(e){e.preventDefault();e.stopPropagation();}sessionStorage.setItem('_nf_pay_rem_dis','1');var b2=document.getElementById('_nf_pay_rem_bar');if(b2)b2.remove();};
   }
   setInterval(renderReminders,2500);
 
@@ -2999,7 +2999,7 @@ CAPACIDADES QUE TIENES:
       '<span style="color:#94a3b8;font-size:11px;border-left:1px solid rgba(255,255,255,.1);padding-left:8px;margin-left:2px;white-space:nowrap">Total <strong style="color:#fbbf24">'+fmtE(totalPending)+'</strong></span>'+
       '<button id="_nf_pend_x" style="background:rgba(255,255,255,.05);border:none;color:#94a3b8;width:20px;height:20px;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;margin-left:4px" title="Tancar fins demà">×</button>'+
     '</div>';
-    document.getElementById('_nf_pend_x').onclick=function(){dismissPend();renderPendingPayments();};
+    document.getElementById('_nf_pend_x').onclick=function(e){if(e){e.preventDefault();e.stopPropagation();}dismissPend();var pb=document.getElementById('_nf_pend_bar');if(pb)pb.remove();};
   }
   setInterval(renderPendingPayments,3000);
 
