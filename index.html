@@ -4550,6 +4550,18 @@ CAPACIDADES QUE TIENES:
     var totalSpend=arr.reduce(function(s,o){return s+o.spend;},0);
     var totalRev=arr.reduce(function(s,o){return s+o.rev;},0);
     var totalClients=clients.filter(function(c){return c.active!==false;}).length;
+    // ── Monthly tapering funnel (moved here from Resumen) ──
+    var callsM={};try{callsM=JSON.parse(localStorage.getItem(pre()+'calls')||'{}');}catch(e){}
+    var nowE=new Date();var ckE=nowE.getFullYear()+'-'+((nowE.getMonth()<9?'0':'')+(nowE.getMonth()+1));
+    var cdmE=callsM[ckE]||{total:0,closed:0};
+    function inMonthE(d){if(!d)return false;var t=new Date(String(d).slice(0,10));if(isNaN(t.getTime()))return false;return t.getFullYear()===nowE.getFullYear()&&t.getMonth()===nowE.getMonth();}
+    var leadsMonthE=leads.filter(function(l){return inMonthE(l.date);}).length;
+    var newClientsMonthE=clients.filter(function(c){return inMonthE(c.startDate);}).length;
+    var MONOE='ui-monospace,SFMono-Regular,Menlo,Consolas,monospace';
+    var mStages=[{l:'Leads',v:leadsMonthE},{l:'Llamadas',v:cdmE.total||0},{l:'Cerradas',v:cdmE.closed||0},{l:'Clientes',v:newClientsMonthE}];
+    var mTaper=[100,74,53,36];
+    var mRows=mStages.map(function(st,i){var w=mTaper[i];var conv=(i>0&&mStages[i-1].v>0)?Math.round(st.v/mStages[i-1].v*100):null;return (i>0?'<div style="text-align:center;font-family:'+MONOE+';font-size:9.5px;color:var(--muted);padding:4px 0">↓ '+(conv!=null?conv+'%':'—')+'</div>':'')+'<div style="height:38px;width:'+w+'%;margin:0 auto;background:linear-gradient(90deg,#4d7c0f,#a3e635);border-radius:9px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;box-sizing:border-box;min-width:135px;box-shadow:0 2px 10px rgba(163,230,53,.10)"><span style="font-size:12px;font-weight:800;color:#0e1a05">'+st.l+'</span><span style="font-family:'+MONOE+';font-size:15px;font-weight:800;color:#0e1a05">'+st.v+'</span></div>';}).join('');
+    var monthFunnel='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:16px 18px 18px"><div style="font-family:'+MONOE+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Embudo · este mes</div>'+mRows+'</div>';
     if(totalLeads===0&&totalClients===0){root.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:40px 20px;text-align:center;color:var(--muted);font-size:14px">A\u00fan no hay leads ni clientes para analizar el embudo.</div>';return;}
     var stages=[{l:'Leads totales',n:totalLeads,p:100},{l:'Contactados',n:contacted,p:totalLeads?Math.round(contacted/totalLeads*100):0},{l:'Cerrados (clientes)',n:closed,p:conv}];
     var funnel=stages.map(function(s,i){var col=i===0?'#38bdf8':i===1?'#a3e635':'#34d399';return '<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:4px"><span style="color:var(--text2);font-weight:600">'+s.l+'</span><span style="color:var(--muted)"><b style="color:var(--text)">'+s.n+'</b> \u00b7 '+s.p+'%</span></div><div style="height:26px;background:var(--bg4);border-radius:6px;overflow:hidden"><div style="height:100%;width:'+Math.max(s.p,3)+'%;background:'+col+';border-radius:6px"></div></div></div>';}).join('');
@@ -4572,6 +4584,7 @@ CAPACIDADES QUE TIENES:
     }).join('');
     root.innerHTML='<div style="display:flex;flex-direction:column;gap:16px">'+
       '<div><div style="font-size:18px;font-weight:800;color:var(--text)">Embudo de conversi\u00f3n</div><div style="font-size:12px;color:var(--muted);margin-top:2px">De lead a cliente, y qu\u00e9 canal te sale m\u00e1s rentable</div></div>'+
+      monthFunnel+
       '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:12px">'+tile('Leads totales',totalLeads)+tile('Conversi\u00f3n global',conv+'%','#34d399')+tile('Gasto en Ads',fmt(totalSpend))+tile('Coste/cliente',totalSpend>0&&totalClients?fmt(totalSpend/totalClients):'\u2014')+tile('Ingreso/mes',fmt(totalRev),'#a3e635')+'</div>'+
       '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:14px">Embudo global</div>'+funnel+'<div style="font-size:12px;color:var(--muted);margin-top:8px">Tasa de cierre global: <b style="color:#34d399">'+conv+'%</b> \u00b7 Leads perdidos: <b style="color:#f87171">'+lost+'</b></div></div>'+
       '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:18px 20px"><div style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);margin-bottom:14px">Rendimiento por canal (ROI)</div>'+cards+'</div>'+
@@ -4681,20 +4694,8 @@ CAPACIDADES QUE TIENES:
     function fmtv(v,u){return u==='€'?eur(v):String(Math.round(v));}
     function goalBar(label,cur,goal,unit,col){var p=goal>0?Math.min(100,Math.round(cur/goal*100)):0;var rem=Math.max(0,goal-cur);return '<div style="margin-bottom:14px"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px"><span style="font-size:13px;font-weight:700;color:var(--text)">'+label+'</span><span style="font-family:'+MONO+';font-size:12px;color:var(--text2)"><b style="color:'+col+'">'+fmtv(cur,unit)+'</b> / '+fmtv(goal,unit)+' · '+p+'%</span></div><div style="height:8px;background:var(--bg4);border-radius:20px;overflow:hidden"><div style="height:100%;width:'+p+'%;background:linear-gradient(90deg,'+col+'88,'+col+');border-radius:20px"></div></div>'+(rem>0?'<div style="font-family:'+MONO+';font-size:10px;color:var(--muted);margin-top:5px">faltan '+fmtv(rem,unit)+' para el objetivo</div>':'<div style="font-family:'+MONO+';font-size:10px;color:'+col+';margin-top:5px;font-weight:700">objetivo alcanzado</div>')+'</div>';}
     var goals='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:17px 18px;margin-bottom:16px"><div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px"><span style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase">Objetivos · '+esc(mesY)+'</span><button id="_nf_ovgoal_edit" style="font-family:'+MONO+';background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer">Editar</button></div>'+goalBar('Ingresos',netThis,goalRev,'€',LIME)+goalBar('Clientes activos',active.length,goalCli,'','#84cc16')+'</div>';
-    var fstages=[{l:'Leads',v:leadsThis},{l:'Llamadas',v:cd.total||0},{l:'Cerradas',v:cd.closed||0},{l:'Clientes',v:newThis}];
-    var fTaper=[100,74,53,36]; // funnel narrows stage by stage (values shown are real)
-    var fRows=fstages.map(function(st,i){
-      var w=fTaper[i];
-      var conv=(i>0&&fstages[i-1].v>0)?Math.round(st.v/fstages[i-1].v*100):null;
-      return (i>0?'<div style="text-align:center;font-family:'+MONO+';font-size:9.5px;color:var(--muted);padding:4px 0">↓ '+(conv!=null?conv+'%':'—')+'</div>':'')+
-        '<div style="height:38px;width:'+w+'%;margin:0 auto;background:linear-gradient(90deg,#4d7c0f,#a3e635);border-radius:9px;display:flex;align-items:center;justify-content:space-between;padding:0 15px;box-sizing:border-box;min-width:135px;box-shadow:0 2px 10px rgba(163,230,53,.10)">'+
-          '<span style="font-size:12px;font-weight:800;color:#0e1a05">'+st.l+'</span>'+
-          '<span style="font-family:'+MONO+';font-size:15px;font-weight:800;color:#0e1a05">'+st.v+'</span>'+
-        '</div>';
-    }).join('');
-    var funnel='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:16px 18px 18px;margin-bottom:16px"><div style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:14px">Embudo · este mes</div>'+fRows+'</div>';
     var header='<div style="margin-bottom:20px"><div style="font-family:'+MONO+';font-size:11px;color:var(--muted);letter-spacing:.14em;text-transform:uppercase;margin-bottom:11px">Resumen · '+esc(mesY)+'</div><div style="font-size:38px;font-weight:800;letter-spacing:-.03em;color:var(--text);line-height:1.02">'+greet+(nm?', '+esc(nm):'')+'.</div><div style="font-size:14px;color:var(--text2);margin-top:9px;max-width:560px;line-height:1.5">'+pulse+'</div></div>';
-    root.innerHTML=header+kpis+goals+funnel;
+    root.innerHTML=header+kpis+goals;
     hideNative();
     var ge=document.getElementById('_nf_ovgoal_edit');if(ge)ge.onclick=openGoalModal;
   }
