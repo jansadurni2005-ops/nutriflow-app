@@ -3462,6 +3462,8 @@ CAPACIDADES QUE TIENES:
   var _open=true;     // panel expanded
   var _adding=false;  // showing new-group input
   var _q='';          // search query
+  var _sort='az';     // list sort: az (nombre) | new (recientes) | old (antiguos)
+  function leadTs(l){if(!l||!l.date)return 0;var t=new Date(String(l.date).slice(0,10)).getTime();return isNaN(t)?0:t;}
 
   function gColor(name){var g=loadGroups();for(var i=0;i<g.length;i++){if(g[i].name===name)return g[i].color;}return '#94a3b8';}
   function leadGroups(id){var t=loadTags();return t[id]||[];}
@@ -3504,7 +3506,9 @@ CAPACIDADES QUE TIENES:
     if(_selStatus==='__cold')base=base.filter(isCold);
     else if(_selStatus!==null)base=base.filter(function(l){return (l.status||'New')===_selStatus;});
     var listLeads=base.filter(function(l){return matchLead(l,_q);});
-    if(_selStatus==='__cold')listLeads.sort(function(a,b){return daysAgo(b.date)-daysAgo(a.date);});
+    if(_sort==='new')listLeads.sort(function(a,b){return leadTs(b)-leadTs(a);});
+    else if(_sort==='old')listLeads.sort(function(a,b){return leadTs(a)-leadTs(b);});
+    else if(_selStatus==='__cold')listLeads.sort(function(a,b){return daysAgo(b.date)-daysAgo(a.date);});
     else listLeads.sort(function(a,b){return (leadLabel(a)||'').localeCompare(leadLabel(b)||'');});
     var rows=listLeads.map(function(l){
       var myTags=(tags[l.id]||[]);
@@ -3651,6 +3655,7 @@ CAPACIDADES QUE TIENES:
               '<input id="_nf_lg_search" type="text" autocomplete="off" placeholder="Buscar lead por nombre..." value="'+esc(_q)+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:11px;padding:10px 34px 10px 38px;color:var(--text);font-size:13px;outline:none">'+
               '<span id="_nf_lg_clear" title="Limpiar" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:17px;line-height:1;display:'+(_q?'block':'none')+'">\xd7</span>'+
             '</div>'+
+            '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button id="_nf_lg_sort" title="Cambiar orden" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+(_sort==="new"?"↓ Recientes":_sort==="old"?"↑ Antiguos":"⇅ Nombre")+'</button></div>'+
             '<div id="_nf_lg_list" style="max-height:430px;overflow-y:auto;margin:0 -4px;padding:0 2px"></div>'+
           '</div>'
         :'')+
@@ -3696,6 +3701,8 @@ CAPACIDADES QUE TIENES:
       }
       var clrEl=document.getElementById('_nf_lg_clear');
       if(clrEl)clrEl.onclick=function(){_q='';render();setTimeout(function(){var i=document.getElementById('_nf_lg_search');if(i)i.focus();},20);};
+      var sortBtn=document.getElementById('_nf_lg_sort');
+      if(sortBtn)sortBtn.onclick=function(){_sort=_sort==='az'?'new':_sort==='new'?'old':'az';render();};
       Array.prototype.forEach.call(root.querySelectorAll('[data-sf]'),function(el){
         el.onclick=function(){var k=el.getAttribute('data-sf');_selStatus=(k==='__all')?null:k;render();};
       });
