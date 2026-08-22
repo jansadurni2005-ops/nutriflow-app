@@ -4737,5 +4737,57 @@ CAPACIDADES QUE TIENES:
   setInterval(function(){var root=document.getElementById('_nf_overview_root');if(!root)return;hideNative();var h=hash();if(!root.innerHTML.trim()||h!==_last){_last=h;render();}},600);
 })();
 </script>
+<!--FORMINICIAL_START-->
+<script>
+/* __nf_forminicial_v1 */
+(function(){
+  if(window.__nf_fi_loaded)return; window.__nf_fi_loaded=true;
+  function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
+  function leads(){try{var em=email();if(!em)return[];return JSON.parse(localStorage.getItem("nf_"+em+"_leads")||"[]");}catch(e){return[];}}
+  function grab(note,re){var m=(note||"").match(re);return m?String(m[1]).trim():"";}
+  function esc(s){return (s==null?"":String(s)).replace(/[&<>\"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+  function parseLead(l){
+    var note=l.note||"";
+    if(!/El Protocolo|Asesor/i.test(note)) return null;
+    var tipo=/Asesor|Objetivo:/i.test(note)?"Asesoria":"Registro";
+    return {
+      nombre:(l.name||"").replace(/ . Asesor.a$/,"").replace(/ · Asesoría$/,""),
+      tipo:tipo,
+      email:grab(note,/([^\s·]+@[^\s·]+)/),
+      whatsapp:grab(note,/(\+?\d[\d\s]{4,}\d)/),
+      objetivo:grab(note,/Objetivo:\s*([^·]+)/),
+      deporte:grab(note,/Deporte:\s*([^·]+)/),
+      dias:grab(note,/D[ií]as:\s*([^·]+)/),
+      estado:/SIN TERMINAR/i.test(note)?"⏳ Sin terminar":"✅ Completado",
+      fecha:l.date||""
+    };
+  }
+  function rows(){return leads().map(parseLead).filter(Boolean).sort(function(a,b){return String(b.fecha||"").localeCompare(String(a.fecha||""));});}
+  function render(){
+    var d=rows();
+    var h="<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px\"><div><div style=\"font-size:22px;font-weight:700\">Formulario Inicial</div><div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Personas que han rellenado el formulario de El Protocolo</div></div><div style=\"font-size:13px;color:var(--muted)\">"+d.length+" respuestas</div></div>";
+    if(!d.length) return h+"<div style=\"color:var(--muted);text-align:center;padding:50px 0\">Aún no hay respuestas. Cuando alguien rellene el formulario, aparecerá aquí automáticamente.</div>";
+    var body=d.map(function(r){return "<tr style=\"border-top:1px solid var(--border)\">"+
+      "<td style=\"padding:11px 12px;font-weight:600\">"+esc(r.nombre||"—")+"</td>"+
+      "<td style=\"padding:11px 12px\">"+esc(r.tipo)+"</td>"+
+      "<td style=\"padding:11px 12px\">"+esc(r.objetivo||"—")+"</td>"+
+      "<td style=\"padding:11px 12px\">"+esc(r.deporte||"—")+"</td>"+
+      "<td style=\"padding:11px 12px\">"+esc(r.dias||"—")+"</td>"+
+      "<td style=\"padding:11px 12px;white-space:nowrap\">"+esc(r.whatsapp||r.email||"—")+"</td>"+
+      "<td style=\"padding:11px 12px;white-space:nowrap\">"+esc(r.estado)+"</td>"+
+      "<td style=\"padding:11px 12px;color:var(--muted);white-space:nowrap\">"+esc(r.fecha)+"</td></tr>";}).join("");
+    return h+"<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden\"><thead><tr style=\"text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em\"><th style=\"padding:11px 12px\">Nombre</th><th style=\"padding:11px 12px\">Tipo</th><th style=\"padding:11px 12px\">Objetivo</th><th style=\"padding:11px 12px\">Deporte</th><th style=\"padding:11px 12px\">Días</th><th style=\"padding:11px 12px\">Contacto</th><th style=\"padding:11px 12px\">Estado</th><th style=\"padding:11px 12px\">Fecha</th></tr></thead><tbody>"+body+"</tbody></table></div>";
+  }
+  function panelEl(){var p=document.getElementById("_nf_fi_panel");if(p)return p;p=document.createElement("div");p.id="_nf_fi_panel";p.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);overflow:auto;display:none;padding:24px 28px;";document.body.appendChild(p);return p;}
+  function activate(b,on){if(!b)return;b.style.color=on?"var(--text)":"var(--muted)";b.style.background=on?"var(--bg)":"transparent";b.style.border=on?"1px solid var(--border)":"1px solid transparent";b.style.borderBottom=on?"1px solid var(--bg)":"1px solid transparent";}
+  function openPanel(b){var nav=b.parentNode;var p=panelEl();try{p.style.top=(nav.getBoundingClientRect().bottom)+"px";}catch(e){p.style.top="104px";}p.innerHTML=render();p.style.display="block";activate(b,true);}
+  function closePanel(){var p=document.getElementById("_nf_fi_panel");if(p)p.style.display="none";activate(document.getElementById("_nf_fi_btn"),false);}
+  function findNav(){var bs=[].slice.call(document.querySelectorAll("button"));for(var i=0;i<bs.length;i++){var t=(bs[i].textContent||"").replace(/\s+/g," ").trim();if(bs[i].id!=="_nf_fi_btn"&&t.length<22&&/(Embudo|Agenda|Ventas|Leads)/.test(t))return bs[i].parentNode;}return null;}
+  function addButton(){try{var nav=findNav();if(!nav)return;if(nav.querySelector("#_nf_fi_btn"))return;var s=nav.querySelector("button");var b=document.createElement("button");b.id="_nf_fi_btn";if(s)b.style.cssText=s.style.cssText;activate(b,false);b.style.whiteSpace="nowrap";b.innerHTML="<span>▤</span> Formulario Inicial";b.onclick=function(){openPanel(b);};nav.appendChild(b);if(!nav.__nf_fi_lst){nav.__nf_fi_lst=true;nav.addEventListener("click",function(e){var t=e.target&&e.target.closest?e.target.closest("button"):null;if(t&&t.id!=="_nf_fi_btn")closePanel();},true);}}catch(e){}}
+  setInterval(addButton,900); setTimeout(addButton,400); addButton();
+})();
+</script>
+<!--FORMINICIAL_END-->
+
 </body>
 </html>
