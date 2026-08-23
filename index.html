@@ -4751,6 +4751,7 @@ CAPACIDADES QUE TIENES:
     if(!/El Protocolo|Asesor/i.test(note)) return null;
     var tipo=/Asesor|Objetivo:/i.test(note)?"Asesoria":"Registro";
     return {
+      id:l.id,
       nombre:(l.name||"").replace(/ . Asesor.a$/,"").replace(/ · Asesoría$/,""),
       tipo:tipo,
       email:grab(note,/([^\s·]+@[^\s·]+)/),
@@ -4775,12 +4776,34 @@ CAPACIDADES QUE TIENES:
       "<td style=\"padding:11px 12px\">"+esc(r.dias||"—")+"</td>"+
       "<td style=\"padding:11px 12px;white-space:nowrap\">"+esc(r.whatsapp||r.email||"—")+"</td>"+
       "<td style=\"padding:11px 12px;white-space:nowrap\">"+esc(r.estado)+"</td>"+
-      "<td style=\"padding:11px 12px;color:var(--muted);white-space:nowrap\">"+esc(r.fecha)+"</td></tr>";}).join("");
-    return h+"<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden\"><thead><tr style=\"text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em\"><th style=\"padding:11px 12px\">Nombre</th><th style=\"padding:11px 12px\">Tipo</th><th style=\"padding:11px 12px\">Objetivo</th><th style=\"padding:11px 12px\">Deporte</th><th style=\"padding:11px 12px\">Días</th><th style=\"padding:11px 12px\">Contacto</th><th style=\"padding:11px 12px\">Estado</th><th style=\"padding:11px 12px\">Fecha</th></tr></thead><tbody>"+body+"</tbody></table></div>";
+      "<td style=\"padding:11px 12px;color:var(--muted);white-space:nowrap\">"+esc(r.fecha)+"</td>"+
+      "<td style=\"padding:11px 12px;text-align:right\"><button data-fidel=\""+esc(r.id)+"\" data-finame=\""+esc(r.nombre||"este lead")+"\" title=\"Eliminar\" style=\"background:transparent;border:1px solid var(--border);color:#f87171;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1\">&times;</button></td></tr>";}).join("");
+    return h+"<div style=\"overflow-x:auto\"><table style=\"width:100%;border-collapse:collapse;font-size:13px;background:var(--bg2);border:1px solid var(--border);border-radius:12px;overflow:hidden\"><thead><tr style=\"text-align:left;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.04em\"><th style=\"padding:11px 12px\">Nombre</th><th style=\"padding:11px 12px\">Tipo</th><th style=\"padding:11px 12px\">Objetivo</th><th style=\"padding:11px 12px\">Deporte</th><th style=\"padding:11px 12px\">Días</th><th style=\"padding:11px 12px\">Contacto</th><th style=\"padding:11px 12px\">Estado</th><th style=\"padding:11px 12px\">Fecha</th><th style=\"padding:11px 12px\"></th></tr></thead><tbody>"+body+"</tbody></table></div>";
   }
+  function doDelete(id){
+    try{
+      var em=email(); if(!em)return;
+      var arr=leads().filter(function(l){return String(l.id)!==String(id);});
+      localStorage.setItem("nf_"+em+"_leads",JSON.stringify(arr));
+      try{var tk="nf_"+em+"_leadtags";var t=JSON.parse(localStorage.getItem(tk)||"{}");if(t[id]){delete t[id];localStorage.setItem(tk,JSON.stringify(t));}}catch(e){}
+    }catch(e){}
+    var p=document.getElementById("_nf_fi_panel"); if(p&&p.style.display!=="none")paint(p);
+  }
+  function confirmDel(id,name){
+    var bg=document.getElementById("_nf_fi_confirm"); if(bg)bg.remove();
+    bg=document.createElement("div"); bg.id="_nf_fi_confirm";
+    bg.style.cssText="position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px";
+    bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px 22px;max-width:380px;width:94vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\"><div style=\"font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px\">Eliminar respuesta</div><div style=\"font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5\">¿Eliminar a <b style=\"color:var(--text)\">"+esc(name)+"</b>? No se puede deshacer.</div><div style=\"display:flex;gap:8px\"><button id=\"_nf_fi_no\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:10px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_fi_yes\" style=\"flex:1;background:#f87171;border:none;color:#2a0808;border-radius:9px;padding:10px;font-size:13px;font-weight:800;cursor:pointer\">Eliminar</button></div></div>";
+    document.body.appendChild(bg);
+    bg.onclick=function(e){if(e.target===bg)bg.remove();};
+    document.getElementById("_nf_fi_no").onclick=function(){bg.remove();};
+    document.getElementById("_nf_fi_yes").onclick=function(){bg.remove();doDelete(id);};
+  }
+  function bindFI(p){[].slice.call(p.querySelectorAll("[data-fidel]")).forEach(function(b){b.onclick=function(ev){if(ev){ev.stopPropagation();}confirmDel(b.getAttribute("data-fidel"),b.getAttribute("data-finame"));};});}
+  function paint(p){p.innerHTML=render();bindFI(p);}
   function panelEl(){var p=document.getElementById("_nf_fi_panel");if(p)return p;p=document.createElement("div");p.id="_nf_fi_panel";p.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);overflow:auto;display:none;padding:24px 28px;";document.body.appendChild(p);return p;}
   function activate(b,on){if(!b)return;b.style.color=on?"var(--text)":"var(--muted)";b.style.background=on?"var(--bg)":"transparent";b.style.border=on?"1px solid var(--border)":"1px solid transparent";b.style.borderBottom=on?"1px solid var(--bg)":"1px solid transparent";}
-  function openPanel(b){var nav=b.parentNode;var p=panelEl();try{p.style.top=(nav.getBoundingClientRect().bottom)+"px";}catch(e){p.style.top="104px";}p.innerHTML=render();p.style.display="block";activate(b,true);}
+  function openPanel(b){var nav=b.parentNode;var p=panelEl();try{p.style.top=(nav.getBoundingClientRect().bottom)+"px";}catch(e){p.style.top="104px";}paint(p);p.style.display="block";activate(b,true);}
   function closePanel(){var p=document.getElementById("_nf_fi_panel");if(p)p.style.display="none";activate(document.getElementById("_nf_fi_btn"),false);}
   function findNav(){var bs=[].slice.call(document.querySelectorAll("button"));for(var i=0;i<bs.length;i++){var t=(bs[i].textContent||"").replace(/\s+/g," ").trim();if(bs[i].id!=="_nf_fi_btn"&&t.length<22&&/(Embudo|Agenda|Ventas|Leads)/.test(t))return bs[i].parentNode;}return null;}
   function addButton(){try{var nav=findNav();if(!nav)return;if(nav.querySelector("#_nf_fi_btn"))return;var s=nav.querySelector("button");var b=document.createElement("button");b.id="_nf_fi_btn";if(s)b.style.cssText=s.style.cssText;activate(b,false);b.style.whiteSpace="nowrap";b.innerHTML="<span>▤</span> Formulario Inicial";b.onclick=function(){openPanel(b);};nav.appendChild(b);if(!nav.__nf_fi_lst){nav.__nf_fi_lst=true;nav.addEventListener("click",function(e){var t=e.target&&e.target.closest?e.target.closest("button"):null;if(t&&t.id!=="_nf_fi_btn")closePanel();},true);}}catch(e){}}
