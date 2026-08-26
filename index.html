@@ -3565,6 +3565,7 @@ CAPACIDADES QUE TIENES:
 
   function render(){
     var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
+    var _plS=document.getElementById('_nf_lg_list');var _lgScroll=_plS?_plS.scrollTop:0;var _winScroll=(window.pageYOffset||document.documentElement.scrollTop||0);
     var groups=loadGroups();
     var tags=loadTags();
     var leads=getLeads();
@@ -3720,6 +3721,8 @@ CAPACIDADES QUE TIENES:
         _formOpen=false;_editId=null;render();
       };
       renderList();
+      var _flS=document.getElementById('_nf_lg_list');if(_flS&&_lgScroll)_flS.scrollTop=_lgScroll;
+      if(_winScroll){try{window.scrollTo(0,_winScroll);}catch(e){}}
     }
   }
 
