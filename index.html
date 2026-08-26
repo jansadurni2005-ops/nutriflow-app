@@ -4752,7 +4752,7 @@ CAPACIDADES QUE TIENES:
     var tipo=/Asesor|Objetivo:/i.test(note)?"Asesoria":"Registro";
     return {
       id:l.id,
-      nombre:(l.name||"").replace(/ . Asesor.a$/,"").replace(/ · Asesoría$/,""),
+      nombre:(l.name||"").replace(/ · Protocolo.*$/,"").replace(/ . Asesor.a$/,"").replace(/ · Asesoría$/,""),
       tipo:tipo,
       email:grab(note,/([^\s·]+@[^\s·]+)/),
       whatsapp:grab(note,/(\+?\d[\d\s]{4,}\d)/),
@@ -4811,6 +4811,99 @@ CAPACIDADES QUE TIENES:
 })();
 </script>
 <!--FORMINICIAL_END-->
+
+<!--PACK_START-->
+<script>
+/* __nf_pack_v1 */
+(function(){
+  if(window.__nf_pack_loaded)return; window.__nf_pack_loaded=true;
+  function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
+  function pre(){var em=email();return em?"nf_"+em+"_":"";}
+  function getClients(){try{return JSON.parse(localStorage.getItem(pre()+"clients")||"[]");}catch(e){return[];}}
+  function saveClients(a){var p=pre();if(p)localStorage.setItem(p+"clients",JSON.stringify(a));}
+  function pe(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
+  function today(){return new Date().toISOString().slice(0,10);}
+  function bm(b){return b==="quarterly"?3:b==="semiannual"?6:b==="annual"?12:1;}
+  function renewOf(start,b){if(b==="onetime")return null;var days=b==="quarterly"?90:b==="semiannual"?180:b==="annual"?360:30;var n=new Date(start);if(isNaN(n.getTime()))n=new Date();n.setDate(n.getDate()+days);return n.toISOString().slice(0,10);}
+  function sources(){var def=["Instagram","GEIEG","Webinar","Referral","Àurea","Ads","Other"];try{var s=JSON.parse(localStorage.getItem(pre()+"sources")||"[]").map(function(x){return x&&x.name;}).filter(Boolean);var out=def.slice();s.forEach(function(n){if(out.indexOf(n)<0)out.push(n);});return out;}catch(e){return def;}}
+  function esc(s){return (s==null?"":String(s)).replace(/[&<>\"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+
+  function openModal(){
+    var bg=document.getElementById("_nf_pack_bg"); if(bg)bg.remove();
+    var srcOpts=sources().map(function(s){return "<option value=\""+esc(s)+"\">"+esc(s)+"</option>";}).join("");
+    bg=document.createElement("div"); bg.id="_nf_pack_bg";
+    bg.style.cssText="position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:56px 16px;overflow:auto";
+    bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:450px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\">"+
+      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:6px\"><span style=\"font-size:16px;font-weight:800;color:var(--text)\">👥 Pack de 2 personas</span><button id=\"_nf_pack_x\" style=\"background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1\">&times;</button></div>"+
+      "<div style=\"font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5\">Se crean <b style=\"color:var(--text)\">2 clientes</b> que pagan juntos. El precio total se reparte entre los dos.</div>"+
+      "<input id=\"_nf_pack_n1\" placeholder=\"Nombre persona 1\" autocomplete=\"off\" style=\"width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;margin-bottom:8px\">"+
+      "<input id=\"_nf_pack_n2\" placeholder=\"Nombre persona 2\" autocomplete=\"off\" style=\"width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;outline:none;margin-bottom:8px\">"+
+      "<div style=\"display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap\">"+
+        "<input id=\"_nf_pack_price\" type=\"number\" placeholder=\"Precio total del pack\" style=\"flex:1;min-width:130px;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 12px;color:var(--text);font-size:14px;outline:none\">"+
+        "<select id=\"_nf_pack_bill\" style=\"flex:1;min-width:130px;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px;color:var(--text);font-size:13px;outline:none\"><option value=\"monthly\">Mensual</option><option value=\"quarterly\">Trimestral</option><option value=\"semiannual\">Semestral</option><option value=\"annual\">Anual</option><option value=\"onetime\">Pago único</option></select>"+
+      "</div>"+
+      "<div style=\"display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap\">"+
+        "<select id=\"_nf_pack_src\" style=\"flex:1;min-width:130px;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px;color:var(--text);font-size:13px;outline:none\">"+srcOpts+"</select>"+
+        "<input id=\"_nf_pack_date\" type=\"date\" value=\""+today()+"\" style=\"flex:1;min-width:130px;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px;color:var(--text);font-size:13px;outline:none\">"+
+      "</div>"+
+      "<div id=\"_nf_pack_hint\" style=\"font-size:11px;color:var(--muted);margin-bottom:14px;min-height:15px\"></div>"+
+      "<div style=\"display:flex;gap:8px\"><button id=\"_nf_pack_cancel\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_pack_save\" style=\"flex:2;background:var(--blue);border:none;color:#0e1a05;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer\">Crear pack (2 clientes)</button></div>"+
+    "</div>";
+    document.body.appendChild(bg);
+    function upd(){var tot=parseFloat(document.getElementById("_nf_pack_price").value)||0;var b=document.getElementById("_nf_pack_bill").value;var per=tot/bm(b)/2;var totM=tot/bm(b);var hint=document.getElementById("_nf_pack_hint");if(tot>0){hint.innerHTML="Cada persona: <b style=\"color:var(--text)\">"+per.toFixed(2)+" €/mes</b> · Total del pack: <b style=\"color:var(--text)\">"+totM.toFixed(2)+" €/mes</b> (2 clientes)";}else hint.innerHTML="";}
+    document.getElementById("_nf_pack_price").oninput=upd;
+    document.getElementById("_nf_pack_bill").onchange=upd;
+    document.getElementById("_nf_pack_x").onclick=function(){bg.remove();};
+    document.getElementById("_nf_pack_cancel").onclick=function(){bg.remove();};
+    bg.onclick=function(e){if(e.target===bg)bg.remove();};
+    document.getElementById("_nf_pack_save").onclick=function(){
+      var n1=(document.getElementById("_nf_pack_n1").value||"").trim();
+      var n2=(document.getElementById("_nf_pack_n2").value||"").trim();
+      var tot=parseFloat(document.getElementById("_nf_pack_price").value)||0;
+      var b=document.getElementById("_nf_pack_bill").value;
+      var src=document.getElementById("_nf_pack_src").value;
+      var start=document.getElementById("_nf_pack_date").value||today();
+      var ok=true;
+      if(!n1){document.getElementById("_nf_pack_n1").style.borderColor="#f87171";ok=false;}
+      if(!n2){document.getElementById("_nf_pack_n2").style.borderColor="#f87171";ok=false;}
+      if(tot<=0){document.getElementById("_nf_pack_price").style.borderColor="#f87171";ok=false;}
+      if(!ok)return;
+      var per=+(tot/bm(b)/2).toFixed(2);
+      var ren=renewOf(start,b);
+      var pid="pack"+Date.now().toString(36);
+      var cl=getClients();
+      [n1,n2].forEach(function(nm){ cl.unshift({id:pe(),name:nm,price:per,billing:b,source:src,startDate:start,renewalDate:(b==="onetime"?null:ren),active:true,paidDate:today(),packId:pid}); });
+      saveClients(cl);
+      if(window._nf_setClients){try{window._nf_setClients(cl.slice());}catch(e){}}
+      bg.remove();
+      try{var t=document.createElement("div");t.textContent="✓ Pack creado: "+n1+" + "+n2+" ("+per.toFixed(2)+" €/mes c/u)";t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:10002;background:var(--blue);color:#0e1a05;font-weight:800;padding:11px 18px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)";document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},2800);}catch(e){}
+    };
+    setTimeout(function(){var i=document.getElementById("_nf_pack_n1");if(i)i.focus();},30);
+  }
+
+  function addBtn(){
+    try{
+      var add=null,bs=document.querySelectorAll("button");
+      for(var i=0;i<bs.length;i++){ if((bs[i].textContent||"").indexOf("Añadir cliente")>=0){ add=bs[i]; break; } }
+      if(!add){ var old=document.getElementById("_nf_pack_btn"); if(old)old.remove(); return; }
+      if(document.getElementById("_nf_pack_btn"))return;
+      var b=document.createElement("button");
+      b.id="_nf_pack_btn";
+      try{b.style.cssText=add.style.cssText;}catch(e){}
+      b.style.marginLeft="8px";
+      b.style.background="transparent";
+      b.style.border="1px solid var(--blue)";
+      b.style.color="var(--blue)";
+      b.style.whiteSpace="nowrap";
+      b.innerHTML="👥 Pack de 2";
+      b.onclick=openModal;
+      add.parentNode.insertBefore(b, add.nextSibling);
+    }catch(e){}
+  }
+  setInterval(addBtn,900); setTimeout(addBtn,500); addBtn();
+})();
+</script>
+<!--PACK_END-->
 
 </body>
 </html>
