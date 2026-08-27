@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>El Protocolo — Leads</title>
+<style>
+  :root{--bg:#000;--bg2:#0c0d11;--bg3:#15171d;--border:#ffffff14;--text:#f3f4f6;--muted:#8b919d;--lime:#a3e635;--red:#f87171;}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;padding:18px 14px 60px;max-width:640px;margin:0 auto}
+  h1{font-size:22px;font-weight:800;margin:2px 0 2px}
+  .sub{font-size:12px;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:ui-monospace,Menlo,Consolas,monospace}
+  .status{margin:16px 0;padding:14px 16px;border-radius:12px;background:var(--bg2);border:1px solid var(--border);font-size:14px;line-height:1.5}
+  .status.ok{border-color:#a3e63555;background:#a3e6350f}
+  .status.err{border-color:#f8717155;background:#f871710f}
+  .big{font-size:15px;font-weight:800}
+  .lime{color:var(--lime)}
+  .card{background:var(--bg2);border:1px solid var(--border);border-radius:12px;padding:13px 15px;margin-bottom:10px}
+  .name{font-size:16px;font-weight:700;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+  .badge{font-size:10px;font-weight:800;padding:3px 8px;border-radius:999px;background:var(--bg3);color:var(--muted);text-transform:uppercase;letter-spacing:.05em}
+  .badge.new{background:#a3e6351c;color:var(--lime)}
+  .meta{font-size:13px;color:var(--muted);margin-top:6px;line-height:1.7;word-break:break-word}
+  .meta a{color:var(--text);text-decoration:none;border-bottom:1px solid var(--border)}
+  .btn{display:inline-block;margin-top:6px;background:var(--lime);color:#0e1a05;font-weight:800;border:none;border-radius:10px;padding:12px 18px;font-size:14px;cursor:pointer;text-decoration:none}
+  .btn.ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+  .row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+  .count{font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;color:var(--muted);margin:18px 0 8px}
+</style>
+</head>
+<body>
+  <div class="sub">NUTRIFLOW · SYNC</div>
+  <h1>Leads de El Protocolo</h1>
+  <div id="status" class="status">Cargando tu sesión…</div>
+  <div id="count" class="count" style="display:none"></div>
+  <div id="list"></div>
+  <div class="row">
+    <a class="btn" href="./index.html">Abrir NutriFlow</a>
+    <button class="btn ghost" onclick="location.reload()">Recargar</button>
+  </div>
+
+<script>
+(function(){
+  var SB="https://nrxltxmbpkplhgycodob.supabase.co";
+  var KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs";
+  var $=function(id){return document.getElementById(id);};
+  function setStatus(html,cls){var s=$("status");s.innerHTML=html;s.className="status"+(cls?" "+cls:"");}
+  function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
+  function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
+  function grab(note,re){var m=(note||"").match(re);return m?String(m[1]).trim():"";}
+
+  function tokObj(){var em=email();try{return JSON.parse(localStorage.getItem("_nf_sb_tok_"+em)||"null");}catch(e){return null;}}
+
+  function getValidToken(){
+    var em=email(); var o=tokObj();
+    if(o&&o.tok&&(!o.exp||o.exp>Date.now()+5000)) return Promise.resolve(o.tok);
+    // Token caducado o ausente: intenta refrescar con el refresh_token guardado
+    if(o&&o.refresh){
+      return fetch(SB+"/auth/v1/token?grant_type=refresh_token",{method:"POST",headers:{apikey:KEY,"Content-Type":"application/json"},body:JSON.stringify({refresh_token:o.refresh})})
+        .then(function(r){return r.ok?r.json():null;})
+        .then(function(d){
+          if(d&&d.access_token){
+            try{localStorage.setItem("_nf_sb_tok_"+em,JSON.stringify({tok:d.access_token,refresh:d.refresh_token||o.refresh,uid:o.uid,exp:Date.now()+((d.expires_in||3600)*1000)}));}catch(e){}
+            return d.access_token;
+          }
+          return (o&&o.tok)||null;
+        }).catch(function(){return (o&&o.tok)||null;});
+    }
+    return Promise.resolve(o&&o.tok||null);
+  }
+
+  function parse(l){
+    var note=l.note||"";
+    return {
+      id:l.id,
+      name:(l.name||"").replace(/ · Protocolo.*$/,"").replace(/ · Asesor.*$/i,""),
+      raw:l.name||"",
+      email:grab(note,/([^\s·]+@[^\s·]+)/),
+      wa:grab(note,/(\+?\d[\d\s]{5,}\d)/),
+      obj:grab(note,/Objetivo:\s*([^·]+)/),
+      done:!/SIN TERMINAR/i.test(note),
+      date:l.date||""
+    };
+  }
+
+  function render(cloud,added){
+    $("count").style.display="block";
+    $("count").textContent=cloud.length+" leads · "+added+" nuevos añadidos a tu CRM";
+    var newIds={};
+    // marca como "nuevo" los que se acaban de añadir (los que no estaban): recalculado abajo
+    var html=cloud.map(function(l){
+      var p=parse(l);
+      var waNum=(p.wa||"").replace(/\s/g,"");
+      var waLink=waNum?'<a href="https://wa.me/'+esc(waNum.replace(/^\+/,''))+'">'+esc(p.wa)+'</a>':"";
+      var mailLink=p.email?'<a href="mailto:'+esc(p.email)+'">'+esc(p.email)+'</a>':"";
+      var contact=[waLink,mailLink].filter(Boolean).join(" · ")||"—";
+      return '<div class="card"><div class="name">'+esc(p.name||"(sin nombre)")+
+        (p.done?'':' <span class="badge">⏳ sin terminar</span>')+
+        '</div><div class="meta">'+esc(p.date)+(p.obj?" · "+esc(p.obj):"")+'<br>'+contact+'</div></div>';
+    }).join("");
+    $("list").innerHTML=html;
+  }
+
+  function run(){
+    var em=email();
+    if(!em){ setStatus('No hay ninguna sesión de NutriFlow en este navegador.<br><br>Abre <b>NutriFlow</b>, inicia sesión, y vuelve a abrir esta página.',"err"); return; }
+    setStatus("Sesión: <b>"+esc(em)+"</b> · obteniendo tus leads…");
+    getValidToken().then(function(t){
+      if(!t){ setStatus('No pude obtener el acceso a la nube.<br><br>Abre <b>NutriFlow</b>, asegúrate de haber iniciado sesión, y recarga esta página.',"err"); return; }
+      return fetch(SB+"/rest/v1/leads?select=id,name,source,status,note,date&or=(name.ilike.*Protocolo*,note.ilike.*Protocolo*,note.ilike.*Asesor*)&order=date.desc",
+        {headers:{apikey:KEY,Authorization:"Bearer "+t}})
+        .then(function(r){ if(!r.ok) throw new Error("HTTP "+r.status); return r.json(); })
+        .then(function(cloud){
+          if(!Array.isArray(cloud)) cloud=[];
+          var PRE="nf_"+em+"_";
+          var local=[]; try{local=JSON.parse(localStorage.getItem(PRE+"leads")||"[]");}catch(e){}
+          var have={}; local.forEach(function(l){if(l&&l.id)have[l.id]=1;});
+          var added=0;
+          cloud.forEach(function(l){
+            if(l&&l.id&&!have[l.id]){ local.unshift({id:l.id,name:l.name,source:l.source||"Instagram",status:l.status||"New",note:l.note||"",date:l.date||""}); added++; }
+          });
+          try{localStorage.setItem(PRE+"leads",JSON.stringify(local));}catch(e){}
+          if(added>0) setStatus('<span class="big lime">✓ '+added+' lead'+(added===1?'':'s')+' nuevo'+(added===1?'':'s')+' añadido'+(added===1?'':'s')+' a tu CRM.</span><br>Abre NutriFlow y busca <b>proto</b> para verlos.',"ok");
+          else setStatus('<span class="big">Ya tenías todos ('+cloud.length+') en tu CRM.</span><br>Abajo tienes la lista completa.',"ok");
+          render(cloud,added);
+        });
+    }).catch(function(err){
+      setStatus('Error al descargar los leads: '+esc(err&&err.message||err)+'<br><br>Prueba a recargar. Si sigue, abre NutriFlow, inicia sesión y vuelve.',"err");
+    });
+  }
+
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",run); else run();
+})();
+</script>
+</body>
+</html>
