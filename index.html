@@ -4908,5 +4908,41 @@ CAPACIDADES QUE TIENES:
 </script>
 <!--PACK_END-->
 
+<!--PROTOPULL_START-->
+<script>
+/* __nf_protopull_v1 : baja a la vista los leads de El Protocolo que están en Supabase pero no en localStorage */
+(function(){
+  if(window.__nf_protopull)return; window.__nf_protopull=true;
+  var SB="https://nrxltxmbpkplhgycodob.supabase.co";
+  var KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs";
+  function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
+  function tok(){try{var t=JSON.parse(localStorage.getItem("_nf_sb_tok")||"null");return (t&&t.tok)?t.tok:null;}catch(e){return null;}}
+  function arr(k){try{return JSON.parse(localStorage.getItem(k)||"[]");}catch(e){return [];}}
+  function pull(){
+    var em=email(); var t=tok(); if(!em||!t)return;
+    var PRE="nf_"+em+"_";
+    fetch(SB+"/rest/v1/leads?select=id,name,source,status,note,date&name=ilike.*Protocolo*&order=date.desc",
+      {headers:{apikey:KEY,Authorization:"Bearer "+t}})
+      .then(function(r){return r.ok?r.json():[];})
+      .then(function(cloud){
+        if(!Array.isArray(cloud)||!cloud.length)return;
+        var local=arr(PRE+"leads");
+        var have={}; local.forEach(function(l){if(l&&l.id)have[l.id]=1;});
+        var add=[];
+        cloud.forEach(function(l){
+          if(l&&l.id&&!have[l.id]) add.push({id:l.id,name:l.name,source:l.source||"Instagram",status:l.status||"New",note:l.note||"",date:l.date||new Date().toISOString().slice(0,10)});
+        });
+        if(!add.length)return;
+        var merged=add.concat(local);
+        localStorage.setItem(PRE+"leads",JSON.stringify(merged));
+        if(window._nf_setLeads){try{window._nf_setLeads(merged.slice());}catch(e){}}
+        try{console.log("[NF] El Protocolo: "+add.length+" registro(s) sincronizado(s) a la vista");}catch(e){}
+      }).catch(function(){});
+  }
+  var n=0; var iv=setInterval(function(){ n++; if(email()&&tok()){clearInterval(iv);pull();setInterval(pull,60000);} else if(n>60){clearInterval(iv);} },700);
+})();
+</script>
+<!--PROTOPULL_END-->
+
 </body>
 </html>
