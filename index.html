@@ -221,12 +221,14 @@ function collectSnapshot(){
   return{ts:Date.now(),clients:g('clients'),lostClients:g('lostClients'),leads:g('leads'),antrop:g('antrop')};
 }
 function pushSnapshot(token){
+  // DISABLED 2026-08-28: storing a full clients/leads/antrop copy in user_metadata
+  // bloated the JWT to ~40KB, which made EVERY PostgREST (/rest/v1) call fail with
+  // HTTP 400 (token/header too large) — freezing cross-device sync. The tables are the
+  // source of truth. We also proactively strip any stale nf_snapshot so old devices heal.
   clearTimeout(_snapTimer);
   _snapTimer=setTimeout(function(){
     if(!token)return;
-    var snap=collectSnapshot();
-    if(!(snap.clients.length||snap.lostClients.length||snap.leads.length||snap.antrop.length))return;
-    fetch2('/auth/v1/user','PUT',token,{data:{nf_snapshot:snap}}).catch(function(){});
+    fetch2('/auth/v1/user','PUT',token,{data:{nf_snapshot:null}}).catch(function(){});
   },3000);
 }
 // Restore any locally-empty data type from the cloud snapshot (localStorage + React + cloud).
