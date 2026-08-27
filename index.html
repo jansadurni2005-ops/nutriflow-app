@@ -464,6 +464,7 @@ function refreshFromCloud(){
    .catch(function(){window._nf_syncing=false;_refreshing=false;});
 }
 window._nf_refreshFromCloud=refreshFromCloud;
+window._nf_getToken=getToken;
 
 // Save an email reminder to the cloud (read by the scheduled job that sends the email).
 // Fails silently if the 'reminders' table/backend isn't set up yet.
@@ -4916,10 +4917,20 @@ CAPACIDADES QUE TIENES:
   var SB="https://nrxltxmbpkplhgycodob.supabase.co";
   var KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs";
   function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
-  function tok(){var em=email();try{if(em){var t=JSON.parse(localStorage.getItem("_nf_sb_tok_"+em)||"null");if(t&&t.tok&&(!t.exp||t.exp>Date.now()))return t.tok;}}catch(e){}try{var t2=JSON.parse(localStorage.getItem("_nf_sb_tok")||"null");if(t2&&t2.tok)return t2.tok;}catch(e){}return null;}
+  function cachedTok(){var em=email();try{if(em){var t=JSON.parse(localStorage.getItem("_nf_sb_tok_"+em)||"null");if(t&&t.tok&&(!t.exp||t.exp>Date.now()))return t.tok;}}catch(e){}try{var t2=JSON.parse(localStorage.getItem("_nf_sb_tok")||"null");if(t2&&t2.tok)return t2.tok;}catch(e){}return null;}
+  // Prefer the app's own token getter (it refreshes an expired token); fall back to cache.
+  function getTok(){
+    if(typeof window._nf_getToken==="function"){
+      try{return Promise.resolve(window._nf_getToken()).then(function(t){return t||cachedTok();}).catch(function(){return cachedTok();});}catch(e){}
+    }
+    return Promise.resolve(cachedTok());
+  }
   function arr(k){try{return JSON.parse(localStorage.getItem(k)||"[]");}catch(e){return [];}}
-  function pull(){
-    var em=email(); var t=tok(); if(!em||!t)return;
+  function toast(n){try{var t=document.createElement("div");t.textContent="✓ "+n+" lead"+(n===1?"":"s")+" de El Protocolo añadido"+(n===1?"":"s");t.style.cssText="position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100020;background:#a3e635;color:#0e1a05;font-weight:800;padding:11px 18px;border-radius:10px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.4)";document.body.appendChild(t);setTimeout(function(){if(t.parentNode)t.parentNode.removeChild(t);},4500);}catch(e){}}
+  // If the injected Leads panel is on screen, re-run its render so new rows show without re-typing.
+  function refreshPanel(){try{var s=document.getElementById("_nf_lg_search");if(s){s.dispatchEvent(new Event("input",{bubbles:true}));}}catch(e){}}
+  function doFetch(t){
+    var em=email(); if(!em||!t)return;
     var PRE="nf_"+em+"_";
     fetch(SB+"/rest/v1/leads?select=id,name,source,status,note,date&or=(name.ilike.*Protocolo*,note.ilike.*Protocolo*,note.ilike.*Asesor*)&order=date.desc",
       {headers:{apikey:KEY,Authorization:"Bearer "+t}})
@@ -4936,10 +4947,13 @@ CAPACIDADES QUE TIENES:
         var merged=add.concat(local);
         localStorage.setItem(PRE+"leads",JSON.stringify(merged));
         if(window._nf_setLeads){try{window._nf_setLeads(merged.slice());}catch(e){}}
+        refreshPanel();
+        toast(add.length);
         try{console.log("[NF] El Protocolo: "+add.length+" registro(s) sincronizado(s) a la vista");}catch(e){}
       }).catch(function(){});
   }
-  var n=0; var iv=setInterval(function(){ n++; if(email()&&tok()){clearInterval(iv);pull();setInterval(pull,60000);} else if(n>60){clearInterval(iv);} },700);
+  function pull(){ if(!email())return; getTok().then(function(t){ if(t) doFetch(t); }); }
+  var n=0; var iv=setInterval(function(){ n++; if(email()){clearInterval(iv);pull();setInterval(pull,60000);} else if(n>80){clearInterval(iv);} },700);
 })();
 </script>
 <!--PROTOPULL_END-->
