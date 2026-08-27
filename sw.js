@@ -1,5 +1,5 @@
 // NutriFlow service worker — offline app shell + always-fresh HTML/data
-var CACHE='nutriflow-v2';
+var CACHE='nutriflow-v3';
 var ASSETS=['./','./index.html','./manifest.json','./icon-192.png','./icon-512.png'];
 
 self.addEventListener('install',function(e){
@@ -25,7 +25,7 @@ self.addEventListener('fetch',function(e){
   // Network-first for the app page so updates always land; cached copy only offline
   if(req.mode==='navigate'||url.pathname.indexOf('index.html')>=0||url.pathname.charAt(url.pathname.length-1)==='/'){
     e.respondWith(
-      fetch(req).then(function(r){var cp=r.clone();caches.open(CACHE).then(function(c){c.put('./index.html',cp);});return r;})
+      fetch(req,{cache:'no-store'}).then(function(r){var cp=r.clone();caches.open(CACHE).then(function(c){c.put('./index.html',cp);});return r;})
         .catch(function(){return caches.match('./index.html');})
     );
     return;
