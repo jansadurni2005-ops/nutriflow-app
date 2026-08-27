@@ -4916,12 +4916,12 @@ CAPACIDADES QUE TIENES:
   var SB="https://nrxltxmbpkplhgycodob.supabase.co";
   var KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs";
   function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
-  function tok(){try{var t=JSON.parse(localStorage.getItem("_nf_sb_tok")||"null");return (t&&t.tok)?t.tok:null;}catch(e){return null;}}
+  function tok(){var em=email();try{if(em){var t=JSON.parse(localStorage.getItem("_nf_sb_tok_"+em)||"null");if(t&&t.tok&&(!t.exp||t.exp>Date.now()))return t.tok;}}catch(e){}try{var t2=JSON.parse(localStorage.getItem("_nf_sb_tok")||"null");if(t2&&t2.tok)return t2.tok;}catch(e){}return null;}
   function arr(k){try{return JSON.parse(localStorage.getItem(k)||"[]");}catch(e){return [];}}
   function pull(){
     var em=email(); var t=tok(); if(!em||!t)return;
     var PRE="nf_"+em+"_";
-    fetch(SB+"/rest/v1/leads?select=id,name,source,status,note,date&name=ilike.*Protocolo*&order=date.desc",
+    fetch(SB+"/rest/v1/leads?select=id,name,source,status,note,date&or=(name.ilike.*Protocolo*,note.ilike.*Protocolo*,note.ilike.*Asesor*)&order=date.desc",
       {headers:{apikey:KEY,Authorization:"Bearer "+t}})
       .then(function(r){return r.ok?r.json():[];})
       .then(function(cloud){
