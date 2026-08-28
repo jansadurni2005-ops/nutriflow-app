@@ -2940,6 +2940,11 @@ CAPACIDADES QUE TIENES:
       var c=clientMap[p.clientId];if(!c||c.active===false)return false;
       // only if cycle still active
       if(c.startDate!==p.cycleStart)return false;
+      // don't remind if the client has ALREADY paid the full cycle (was flagging paid clients)
+      var _cyc=all.filter(function(q){return q.clientId===c.id&&q.cycleStart===c.startDate;});
+      var _paid=_cyc.reduce(function(s,q){return s+(parseFloat(q.amount)||0);},0);
+      var _due=(parseFloat(c.price)||0)*billingMonths(c.billing);
+      if(_due>0&&(_due-_paid)<=0.01)return false;
       var d=daysTo(p.reminderDate);
       return d<=2;
     });
@@ -2951,7 +2956,12 @@ CAPACIDADES QUE TIENES:
     var chips=due.slice(0,3).map(function(p){
       var c=clientMap[p.clientId];var d=daysTo(p.reminderDate);
       var when=d<0?'fa '+Math.abs(d)+'d':d===0?'avui':d===1?'demà':'en '+d+'d';
-      return '<span style="background:rgba(0,0,0,.18);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap">'+esc((c&&c.name)||'?')+' — '+when+' · '+fmtE(p.amount)+'</span>';
+      // show the amount STILL owed this cycle, not the last payment's amount
+      var _cyc=all.filter(function(q){return q.clientId===c.id&&q.cycleStart===c.startDate;});
+      var _paid=_cyc.reduce(function(s,q){return s+(parseFloat(q.amount)||0);},0);
+      var _rem=(parseFloat(c.price)||0)*billingMonths(c.billing)-_paid;
+      if(!(_rem>0))_rem=parseFloat(p.amount)||0;
+      return '<span style="background:rgba(0,0,0,.18);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap">'+esc((c&&c.name)||'?')+' — '+when+' · '+fmtE(_rem)+'</span>';
     }).join('');
     var more=due.length>3?'<span style="font-size:12px;opacity:.75">+'+(due.length-3)+' més</span>':'';
     if(!bar){bar=document.createElement('div');bar.id='_nf_pay_rem_bar';document.body.appendChild(bar);}
