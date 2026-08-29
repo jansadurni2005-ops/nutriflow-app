@@ -4793,8 +4793,10 @@ CAPACIDADES QUE TIENES:
   function esc(s){return (s==null?"":String(s)).replace(/[&<>\"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
   function parseLead(l){
     var note=l.note||"";
-    if(!/El Protocolo|Asesor/i.test(note)) return null;
-    var tipo=/Asesor|Objetivo:/i.test(note)?"Asesoria":"Registro";
+    // Solo la ASESORÍA 1:1 (formulario completo o a medias). Los registros normales de El Protocolo
+    // NO salen aquí — esos van a Leads → chip ⭐ Protocolo.
+    if(!/asesor/i.test(note) && !/objetivo:|deporte:|d[ií]as:/i.test(note)) return null;
+    var tipo="Asesoría 1:1";
     return {
       id:l.id,
       nombre:(l.name||"").replace(/ · Protocolo.*$/,"").replace(/ . Asesor.a$/,"").replace(/ · Asesoría$/,""),
@@ -4811,8 +4813,8 @@ CAPACIDADES QUE TIENES:
   function rows(){return leads().map(parseLead).filter(Boolean).sort(function(a,b){return String(b.fecha||"").localeCompare(String(a.fecha||""));});}
   function render(){
     var d=rows();
-    var h="<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px\"><div><div style=\"font-size:22px;font-weight:700\">Formulario Inicial</div><div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Personas que han rellenado el formulario de El Protocolo</div></div><div style=\"font-size:13px;color:var(--muted)\">"+d.length+" respuestas</div></div>";
-    if(!d.length) return h+"<div style=\"color:var(--muted);text-align:center;padding:50px 0\">Aún no hay respuestas. Cuando alguien rellene el formulario, aparecerá aquí automáticamente.</div>";
+    var h="<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px\"><div><div style=\"font-size:22px;font-weight:700\">Formulario Inicial</div><div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Personas que han solicitado la asesoría 1:1 (formulario completo o a medias)</div></div><div style=\"font-size:13px;color:var(--muted)\">"+d.length+" respuestas</div></div>";
+    if(!d.length) return h+"<div style=\"color:var(--muted);text-align:center;padding:50px 0\">Aún no hay solicitudes de asesoría. Cuando alguien empiece o termine el formulario de la asesoría 1:1, aparecerá aquí automáticamente.</div>";
     var body=d.map(function(r){return "<tr style=\"border-top:1px solid var(--border)\">"+
       "<td style=\"padding:11px 12px;font-weight:600\">"+esc(r.nombre||"—")+"</td>"+
       "<td style=\"padding:11px 12px\">"+esc(r.tipo)+"</td>"+
