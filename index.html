@@ -4813,7 +4813,7 @@ CAPACIDADES QUE TIENES:
   function rows(){return leads().map(parseLead).filter(Boolean).sort(function(a,b){return String(b.fecha||"").localeCompare(String(a.fecha||""));});}
   function render(){
     var d=rows();
-    var h="<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:18px\"><div><div style=\"font-size:22px;font-weight:700\">Formulario Inicial</div><div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Personas que han solicitado la asesoría 1:1 (formulario completo o a medias)</div></div><div style=\"font-size:13px;color:var(--muted)\">"+d.length+" respuestas</div></div>";
+    var h="<div style=\"position:sticky;top:0;background:var(--bg);z-index:5;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin:-20px -24px 18px;padding:16px 24px;border-bottom:1px solid var(--border)\"><div><div style=\"font-size:22px;font-weight:700\">Formulario Inicial</div><div style=\"font-size:12px;color:var(--muted);margin-top:2px\">Personas que han solicitado la asesoría 1:1 (formulario completo o a medias)</div></div><div style=\"display:flex;align-items:center;gap:12px\"><span style=\"font-size:13px;color:var(--muted)\">"+d.length+" respuestas</span><button id=\"_nf_fi_close\" style=\"background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:9px;padding:8px 14px;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap\">✕ Cerrar</button></div></div>";
     if(!d.length) return h+"<div style=\"color:var(--muted);text-align:center;padding:50px 0\">Aún no hay solicitudes de asesoría. Cuando alguien empiece o termine el formulario de la asesoría 1:1, aparecerá aquí automáticamente.</div>";
     var body=d.map(function(r){return "<tr style=\"border-top:1px solid var(--border)\">"+
       "<td style=\"padding:11px 12px;font-weight:600\">"+esc(r.nombre||"—")+"</td>"+
@@ -4839,7 +4839,7 @@ CAPACIDADES QUE TIENES:
   function confirmDel(id,name){
     var bg=document.getElementById("_nf_fi_confirm"); if(bg)bg.remove();
     bg=document.createElement("div"); bg.id="_nf_fi_confirm";
-    bg.style.cssText="position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px";
+    bg.style.cssText="position:fixed;inset:0;z-index:99999;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;padding:16px";
     bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:14px;padding:20px 22px;max-width:380px;width:94vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\"><div style=\"font-size:15px;font-weight:800;color:var(--text);margin-bottom:8px\">Eliminar respuesta</div><div style=\"font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.5\">¿Eliminar a <b style=\"color:var(--text)\">"+esc(name)+"</b>? No se puede deshacer.</div><div style=\"display:flex;gap:8px\"><button id=\"_nf_fi_no\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:10px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_fi_yes\" style=\"flex:1;background:#f87171;border:none;color:#2a0808;border-radius:9px;padding:10px;font-size:13px;font-weight:800;cursor:pointer\">Eliminar</button></div></div>";
     document.body.appendChild(bg);
     bg.onclick=function(e){if(e.target===bg)bg.remove();};
@@ -4847,11 +4847,12 @@ CAPACIDADES QUE TIENES:
     document.getElementById("_nf_fi_yes").onclick=function(){bg.remove();doDelete(id);};
   }
   function bindFI(p){[].slice.call(p.querySelectorAll("[data-fidel]")).forEach(function(b){b.onclick=function(ev){if(ev){ev.stopPropagation();}confirmDel(b.getAttribute("data-fidel"),b.getAttribute("data-finame"));};});}
-  function paint(p){p.innerHTML=render();bindFI(p);}
-  function panelEl(){var p=document.getElementById("_nf_fi_panel");if(p)return p;p=document.createElement("div");p.id="_nf_fi_panel";p.style.cssText="position:fixed;left:0;right:0;bottom:0;z-index:40;background:var(--bg);overflow:auto;display:none;padding:24px 28px;";document.body.appendChild(p);return p;}
+  function paint(p){p.innerHTML=render();bindFI(p);var c=p.querySelector("#_nf_fi_close");if(c)c.onclick=function(){closePanel();};}
+  function panelEl(){var p=document.getElementById("_nf_fi_panel");if(p)return p;p=document.createElement("div");p.id="_nf_fi_panel";p.style.cssText="position:fixed;inset:0;z-index:99990;background:var(--bg);overflow-y:auto;-webkit-overflow-scrolling:touch;display:none;padding:20px 24px 60px;";document.body.appendChild(p);return p;}
   function activate(b,on){if(!b)return;b.style.color=on?"var(--text)":"var(--muted)";b.style.background=on?"var(--bg)":"transparent";b.style.border=on?"1px solid var(--border)":"1px solid transparent";b.style.borderBottom=on?"1px solid var(--bg)":"1px solid transparent";}
-  function openPanel(b){var nav=b.parentNode;var p=panelEl();try{p.style.top=(nav.getBoundingClientRect().bottom)+"px";}catch(e){p.style.top="104px";}paint(p);p.style.display="block";activate(b,true);}
-  function closePanel(){var p=document.getElementById("_nf_fi_panel");if(p)p.style.display="none";activate(document.getElementById("_nf_fi_btn"),false);}
+  var _fiPrevHtmlOv="",_fiPrevBodyOv="";
+  function openPanel(b){var p=panelEl();try{_fiPrevHtmlOv=document.documentElement.style.overflow;_fiPrevBodyOv=document.body.style.overflow;document.documentElement.style.overflow="hidden";document.body.style.overflow="hidden";}catch(e){}p.scrollTop=0;paint(p);p.style.display="block";activate(b,true);}
+  function closePanel(){var p=document.getElementById("_nf_fi_panel");if(p)p.style.display="none";try{document.documentElement.style.overflow=_fiPrevHtmlOv;document.body.style.overflow=_fiPrevBodyOv;}catch(e){}activate(document.getElementById("_nf_fi_btn"),false);}
   function findNav(){var bs=[].slice.call(document.querySelectorAll("button"));for(var i=0;i<bs.length;i++){var t=(bs[i].textContent||"").replace(/\s+/g," ").trim();if(bs[i].id!=="_nf_fi_btn"&&t.length<22&&/(Embudo|Agenda|Ventas|Leads)/.test(t))return bs[i].parentNode;}return null;}
   function addButton(){try{var nav=findNav();if(!nav)return;if(nav.querySelector("#_nf_fi_btn"))return;var s=nav.querySelector("button");var b=document.createElement("button");b.id="_nf_fi_btn";if(s)b.style.cssText=s.style.cssText;activate(b,false);b.style.whiteSpace="nowrap";b.innerHTML="<span>▤</span> Formulario Inicial";b.onclick=function(){openPanel(b);};nav.appendChild(b);if(!nav.__nf_fi_lst){nav.__nf_fi_lst=true;nav.addEventListener("click",function(e){var t=e.target&&e.target.closest?e.target.closest("button"):null;if(t&&t.id!=="_nf_fi_btn")closePanel();},true);}}catch(e){}}
   setInterval(addButton,900); setTimeout(addButton,400); addButton();
