@@ -5025,6 +5025,12 @@ CÓMO RESPONDER (PRIORITARIO)
       b.innerHTML="👥 Pack de 2";
       b.onclick=openModal;
       add.parentNode.insertBefore(b, add.nextSibling);
+      // Let the action buttons wrap instead of overflowing / getting cut off on mobile
+      try{
+        var grp=add.parentNode; grp.style.flexWrap="wrap"; grp.style.rowGap="8px";
+        var titleRow=grp.parentNode;
+        if(titleRow&&/space-between/.test(titleRow.getAttribute("style")||"")){titleRow.style.flexWrap="wrap";titleRow.style.rowGap="10px";}
+      }catch(e){}
     }catch(e){}
   }
   setInterval(addBtn,900); setTimeout(addBtn,500); addBtn();
