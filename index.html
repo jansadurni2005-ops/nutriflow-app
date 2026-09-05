@@ -5087,5 +5087,100 @@ CÓMO RESPONDER (PRIORITARIO)
 </script>
 <!--PROTOPULL_END-->
 
+<!--PROGRESS_START-->
+<script>
+/* __nf_progress_v1 : progreso semanal + comparación con el mejor mes + récords (Resumen) */
+(function(){
+  if(window.__nf_progress_loaded)return; window.__nf_progress_loaded=true;
+  var MONO="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace";
+  var MES=["ene","feb","mar","abr","may","jun","jul","ago","sep","oct","nov","dic"];
+  function email(){try{return (JSON.parse(localStorage.getItem("nf_session")||"{}").email)||"";}catch(e){return "";}}
+  function PRE(){var e=email();return e?"nf_"+e+"_":"";}
+  function jget(k,d){try{return JSON.parse(localStorage.getItem(PRE()+k)||d);}catch(e){try{return JSON.parse(d);}catch(x){return null;}}}
+  function clients(){return jget("clients","[]")||[];}
+  function payments(){return jget("payments","[]")||[];}
+  function cfg(){return jget("config","{}")||{};}
+  function paidMap(){if(window._nf_paidMap)return window._nf_paidMap;return jget("paiddates","{}")||{};}
+  function goalVal(){var g=parseFloat(localStorage.getItem(PRE()+"goal"));if(!isNaN(g)&&g>0)return g;var c=cfg();var gr=parseFloat(c.goalRevenue||c.revenueGoal||0);return gr>0?gr:3000;}
+  function bm(b){return b==="quarterly"?3:b==="semiannual"?6:b==="annual"?12:1;}
+  function R(amt,src){var c=cfg();var sp=c.partnerSource||c.splitPartner||"GEIEG";var pct=(c.splitPercent||70)/100;var com=window._nf_getSourcePct?window._nf_getSourcePct(src):null;if(com!=null&&com>0)return amt*(100-com)/100;if(src===sp)return amt*pct;return amt;}
+  function eur(n){n=Math.round(n||0);try{return n.toLocaleString("es-ES")+" €";}catch(e){return n+" €";}}
+  function incomeInRange(start,end){
+    var total=0,pays=payments(),pm=paidMap(),cs=clients(),paidC={};
+    pays.forEach(function(p){if(!p||!p.date)return;var d=new Date(String(p.date).slice(0,10));if(isNaN(d.getTime()))return;if(d>=start&&d<end){total+=parseFloat(p.amount)||0;paidC[p.clientId]=1;}});
+    cs.forEach(function(c){if(!c||c.active===false||!c.startDate)return;if(paidC[c.id])return;var pd=(pm&&pm[c.id])||c.paidDate||c.startDate;if(!pd)return;var d=new Date(String(pd).slice(0,10));if(isNaN(d.getTime()))return;if(d>=start&&d<end){var ct=(parseFloat(c.price)||0)*bm(c.billing);if(ct>0)total+=R(ct,c.source);}});
+    return total;
+  }
+  function monthIncome(yr,mo){if(window._nf_cashForMonth){try{return window._nf_cashForMonth(clients(),R,yr,mo,false)||0;}catch(e){}}return incomeInRange(new Date(yr,mo,1),new Date(yr,mo+1,1));}
+  function startOfWeek(d){var x=new Date(d);x.setHours(0,0,0,0);var day=(x.getDay()+6)%7;x.setDate(x.getDate()-day);return x;}
+  function addDays(d,n){var x=new Date(d);x.setDate(x.getDate()+n);return x;}
+  function compute(){
+    var now=new Date();
+    var ws=startOfWeek(now);
+    var thisWeek=incomeInRange(ws,addDays(ws,7));
+    var bestPrevWeek=0;
+    for(var w=1;w<=26;w++){var s=addDays(ws,-7*w);var v=incomeInRange(s,addDays(s,7));if(v>bestPrevWeek)bestPrevWeek=v;}
+    var thisMo=monthIncome(now.getFullYear(),now.getMonth());
+    var bestPrevMo=0,bestMoDate=null;
+    for(var m=1;m<=12;m++){var dt=new Date(now.getFullYear(),now.getMonth()-m,1);var v2=monthIncome(dt.getFullYear(),dt.getMonth());if(v2>bestPrevMo){bestPrevMo=v2;bestMoDate=dt;}}
+    return {thisWeek:thisWeek,bestPrevWeek:bestPrevWeek,weekRecord:(thisWeek>0&&thisWeek>bestPrevWeek),thisMo:thisMo,bestPrevMo:bestPrevMo,bestMoDate:bestMoDate,monthRecord:(thisMo>0&&thisMo>bestPrevMo),goal:goalVal()};
+  }
+  function bar(pct,color){pct=Math.max(0,Math.min(100,pct));return "<div style=\"height:7px;background:var(--bg4);border-radius:99px;overflow:hidden;margin-top:9px\"><div style=\"height:100%;width:"+pct+"%;background:"+color+";border-radius:99px\"></div></div>";}
+  function eyebrow(t){return "<div style=\"font-size:9.5px;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-family:"+MONO+"\">"+t+"</div>";}
+  function render(card){
+    var m=compute();
+    var weekTarget=m.goal/4.345;
+    var weekPct=weekTarget>0?m.thisWeek/weekTarget*100:0;
+    var monthPct=m.goal>0?m.thisMo/m.goal*100:0;
+    var delta=m.thisMo-m.bestPrevMo, up=delta>=0;
+    var dpct=m.bestPrevMo>0?Math.round(delta/m.bestPrevMo*100):(m.thisMo>0?100:0);
+    var bestMoLbl=m.bestMoDate?MES[m.bestMoDate.getMonth()]:"—";
+    var celebrate=m.weekRecord||m.monthRecord;
+    var celebMsg=(m.weekRecord&&m.monthRecord)?"¡Récord de semana Y de mes! Enhorabuena 🎉":(m.weekRecord?"¡Récord de la semana! Nunca habías facturado tanto en 7 días 🎉":"¡Nuevo récord mensual! Es tu mejor mes hasta ahora 🎉");
+    card.innerHTML=
+    "<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:18px 20px\">"+
+      "<div style=\"display:flex;align-items:center;gap:8px;margin-bottom:14px\"><span style=\"font-size:16px\">📈</span><span style=\"font-size:11px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-family:"+MONO+"\">Tu progreso</span></div>"+
+      (celebrate?"<div style=\"display:flex;align-items:center;gap:10px;background:#a3e6351a;border:1px solid #a3e63555;border-radius:12px;padding:11px 14px;margin-bottom:14px\"><span style=\"font-size:22px\">🏆</span><div style=\"font-size:13px;font-weight:800;color:#a3e635;line-height:1.35\">"+celebMsg+"</div></div>":"")+
+      "<div style=\"display:flex;gap:14px;flex-wrap:wrap\">"+
+        "<div style=\"flex:1;min-width:210px;background:var(--bg3);border-radius:12px;padding:14px 16px\">"+
+          eyebrow("Esta semana")+
+          "<div style=\"font-size:26px;font-weight:800;font-family:"+MONO+";color:var(--text);margin-top:6px;line-height:1\">"+eur(m.thisWeek)+"</div>"+
+          "<div style=\"font-size:11px;margin-top:5px;font-weight:"+(m.weekRecord?"700":"400")+";color:"+(m.weekRecord?"#a3e635":"var(--muted)")+"\">"+(m.weekRecord?"🏆 ¡Récord semanal!":"Mejor semana: "+eur(m.bestPrevWeek))+"</div>"+
+          bar(weekPct,weekPct>=100?"#34d399":"#a3e635")+
+          "<div style=\"font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.4\">"+(weekPct>=100?"✓ Vas por encima del ritmo para tu objetivo":Math.round(weekPct)+"% del ritmo semanal ("+eur(weekTarget)+"/sem)")+"</div>"+
+        "</div>"+
+        "<div style=\"flex:1;min-width:210px;background:var(--bg3);border-radius:12px;padding:14px 16px\">"+
+          eyebrow("Este mes")+
+          "<div style=\"font-size:26px;font-weight:800;font-family:"+MONO+";color:var(--text);margin-top:6px;line-height:1\">"+eur(m.thisMo)+"</div>"+
+          "<div style=\"font-size:11px;margin-top:5px;font-weight:700;color:"+(up?"#34d399":"#f87171")+"\">"+(up?"▲ +":"▼ −")+eur(Math.abs(delta))+" ("+(up?"+":"")+dpct+"%) <span style=\"color:var(--muted);font-weight:400\">vs mejor mes"+(m.bestPrevMo>0?" ("+bestMoLbl+" "+eur(m.bestPrevMo)+")":"")+"</span></div>"+
+          bar(monthPct,monthPct>=100?"#34d399":"#a3e635")+
+          "<div style=\"font-size:10.5px;color:var(--muted);margin-top:7px;line-height:1.4\">"+(monthPct>=100?"✓ ¡Objetivo del mes superado!":"faltan "+eur(m.goal-m.thisMo)+" para el objetivo")+"</div>"+
+        "</div>"+
+      "</div>"+
+    "</div>";
+    card.__h=[Math.round(m.thisWeek),Math.round(m.thisMo),Math.round(m.goal),m.weekRecord,m.monthRecord,Math.round(m.bestPrevMo),Math.round(m.bestPrevWeek)].join("|");
+  }
+  function tick(){
+    var root=document.getElementById("_nf_overview_root");
+    var card=document.getElementById("_nf_progress_card");
+    if(!root){ if(card)card.remove(); return; }
+    if(!card){
+      card=document.createElement("div"); card.id="_nf_progress_card";
+      try{card.style.cssText=root.getAttribute("style")||"max-width:880px;margin:0 auto;padding:0 28px;box-sizing:border-box";}catch(e){}
+      card.style.paddingTop="0"; card.style.paddingBottom="0"; card.style.marginTop="4px"; card.style.marginBottom="20px";
+      root.parentNode.insertBefore(card, root.nextSibling);
+      render(card);
+      return;
+    }
+    // re-render only when the data actually changes
+    var m=compute();
+    var h=[Math.round(m.thisWeek),Math.round(m.thisMo),Math.round(m.goal),m.weekRecord,m.monthRecord,Math.round(m.bestPrevMo),Math.round(m.bestPrevWeek)].join("|");
+    if(card.__h!==h)render(card);
+  }
+  setInterval(tick,1500); setTimeout(tick,900); tick();
+})();
+</script>
+<!--PROGRESS_END-->
+
 </body>
 </html>
