@@ -4680,6 +4680,45 @@ CÓMO RESPONDER (PRIORITARIO)
 </script>
 <script>
 (function(){
+  function em(){try{return JSON.parse(localStorage.getItem('nf_session')||'{}').email||'';}catch(e){return '';}}
+  function parse(k){try{return JSON.parse(localStorage.getItem(k)||'null');}catch(e){return null;}}
+  function mergeMonth(a,b){
+    a=(a&&typeof a==='object')?a:{}; b=(b&&typeof b==='object')?b:{};
+    var la=Array.isArray(a.log)?a.log:[]; var lb=Array.isArray(b.log)?b.log:[];
+    var seen={},log=[];
+    la.concat(lb).forEach(function(e){if(!e)return;var id=e.id||((e.name||'')+'|'+(e.ts||''));if(seen[id])return;seen[id]=1;log.push(e);});
+    var cl=log.filter(function(e){return e&&e.closed;}).length;
+    var total=Math.max(a.total||0,b.total||0,log.length);
+    var closed=Math.max(a.closed||0,b.closed||0,cl);
+    if(closed>total)closed=total;
+    var r={total:total,closed:closed};
+    if(log.length)r.log=log;
+    return r;
+  }
+  function run(){
+    var e=em(); if(!e)return;
+    var sessKey='nf_'+e+'_calls';
+    var merged=parse(sessKey)||{};
+    var changed=false;
+    Object.keys(localStorage).forEach(function(k){
+      if(!/^nf_.+_calls$/.test(k)||k===sessKey)return;
+      var st=parse(k); if(!st||typeof st!=='object')return;
+      Object.keys(st).forEach(function(mk){
+        if(!/^[0-9]{4}-[0-9]{2}$/.test(mk))return;
+        var m=mergeMonth(merged[mk],st[mk]);
+        var before='';try{before=JSON.stringify(merged[mk]||null);}catch(x){}
+        var after='';try{after=JSON.stringify(m);}catch(x){}
+        if(before!==after){merged[mk]=m;changed=true;}
+      });
+    });
+    if(changed){try{localStorage.setItem(sessKey,JSON.stringify(merged));}catch(e2){}}
+  }
+  var n=0;var iv=setInterval(function(){n++;run();if(n>18)clearInterval(iv);},2000);
+  setTimeout(run,1500);
+})();
+</script>
+<script>
+(function(){
   function getPre(){try{var s=JSON.parse(localStorage.getItem('nf_session')||'{}');if(s&&s.email)return 'nf_'+s.email+'_';}catch(e){}var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});return k?k.replace(/_clients$/,'')+'_':'';}
   function gj(key,def){try{return JSON.parse(localStorage.getItem(getPre()+key)||def);}catch(e){try{return JSON.parse(def);}catch(x){return null;}}}
   function getClients(){return gj('clients','[]')||[];}
