@@ -4135,7 +4135,7 @@ CÓMO RESPONDER (PRIORITARIO)
 </script>
 <script>
 (function(){
-  function getPre(){var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});if(k)return k.replace(/_clients$/,'')+'_';try{var e=JSON.parse(localStorage.getItem('nf_session')||'{}').email;if(e)return 'nf_'+e+'_';}catch(x){}return '';}
+  function getPre(){try{var e=JSON.parse(localStorage.getItem('nf_session')||'{}').email;if(e)return 'nf_'+e+'_';}catch(x){}var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});if(k)return k.replace(/_clients$/,'')+'_';return '';}
   function loadCalls(){var p=getPre();if(!p)return{};try{return JSON.parse(localStorage.getItem(p+'calls')||'{}');}catch(e){return{};}}
   function saveCalls(o){var p=getPre();if(p)localStorage.setItem(p+'calls',JSON.stringify(o));}
   function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
