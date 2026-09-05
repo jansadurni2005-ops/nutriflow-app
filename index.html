@@ -5167,8 +5167,8 @@ CÓMO RESPONDER (PRIORITARIO)
     if(!card){
       card=document.createElement("div"); card.id="_nf_progress_card";
       try{card.style.cssText=root.getAttribute("style")||"max-width:880px;margin:0 auto;padding:0 28px;box-sizing:border-box";}catch(e){}
-      card.style.paddingTop="0"; card.style.paddingBottom="0"; card.style.marginTop="4px"; card.style.marginBottom="20px";
-      root.parentNode.insertBefore(card, root.nextSibling);
+      card.style.paddingTop="0"; card.style.paddingBottom="0"; card.style.marginTop="18px"; card.style.marginBottom="6px";
+      root.parentNode.insertBefore(card, root);
       render(card);
       return;
     }
