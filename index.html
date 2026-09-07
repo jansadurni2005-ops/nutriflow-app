@@ -754,7 +754,9 @@ setInterval(function(){
 function safeRefresh(){if(_repairDone&&EM&&sessionStorage.getItem(okKey(EM)))refreshFromCloud();}
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
-setInterval(function(){if(!document.hidden)safeRefresh();},45000);
+// Near-real-time sync: re-pull cloud data every 5s while the app is visible (was 45s).
+// The _refreshing guard prevents pile-ups on slow networks; hidden tabs don't poll (battery).
+setInterval(function(){if(!document.hidden)safeRefresh();},5000);
 
 // ── TEAM / CLOSERS: helpers for the closer feature (SB/KEY/fetch2/getToken/currentEmail in scope) ──
 window._nf_sbEmail=function(){return EM||currentEmail();};
