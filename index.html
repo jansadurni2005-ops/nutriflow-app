@@ -410,6 +410,11 @@ function syncRead(token){
 // Runs when the tab becomes visible and periodically, so every device always shows
 // the same (cloud) data — e.g. clients dados de baja disappear everywhere.
 var _refreshing=false;
+// A device must PULL the latest cloud data before it is allowed to PUSH, so an app that
+// opens with stale local data can never overwrite a newer change made on another device.
+// Turns true after the first successful refresh; 8s fallback so pushes are never blocked forever.
+var _pullReady=false;
+setTimeout(function(){_pullReady=true;},8000);
 function refreshFromCloud(){
   if(_refreshing)return;
   var tokData=null;try{tokData=JSON.parse(localStorage.getItem('_nf_sb_tok')||'null');}catch(e){}
@@ -463,7 +468,7 @@ function refreshFromCloud(){
       }finally{window._nf_syncing=false;}
       return pullExtras(token);
     });
-  }).then(function(){_refreshing=false;})
+  }).then(function(){_refreshing=false;_pullReady=true;})
    .catch(function(){window._nf_syncing=false;_refreshing=false;});
 }
 window._nf_refreshFromCloud=refreshFromCloud;
@@ -609,6 +614,9 @@ function setupInterceptor(){
     if(window._nf_syncing)return;
     // Don't re-push extras while we're applying remote extras (avoids loops)
     if(isExtra&&window._nf_applyingExtras)return;
+    // Never push until we've pulled the latest cloud data at least once this session,
+    // so an app opened with stale local data can't overwrite a newer change from another device.
+    if(!_pullReady)return;
     var tokData=getCachedTok(EM);
     var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
     if(!tok){
