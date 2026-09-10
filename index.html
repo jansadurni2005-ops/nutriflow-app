@@ -5194,7 +5194,7 @@ CÓMO RESPONDER (PRIORITARIO)
 
 <!--GASTOS_START-->
 <script>
-/* __nf_gastos_v1 : pestaña Gastos — gastos del negocio + % limpio */
+/* __nf_gastos_v1 : pestaña Gastos — gastos del negocio (con periodicidad) + % limpio */
 (function(){
   if(window.__nf_gastos_loaded)return; window.__nf_gastos_loaded=true;
   var MONO="ui-monospace,SFMono-Regular,Menlo,Consolas,monospace", LIME="#a3e635";
@@ -5208,6 +5208,9 @@ CÓMO RESPONDER (PRIORITARIO)
   function esc(s){return (s==null?"":String(s)).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c];});}
   function pe(){return "g"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function eur(n){n=Math.round((n||0)*100)/100;try{return n.toLocaleString("es-ES",{minimumFractionDigits:(n%1?2:0),maximumFractionDigits:2})+" €";}catch(e){return n+" €";}}
+  function perMonths(b){return b==="quarterly"?3:b==="semiannual"?6:b==="annual"?12:1;}
+  function perLabel(b){return b==="quarterly"?"Trimestral":b==="semiannual"?"Semestral":b==="annual"?"Anual":"Mensual";}
+  function monthlyOf(x){return (parseFloat(x.amount)||0)/perMonths(x.billing);}
   function mrr(){
     var cs=clients(),c=cfg(),sp=c.partnerSource||c.splitPartner||"GEIEG",pct=(c.splitPercent||70)/100;
     function R(amt,src){var com=window._nf_getSourcePct?window._nf_getSourcePct(src):null;if(com!=null&&com>0)return amt*(100-com)/100;if(src===sp)return amt*pct;return amt;}
@@ -5215,25 +5218,30 @@ CÓMO RESPONDER (PRIORITARIO)
   }
   function donut(pct,color){pct=Math.max(0,Math.min(100,Math.round(pct)));var r=54,C=2*Math.PI*r,dash=pct/100*C;return "<div style=\"position:relative;width:150px;height:150px;flex-shrink:0\"><svg width=\"150\" height=\"150\" viewBox=\"0 0 150 150\"><circle cx=\"75\" cy=\"75\" r=\""+r+"\" fill=\"none\" stroke=\"var(--bg4)\" stroke-width=\"15\"/><circle cx=\"75\" cy=\"75\" r=\""+r+"\" fill=\"none\" stroke=\""+color+"\" stroke-width=\"15\" stroke-linecap=\"round\" stroke-dasharray=\""+dash+" "+C+"\" transform=\"rotate(-90 75 75)\"/></svg><div style=\"position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center\"><div style=\"font-size:30px;font-weight:800;font-family:"+MONO+";color:var(--text);line-height:1\">"+pct+"%</div><div style=\"font-size:10px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-top:4px\">limpio</div></div></div>";}
   function stat(label,value,color){return "<div style=\"background:var(--bg3);border-radius:11px;padding:12px 14px;min-width:120px;flex:1\"><div style=\"font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);font-weight:700\">"+label+"</div><div style=\"font-size:22px;font-weight:800;font-family:"+MONO+";color:"+(color||"var(--text)")+";margin-top:5px;line-height:1\">"+value+"</div></div>";}
-  function hash(){var g=gastos();return g.length+"|"+g.reduce(function(s,x){return s+(parseFloat(x.amount)||0);},0)+"|"+Math.round(mrr());}
+  function hash(){var g=gastos();return g.length+"|"+g.reduce(function(s,x){return s+monthlyOf(x);},0).toFixed(2)+"|"+Math.round(mrr());}
   function render(root){
     root.style.maxWidth="900px"; root.style.margin="0 auto"; root.style.padding="24px 28px 40px";
     var g=gastos(), inc=mrr();
-    var tot=g.reduce(function(s,x){return s+(parseFloat(x.amount)||0);},0);
+    var tot=g.reduce(function(s,x){return s+monthlyOf(x);},0);
     var neto=inc-tot;
     var pct=inc>0?(neto/inc*100):(tot>0?0:100);
     var pcol=pct>=70?"#34d399":pct>=40?"#f59e0b":"#f87171";
-    var rows=g.length?g.slice().sort(function(a,b){return (parseFloat(b.amount)||0)-(parseFloat(a.amount)||0);}).map(function(x){
-      return "<div style=\"display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg3);border-radius:10px;margin-bottom:8px\">"+
-        "<span style=\"flex:1;min-width:0;font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+esc(x.name||"—")+"</span>"+
-        "<span style=\"font-size:13px;font-weight:700;font-family:"+MONO+";color:#f87171;white-space:nowrap\">−"+eur(x.amount)+"<span style=\"font-size:10px;color:var(--muted);font-weight:400\"> /mes</span></span>"+
+    var rows=g.length?g.slice().sort(function(a,b){return monthlyOf(b)-monthlyOf(a);}).map(function(x){
+      var recur=(x.billing&&x.billing!=="monthly");
+      var sub=eur(x.amount)+" · "+perLabel(x.billing);
+      return "<div data-gedit=\""+esc(x.id)+"\" style=\"display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg3);border-radius:10px;margin-bottom:8px;cursor:pointer\">"+
+        "<div style=\"flex:1;min-width:0\">"+
+          "<div style=\"font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+esc(x.name||"—")+"</div>"+
+          "<div style=\"font-size:10.5px;color:var(--muted);margin-top:2px\">"+sub+"</div>"+
+        "</div>"+
+        "<span style=\"font-size:13px;font-weight:700;font-family:"+MONO+";color:#f87171;white-space:nowrap;text-align:right\">−"+eur(monthlyOf(x))+"<span style=\"font-size:10px;color:var(--muted);font-weight:400\"> /mes</span></span>"+
         "<button data-gdel=\""+esc(x.id)+"\" title=\"Eliminar\" style=\"background:transparent;border:1px solid var(--border);color:#f87171;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0\">&times;</button>"+
       "</div>";
     }).join(""):"<div style=\"color:var(--muted);text-align:center;padding:26px 0;font-size:13px;font-style:italic\">Aún no has añadido gastos. Pulsa «+ Añadir gasto» (suscripciones, herramientas, publicidad, gestor…).</div>";
     root.innerHTML=
       "<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px\"><div style=\"font-size:22px;font-weight:700;color:var(--text)\">Gastos</div>"+
         "<button id=\"_nf_gasto_add\" style=\"background:"+LIME+";border:none;color:#0e1a05;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer\">+ Añadir gasto</button></div>"+
-      "<div style=\"font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5\">Lo que gastas para mantener el negocio. El <b style=\"color:var(--text2)\">% limpio</b> es lo que te queda de tu ingreso recurrente después de los gastos.</div>"+
+      "<div style=\"font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5\">Lo que gastas para mantener el negocio (mensual, trimestral, semestral o anual — todo se calcula a <b style=\"color:var(--text2)\">coste/mes</b>). El <b style=\"color:var(--text2)\">% limpio</b> es lo que te queda de tu ingreso recurrente después de los gastos.</div>"+
       "<div style=\"display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px\">"+
         donut(pct,pcol)+
         "<div style=\"flex:1;min-width:220px;display:flex;flex-wrap:wrap;gap:10px;align-content:center\">"+
@@ -5242,27 +5250,36 @@ CÓMO RESPONDER (PRIORITARIO)
           stat("Neto / mes",eur(neto),neto>=0?"#34d399":"#f87171")+
         "</div>"+
       "</div>"+
-      "<div style=\"font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 2px 10px\">Tus gastos ("+g.length+")</div>"+
+      "<div style=\"font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin:0 2px 10px\">Tus gastos ("+g.length+") · toca uno para editar</div>"+
       "<div>"+rows+"</div>";
-    var addBtn=root.querySelector("#_nf_gasto_add"); if(addBtn)addBtn.onclick=openModal;
-    [].slice.call(root.querySelectorAll("[data-gdel]")).forEach(function(b){b.onclick=function(){var id=b.getAttribute("data-gdel");saveGastos(gastos().filter(function(x){return String(x.id)!==String(id);}));var r=document.getElementById("_nf_gastos_root");if(r)render(r);};});
+    var addBtn=root.querySelector("#_nf_gasto_add"); if(addBtn)addBtn.onclick=function(){openModal(null);};
+    [].slice.call(root.querySelectorAll("[data-gdel]")).forEach(function(b){b.onclick=function(ev){if(ev){ev.stopPropagation();}var id=b.getAttribute("data-gdel");saveGastos(gastos().filter(function(x){return String(x.id)!==String(id);}));var r=document.getElementById("_nf_gastos_root");if(r)render(r);};});
+    [].slice.call(root.querySelectorAll("[data-gedit]")).forEach(function(rowEl){rowEl.onclick=function(){var id=rowEl.getAttribute("data-gedit");var ex=gastos().filter(function(x){return String(x.id)===String(id);})[0];if(ex)openModal(ex);};});
     root.__h=hash();
   }
-  function openModal(){
+  function openModal(existing){
     var bg=document.getElementById("_nf_gasto_bg"); if(bg)bg.remove();
+    var ed=existing||null;
+    var opts=[["monthly","Mensual"],["quarterly","Trimestral"],["semiannual","Semestral"],["annual","Anual"]].map(function(o){return "<option value=\""+o[0]+"\""+((ed&&ed.billing===o[0])||(!ed&&o[0]==="monthly")?" selected":"")+">"+o[1]+"</option>";}).join("");
     bg=document.createElement("div"); bg.id="_nf_gasto_bg";
     bg.style.cssText="position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto";
-    bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:420px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\">"+
-      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:14px\"><span style=\"font-size:16px;font-weight:800;color:var(--text)\">Nuevo gasto</span><button id=\"_nf_gasto_x\" style=\"background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1\">&times;</button></div>"+
-      "<input id=\"_nf_gasto_n\" placeholder=\"Nombre (ej. Notion, Canva, Ads…)\" autocomplete=\"off\" style=\"width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;margin-bottom:10px\">"+
-      "<input id=\"_nf_gasto_a\" type=\"number\" inputmode=\"decimal\" placeholder=\"Coste al mes (€)\" style=\"width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;margin-bottom:16px\">"+
-      "<div style=\"display:flex;gap:8px\"><button id=\"_nf_gasto_c\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_gasto_s\" style=\"flex:2;background:"+LIME+";border:none;color:#0e1a05;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer\">Guardar gasto</button></div>"+
+    bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:430px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\">"+
+      "<div style=\"display:flex;justify-content:space-between;align-items:center;margin-bottom:14px\"><span style=\"font-size:16px;font-weight:800;color:var(--text)\">"+(ed?"Editar gasto":"Nuevo gasto")+"</span><button id=\"_nf_gasto_x\" style=\"background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;line-height:1\">&times;</button></div>"+
+      "<input id=\"_nf_gasto_n\" placeholder=\"Nombre (ej. Notion, Canva, Ads, gestor…)\" autocomplete=\"off\" value=\""+(ed?esc(ed.name):"")+"\" style=\"width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;margin-bottom:10px\">"+
+      "<div style=\"display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap\">"+
+        "<input id=\"_nf_gasto_a\" type=\"number\" inputmode=\"decimal\" placeholder=\"Coste (€)\" value=\""+(ed?esc(ed.amount):"")+"\" style=\"flex:1;min-width:130px;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:11px 13px;color:var(--text);font-size:14px;outline:none\">"+
+        "<select id=\"_nf_gasto_p\" style=\"flex:1;min-width:130px;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:11px;color:var(--text);font-size:13px;outline:none\">"+opts+"</select>"+
+      "</div>"+
+      "<div id=\"_nf_gasto_hint\" style=\"font-size:11px;color:var(--muted);margin-bottom:16px;min-height:15px\"></div>"+
+      "<div style=\"display:flex;gap:8px\"><button id=\"_nf_gasto_c\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_gasto_s\" style=\"flex:2;background:"+LIME+";border:none;color:#0e1a05;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer\">"+(ed?"Guardar cambios":"Guardar gasto")+"</button></div>"+
     "</div>";
     document.body.appendChild(bg);
+    function upd(){var a=parseFloat(document.getElementById("_nf_gasto_a").value)||0;var b=document.getElementById("_nf_gasto_p").value;var h=document.getElementById("_nf_gasto_hint");if(a>0&&b!=="monthly"){h.innerHTML="Equivale a <b style=\"color:var(--text)\">"+eur(a/perMonths(b))+"/mes</b>";}else h.innerHTML="";}
+    document.getElementById("_nf_gasto_a").oninput=upd; document.getElementById("_nf_gasto_p").onchange=upd; upd();
     bg.onclick=function(e){if(e.target===bg)bg.remove();};
     document.getElementById("_nf_gasto_x").onclick=function(){bg.remove();};
     document.getElementById("_nf_gasto_c").onclick=function(){bg.remove();};
-    function save(){var ne=document.getElementById("_nf_gasto_n"),ae=document.getElementById("_nf_gasto_a");var n=(ne.value||"").trim();var a=parseFloat(ae.value);if(!n){ne.style.borderColor="#f87171";ne.focus();return;}if(isNaN(a)||a<0){ae.style.borderColor="#f87171";ae.focus();return;}var g=gastos();g.push({id:pe(),name:n,amount:a});saveGastos(g);bg.remove();var r=document.getElementById("_nf_gastos_root");if(r)render(r);}
+    function save(){var ne=document.getElementById("_nf_gasto_n"),ae=document.getElementById("_nf_gasto_a"),pe2=document.getElementById("_nf_gasto_p");var n=(ne.value||"").trim();var a=parseFloat(ae.value);var b=pe2.value||"monthly";if(!n){ne.style.borderColor="#f87171";ne.focus();return;}if(isNaN(a)||a<0){ae.style.borderColor="#f87171";ae.focus();return;}var g=gastos();if(ed){g=g.map(function(x){return String(x.id)===String(ed.id)?{id:ed.id,name:n,amount:a,billing:b}:x;});}else{g.push({id:pe(),name:n,amount:a,billing:b});}saveGastos(g);bg.remove();var r=document.getElementById("_nf_gastos_root");if(r)render(r);}
     document.getElementById("_nf_gasto_s").onclick=save;
     ["_nf_gasto_n","_nf_gasto_a"].forEach(function(id){var el=document.getElementById(id);if(el)el.onkeydown=function(e){if(e.key==="Enter")save();if(e.key==="Escape")bg.remove();};});
     setTimeout(function(){var i=document.getElementById("_nf_gasto_n");if(i)i.focus();},30);
