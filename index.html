@@ -2957,90 +2957,68 @@ CÓMO RESPONDER (PRIORITARIO)
   function daysTo(s){if(!s)return 999;var d=new Date(s),n=new Date();d.setHours(0,0,0,0);n.setHours(0,0,0,0);return Math.round((d-n)/864e5);}
 
   function renderReminders(){
-    if(sessionStorage.getItem('_nf_pay_rem_dis')){var _rb=document.getElementById('_nf_pay_rem_bar');if(_rb)_rb.remove();return;}
+    cleanPendDismissals();
+    var bar=document.getElementById('_nf_pay_rem_bar');
+    if(isPendDismissed()){if(bar)bar.remove();return;}
     var all=loadAll();
     var clients=getClients();
     var clientMap={};clients.forEach(function(c){clientMap[c.id]=c;});
     var due=all.filter(function(p){
       if(!p.reminderDate)return false;
       var c=clientMap[p.clientId];if(!c||c.active===false)return false;
-      // only if cycle still active
       if(c.startDate!==p.cycleStart)return false;
-      // don't remind if the client has ALREADY paid the full cycle (was flagging paid clients)
       var _cyc=all.filter(function(q){return q.clientId===c.id&&q.cycleStart===c.startDate;});
       var _paid=_cyc.reduce(function(s,q){return s+(parseFloat(q.amount)||0);},0);
       var _due=(parseFloat(c.price)||0)*billingMonths(c.billing);
       if(_due>0&&(_due-_paid)<=0.01)return false;
-      var d=daysTo(p.reminderDate);
-      return d<=2;
+      return daysTo(p.reminderDate)<=2;
     });
-    var bar=document.getElementById('_nf_pay_rem_bar');
-    if(!due.length){if(bar)bar.remove();return;}
     due.sort(function(a,b){return (a.reminderDate||'').localeCompare(b.reminderDate||'');});
+    var pending=clients.filter(function(c){return c.active!==false&&c.startDate;}).map(function(c){
+      var cp=all.filter(function(p){return p.clientId===c.id&&p.cycleStart===c.startDate;});
+      var paid=cp.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
+      var totalDue=(parseFloat(c.price)||0)*billingMonths(c.billing);
+      return {client:c,paid:paid,due:totalDue,remaining:totalDue-paid,pct:totalDue>0?Math.round(paid/totalDue*100):100,hasPayments:cp.length>0};
+    }).filter(function(x){return x.hasPayments&&x.paid>0&&x.due>0&&x.remaining>0.01;});
+    pending.sort(function(a,b){return a.pct-b.pct;});
+    if(!due.length&&!pending.length){if(bar)bar.remove();return;}
     var urgent=due.some(function(p){return daysTo(p.reminderDate)<=0;});
-    var col=urgent?'#ef4444':'#f59e0b';
-    var chips=due.slice(0,3).map(function(p){
-      var c=clientMap[p.clientId];var d=daysTo(p.reminderDate);
-      var when=d<0?'fa '+Math.abs(d)+'d':d===0?'avui':d===1?'demà':'en '+d+'d';
-      // show the amount STILL owed this cycle, not the last payment's amount
-      var _cyc=all.filter(function(q){return q.clientId===c.id&&q.cycleStart===c.startDate;});
-      var _paid=_cyc.reduce(function(s,q){return s+(parseFloat(q.amount)||0);},0);
-      var _rem=(parseFloat(c.price)||0)*billingMonths(c.billing)-_paid;
-      if(!(_rem>0))_rem=parseFloat(p.amount)||0;
-      return '<span style="background:rgba(0,0,0,.18);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap">'+esc((c&&c.name)||'?')+' — '+when+' · '+fmtE(_rem)+'</span>';
-    }).join('');
-    var more=due.length>3?'<span style="font-size:12px;opacity:.75">+'+(due.length-3)+' més</span>':'';
+    var accent=urgent?'#ef4444':(due.length?'#f59e0b':'#3b82f6');
+    var rows='';
+    if(due.length){
+      var dchips=due.slice(0,4).map(function(p){
+        var c=clientMap[p.clientId];var d=daysTo(p.reminderDate);
+        var when=d<0?'fa '+Math.abs(d)+'d':d===0?'avui':d===1?'demà':'en '+d+'d';
+        var _cyc=all.filter(function(q){return q.clientId===c.id&&q.cycleStart===c.startDate;});
+        var _paid=_cyc.reduce(function(s,q){return s+(parseFloat(q.amount)||0);},0);
+        var _rem=(parseFloat(c.price)||0)*billingMonths(c.billing)-_paid;
+        if(!(_rem>0))_rem=parseFloat(p.amount)||0;
+        return '<span style="background:rgba(255,255,255,.12);border-radius:6px;padding:3px 9px;font-size:12px;white-space:nowrap;color:#fff">'+esc((c&&c.name)||'?')+' — '+when+' · '+fmtE(_rem)+'</span>';
+      }).join('');
+      var dmore=due.length>4?'<span style="font-size:11px;opacity:.85;color:#fff">+'+(due.length-4)+' més</span>':'';
+      rows+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap"><span style="white-space:nowrap;font-weight:700;color:#fff">🔔 Cobraments pendents:</span>'+dchips+dmore+'</div>';
+    }
+    if(pending.length){
+      var totalPending=pending.reduce(function(s,p){return s+p.remaining;},0);
+      var pchips=pending.slice(0,4).map(function(p){
+        var barCol=p.pct>=75?'#a7f3d0':p.pct>=40?'#fde68a':'#fecaca';
+        return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.12);border-radius:6px;padding:3px 8px;font-size:11px;white-space:nowrap"><span style="color:#fff;font-weight:600">'+esc(p.client.name.split(' ')[0])+'</span><span style="color:'+barCol+';font-weight:700">'+p.pct+'%</span><span style="color:#e2e8f0;font-size:10px">('+fmtE(p.remaining)+')</span></span>';
+      }).join('');
+      var pmore=pending.length>4?'<span style="opacity:.8;font-size:11px;color:#fff">+'+(pending.length-4)+' més</span>':'';
+      rows+='<div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;'+(due.length?'border-top:1px solid rgba(255,255,255,.22);padding-top:8px':'')+'"><span style="white-space:nowrap;font-weight:700;color:#fff">💰 Pagaments pendents:</span>'+pchips+pmore+'<span style="font-size:11px;color:#fff;border-left:1px solid rgba(255,255,255,.28);padding-left:8px;white-space:nowrap">Total <strong style="color:#fde047">'+fmtE(totalPending)+'</strong></span></div>';
+    }
     if(!bar){bar=document.createElement('div');bar.id='_nf_pay_rem_bar';document.body.appendChild(bar);}
-    bar.innerHTML='<div style="position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:799;background:'+col+';color:#fff;padding:9px 16px;border-radius:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 4px 24px rgba(0,0,0,.35);max-width:92vw;font-weight:600;font-size:13px">'+
-      '<span style="white-space:nowrap">🔔 Cobraments pendents:</span>'+chips+more+
-      '<button id="_nf_pay_rem_x" style="background:rgba(0,0,0,.2);border:none;color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:14px;line-height:1;flex-shrink:0;margin-left:4px">×</button>'+
-    '</div>';
-    document.getElementById('_nf_pay_rem_x').onclick=function(e){if(e){e.preventDefault();e.stopPropagation();}sessionStorage.setItem('_nf_pay_rem_dis','1');var b2=document.getElementById('_nf_pay_rem_bar');if(b2)b2.remove();};
+    bar.innerHTML='<div style="position:fixed;top:110px;left:50%;transform:translateX(-50%);z-index:799;background:'+accent+';color:#fff;padding:11px 16px;border-radius:12px;box-shadow:0 6px 26px rgba(0,0,0,.42);max-width:92vw;font-size:13px;font-weight:600"><button id="_nf_pay_rem_x" style="position:absolute;top:6px;right:8px;background:rgba(0,0,0,.22);border:none;color:#fff;width:22px;height:22px;border-radius:5px;cursor:pointer;font-size:14px;line-height:1" title="Tancar fins demà">×</button><div style="display:flex;flex-direction:column;gap:8px;padding-right:24px">'+rows+'</div></div>';
+    var xb=document.getElementById('_nf_pay_rem_x');
+    if(xb)xb.onclick=function(e){if(e){e.preventDefault();e.stopPropagation();}dismissPend();var b2=document.getElementById('_nf_pay_rem_bar');if(b2)b2.remove();};
   }
-  setInterval(renderReminders,2500);
-
-  // ─── PENDING PAYMENTS FIXED ALERT ───
-  // Persistent banner listing clients with incomplete payments in current cycle
-  // Daily-dismissable (re-appears next day, not per session)
   function ymdToday(){return new Date().toISOString().slice(0,10);}
   function isPendDismissed(){return localStorage.getItem('_nf_pend_dis_'+ymdToday())==='1';}
   function dismissPend(){localStorage.setItem('_nf_pend_dis_'+ymdToday(),'1');}
   function cleanPendDismissals(){var t=ymdToday();Object.keys(localStorage).forEach(function(k){if(k.indexOf('_nf_pend_dis_')===0&&k.indexOf(t)<0)localStorage.removeItem(k);});}
-
-  function renderPendingPayments(){
-    cleanPendDismissals();
-    var bar=document.getElementById('_nf_pend_bar');
-    if(isPendDismissed()){if(bar)bar.remove();return;}
-    var all=loadAll();
-    var clients=getClients().filter(function(c){return c.active!==false&&c.startDate;});
-    var pending=clients.map(function(c){
-      var clientPayments=all.filter(function(p){return p.clientId===c.id&&p.cycleStart===c.startDate;});
-      var paid=clientPayments.reduce(function(s,p){return s+(parseFloat(p.amount)||0);},0);
-      var totalDue=(parseFloat(c.price)||0)*billingMonths(c.billing);
-      return {client:c,paid:paid,due:totalDue,remaining:totalDue-paid,pct:totalDue>0?Math.round(paid/totalDue*100):100,hasPayments:clientPayments.length>0};
-    }).filter(function(x){return x.hasPayments&&x.paid>0&&x.due>0&&x.remaining>0.01;});
-    if(!pending.length){if(bar)bar.remove();return;}
-    pending.sort(function(a,b){return a.pct-b.pct;});
-    var totalPending=pending.reduce(function(s,p){return s+p.remaining;},0);
-    var chips=pending.slice(0,4).map(function(p){
-      var barCol=p.pct>=75?'#34d399':p.pct>=40?'#f59e0b':'#f87171';
-      return '<span style="display:inline-flex;align-items:center;gap:5px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.1);border-radius:6px;padding:3px 8px;font-size:11px;white-space:nowrap">'+
-        '<span style="color:#cbd5e1;font-weight:600">'+esc(p.client.name.split(' ')[0])+'</span>'+
-        '<span style="color:'+barCol+';font-weight:700">'+p.pct+'%</span>'+
-        '<span style="color:#94a3b8;font-size:10px">('+fmtE(p.remaining)+')</span>'+
-      '</span>';
-    }).join('');
-    var more=pending.length>4?'<span style="opacity:.6;font-size:11px;color:#94a3b8">+'+(pending.length-4)+' més</span>':'';
-    if(!bar){bar=document.createElement('div');bar.id='_nf_pend_bar';document.body.appendChild(bar);}
-    bar.innerHTML='<div style="position:fixed;top:155px;left:50%;transform:translateX(-50%);z-index:798;background:rgba(15,23,42,0.96);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);border:1px solid rgba(96,165,250,0.4);color:#cbd5e1;padding:9px 14px;border-radius:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;box-shadow:0 6px 24px rgba(0,0,0,.5);max-width:92vw;font-size:12px">'+
-      '<span style="color:#84cc16;font-weight:700;white-space:nowrap;letter-spacing:.02em">💰 Pagaments pendents:</span>'+
-      chips+more+
-      '<span style="color:#94a3b8;font-size:11px;border-left:1px solid rgba(255,255,255,.1);padding-left:8px;margin-left:2px;white-space:nowrap">Total <strong style="color:#fbbf24">'+fmtE(totalPending)+'</strong></span>'+
-      '<button id="_nf_pend_x" style="background:rgba(255,255,255,.05);border:none;color:#94a3b8;width:20px;height:20px;border-radius:5px;cursor:pointer;font-size:13px;line-height:1;flex-shrink:0;margin-left:4px" title="Tancar fins demà">×</button>'+
-    '</div>';
-    document.getElementById('_nf_pend_x').onclick=function(e){if(e){e.preventDefault();e.stopPropagation();}dismissPend();var pb=document.getElementById('_nf_pend_bar');if(pb)pb.remove();};
-  }
-  setInterval(renderPendingPayments,3000);
+  function renderPendingPayments(){var pb=document.getElementById('_nf_pend_bar');if(pb)pb.remove();}
+  renderPendingPayments();
+  setInterval(renderReminders,2500);
 
   // ─── PROGRESS BAR INDICATOR IN NEW CLIENT FORM ───
   // Inject a help block below the "Fecha de inicio del periodo" field showing
