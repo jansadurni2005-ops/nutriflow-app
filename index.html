@@ -5270,5 +5270,45 @@ CÓMO RESPONDER (PRIORITARIO)
 </script>
 <!--GASTOS_END-->
 
+<script>
+(function(){
+  function make(){
+    if(document.getElementById('_nf_refresh_fab'))return;
+    if(!document.body)return;
+    var b=document.createElement('button');
+    b.id='_nf_refresh_fab';b.type='button';b.setAttribute('aria-label','Actualizar');
+    b.innerHTML='<span id="_nf_refresh_ic" style="font-size:17px;line-height:1;display:inline-block">🔄</span><span id="_nf_refresh_tx" style="font-size:13px;font-weight:700;letter-spacing:.02em">Actualizar</span>';
+    b.style.cssText='position:fixed;bottom:88px;right:16px;z-index:780;display:flex;align-items:center;gap:7px;background:#84cc16;color:#0a0a0a;border:none;border-radius:24px;padding:10px 15px;font-family:system-ui,-apple-system,sans-serif;cursor:pointer;box-shadow:0 6px 20px rgba(0,0,0,.45);-webkit-tap-highlight-color:transparent;transition:transform .12s ease,opacity .12s';
+    b.onclick=doRefresh;
+    b.ontouchstart=function(){};
+    document.body.appendChild(b);
+  }
+  var busy=false;
+  function doRefresh(){
+    if(busy)return;busy=true;
+    var ic=document.getElementById('_nf_refresh_ic'),tx=document.getElementById('_nf_refresh_tx'),b=document.getElementById('_nf_refresh_fab');
+    if(tx)tx.textContent='Actualizando…';
+    if(ic){ic.textContent='⏳';ic.style.animation='nfspin 1s linear infinite';}
+    if(b)b.style.opacity='.85';
+    try{if(window._nf_refreshFromCloud)window._nf_refreshFromCloud();}catch(e){}
+    var done=false;
+    function go(){if(done)return;done=true;try{location.reload();}catch(e){try{location.href=location.pathname+'?r='+Date.now();}catch(_){}}}
+    (async function(){
+      try{
+        if('serviceWorker' in navigator){
+          var regs=await navigator.serviceWorker.getRegistrations();
+          await Promise.all(regs.map(function(r){return r.update().catch(function(){});}));
+        }
+        if(window.caches){var keys=await caches.keys();await Promise.all(keys.map(function(k){return caches.delete(k);}));}
+      }catch(e){}
+      setTimeout(go,500);
+    })();
+    setTimeout(go,2500);
+  }
+  try{var st=document.createElement('style');st.id='_nf_refresh_kf';st.textContent='@keyframes nfspin{to{transform:rotate(360deg)}}';(document.head||document.documentElement).appendChild(st);}catch(e){}
+  if(document.body)make();else document.addEventListener('DOMContentLoaded',make);
+  setInterval(make,3000);
+})();
+</script>
 </body>
 </html>
