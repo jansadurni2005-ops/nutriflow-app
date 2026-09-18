@@ -5292,18 +5292,14 @@ CÓMO RESPONDER (PRIORITARIO)
     if(b)b.style.opacity='.85';
     try{if(window._nf_refreshFromCloud)window._nf_refreshFromCloud();}catch(e){}
     var done=false;
-    function go(){if(done)return;done=true;try{location.reload();}catch(e){try{location.href=location.pathname+'?r='+Date.now();}catch(_){}}}
+    function go(){if(done)return;done=true;try{sessionStorage.setItem('_nf_swrl','1');}catch(e){}var u=location.origin+location.pathname+'?fresh='+Date.now();try{location.replace(u);}catch(e){location.href=u;}}
     (async function(){
-      try{
-        if('serviceWorker' in navigator){
-          var regs=await navigator.serviceWorker.getRegistrations();
-          await Promise.all(regs.map(function(r){return r.update().catch(function(){});}));
-        }
-        if(window.caches){var keys=await caches.keys();await Promise.all(keys.map(function(k){return caches.delete(k);}));}
-      }catch(e){}
-      setTimeout(go,500);
+      try{sessionStorage.clear();}catch(e){}
+      try{if('serviceWorker' in navigator){var regs=await navigator.serviceWorker.getRegistrations();await Promise.all(regs.map(function(r){return r.unregister().catch(function(){});}));}}catch(e){}
+      try{if(window.caches){var keys=await caches.keys();await Promise.all(keys.map(function(k){return caches.delete(k);}));}}catch(e){}
+      go();
     })();
-    setTimeout(go,2500);
+    setTimeout(go,3500);
   }
   try{var st=document.createElement('style');st.id='_nf_refresh_kf';st.textContent='@keyframes nfspin{to{transform:rotate(360deg)}}';(document.head||document.documentElement).appendChild(st);}catch(e){}
   if(document.body)make();else document.addEventListener('DOMContentLoaded',make);
