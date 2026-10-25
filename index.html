@@ -3497,7 +3497,7 @@ CÓMO RESPONDER (PRIORITARIO)
   function typeLabel(t,l){var x=TYPES.find(function(x){return x[0]===t;});return t==='other'?(l.source||'Otro canal'):x[1];}
   function interestOf(m){return INTEREST.some(function(i){return i[0]===m.interest;})?m.interest:'unknown';}
   function saveLeads(list){write('leads',list);if(window._nf_setLeads)window._nf_setLeads(list.slice());window._nf_leads_ref=list;}
-  function stage(id,status){var all=read('leadmeta',{}),m=all[id]||{};if(status==='Call scheduled'&&!m.callReachedAt)m.callReachedAt=new Date().toISOString();all[id]=m;write('leadmeta',all);}
+  function stage(id,status){var all=read('leadmeta',{}),m=all[id]||{},existing=leads().find(function(l){return l.id===id;});if(!existing||existing.status!==status){delete m.saleFromCall;delete m.saleBeforeCall;}if(status==='Call scheduled'&&!m.callReachedAt)m.callReachedAt=new Date().toISOString();all[id]=m;write('leadmeta',all);}
   function setStatus(id,status){stage(id,status);saveLeads(leads().map(function(l){return l.id===id?Object.assign({},l,{status:status}):l;}));render();}
   // Historical calls are matched by ID, or by a unique exact normalized name only.
   function outcomes(list,metadata,calls){
@@ -3911,13 +3911,50 @@ CÓMO RESPONDER (PRIORITARIO)
   function getLeads(){try{return JSON.parse(localStorage.getItem(getPre()+'leads')||'[]');}catch(e){return[];}}
   function getClients(){try{return JSON.parse(localStorage.getItem(getPre()+'clients')||'[]');}catch(e){return[];}}
   function getCfg(){try{return JSON.parse(localStorage.getItem(getPre()+'config')||'{}');}catch(e){return{};}}
-  function saveLeadsArr(a){var p=getPre();if(p)localStorage.setItem(p+'leads',JSON.stringify(a));}
+  function saveLeadsArr(a){var p=getPre();if(p)localStorage.setItem(p+'leads',JSON.stringify(a));if(window._nf_setLeads)window._nf_setLeads(a.slice());window._nf_leads_ref=a;}
   function pe(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
   function todayStr(){return new Date().toISOString().slice(0,10);}
   var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
   function getSourcesList(){var out=[],seen={};function add(n){n=(n||'').toString().trim();if(n&&!seen[n.toLowerCase()]){seen[n.toLowerCase()]=1;out.push(n);}}['Instagram','GEIEG','Webinar','Referral','Àurea','Ads','Other'].forEach(add);try{JSON.parse(localStorage.getItem(getPre()+'sources')||'[]').forEach(function(x){if(x&&x.name)add(x.name);});}catch(e){}try{getLeads().forEach(function(l){if(l&&l.source)add(l.source);});}catch(e){}return out;}
-  function findLeadByName(nm){nm=(nm||'').trim().toLowerCase();if(!nm)return null;var ls=getLeads();for(var i=0;i<ls.length;i++){if(String(ls[i].name||'').trim().toLowerCase()===nm)return ls[i];}return null;}
-  function checkCallMatch(){var i=document.getElementById('_nfcall_name');var m=document.getElementById('_nfcall_match');var sw=document.getElementById('_nfcall_srcwrap');if(!i||!m||!sw)return;var nm=(i.value||'').trim();if(!nm){m.innerHTML='';sw.style.display='none';return;}var ex=findLeadByName(nm);if(ex){m.innerHTML='<span style="color:#34d399">✓ Ya está en tus leads'+(ex.status?' · '+(ST_LBL[ex.status]||ex.status):'')+'</span>';sw.style.display='none';}else{m.innerHTML='<span style="color:#a3e635">🆕 No está en Leads — se creará automáticamente</span>';sw.style.display='block';}}
+  var _selectedLeadId=null;
+  function nameKey(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
+  function exactLeads(name){return getLeads().filter(function(l){return nameKey(l.name)===nameKey(name);});}
+  function checkCallMatch(){
+    var input=document.getElementById('_nfcall_name'),message=document.getElementById('_nfcall_match'),sources=document.getElementById('_nfcall_srcwrap'),select=document.getElementById('_nfcall_select');
+    if(!input||!message||!sources||!select)return;
+    var name=input.value.trim(),list=getLeads(),selected=list.find(function(l){return l.id===_selectedLeadId;}),exact=name?exactLeads(name):[];
+    var matches=list.filter(function(l){return !name||nameKey(l.name).indexOf(nameKey(name))>=0;}).sort(function(a,b){return String(a.name||'').localeCompare(String(b.name||''));});
+    select.innerHTML=matches.map(function(l){return '<option value="'+esc(l.id)+'">'+esc(l.name)+' · '+esc(l.source||'Sin canal')+' · '+esc(ST_LBL[l.status]||l.status)+' · '+esc(l.date||'')+'</option>';}).join('');
+    select.value=selected?selected.id:'';
+    select.style.display=matches.length?'block':'none';
+    sources.style.display=name&&!selected&&!exact.length?'block':'none';
+    message.style.color=selected||exact.length===1?'#34d399':'#a3e635';
+    message.textContent=selected?'✓ Lead seleccionado: '+selected.name+' · '+(ST_LBL[selected.status]||selected.status):!name?'Busca y selecciona un lead. Si no existe, escribe su nombre para crearlo.':exact.length>1?'Hay varios leads con este nombre. Selecciona uno para evitar duplicados.':exact.length===1?'✓ Se vinculará al lead existente: '+exact[0].name:'Se creará «'+name+'» como nuevo lead al guardar. Si ya está en la lista, selecciónalo.';
+  }
+  function resolveCallLead(entry){
+    if(entry.leadId)return getLeads().find(function(l){return l.id===entry.leadId;})||null;
+    var matches=exactLeads(entry.name);return matches.length===1?matches[0]:null;
+  }
+  function ensureCallLead(entry){
+    var lead=resolveCallLead(entry);if(lead){entry.leadId=lead.id;return lead;}
+    if(entry.leadId){alert('El lead de esta llamada fue eliminado. Registra la venta seleccionando el lead correcto.');return null;}
+    if(exactLeads(entry.name).length>1){alert('Esta llamada antigua tiene un nombre duplicado. Registra la venta seleccionando el lead correcto.');return null;}
+    if(!String(entry.name||'').trim())return null;
+    lead={id:pe(),name:entry.name,source:'Other',status:'Contacted',date:todayStr(),note:'Creado al cerrar una llamada histórica'};
+    var list=getLeads();list.unshift(lead);saveLeadsArr(list);entry.leadId=lead.id;return lead;
+  }
+  function syncLeadSale(entry,calls){
+    var lead=resolveCallLead(entry);if(!lead)return;
+    var key=getPre()+'leadmeta',metadata={};try{metadata=JSON.parse(localStorage.getItem(key)||'{}');}catch(e){}
+    var m=Object.assign({},metadata[lead.id]||{}),closed=false;
+    Object.keys(calls).forEach(function(k){(calls[k].log||[]).forEach(function(log){if(!log.closed)return;var linked=resolveCallLead(log);if(linked&&linked.id===lead.id)closed=true;});});
+    var status=lead.status;
+    if(closed&&status!=='Closed'){m.saleBeforeCall=status;m.saleFromCall=true;status='Closed';}
+    else if(!closed&&m.saleFromCall){if(status==='Closed')status=m.saleBeforeCall||'Contacted';delete m.saleBeforeCall;delete m.saleFromCall;}
+    metadata[lead.id]=m;localStorage.setItem(key,JSON.stringify(metadata));
+    if(status!==lead.status)saveLeadsArr(getLeads().map(function(l){return l.id===lead.id?Object.assign({},l,{status:status}):l;}));
+  }
+
   var MES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   var MESL=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
   var off=0;
@@ -3941,7 +3978,7 @@ CÓMO RESPONDER (PRIORITARIO)
           '<span style="width:7px;height:7px;border-radius:50%;background:'+(e.closed?'#34d399':'var(--bg4)')+';flex-shrink:0"></span>'+
           '<span style="flex:1;min-width:0;font-size:12.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+esc(e.name)+'</span>'+
           (tl?'<span style="font-size:10px;color:var(--muted);flex-shrink:0">'+tl+'</span>':'')+
-          '<button data-lclose="'+esc(e.id)+'" style="background:'+(e.closed?'rgba(52,211,153,.14)':'var(--bg4)')+';border:1px solid '+(e.closed?'rgba(52,211,153,.35)':'transparent')+';color:'+(e.closed?'#34d399':'var(--muted)')+';font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0">'+(e.closed?'✓ Cerrada':'Marcar cerrada')+'</button>'+
+          '<button data-lclose="'+esc(e.id)+'" style="background:'+(e.closed?'rgba(52,211,153,.14)':'var(--bg4)')+';border:1px solid '+(e.closed?'rgba(52,211,153,.35)':'transparent')+';color:'+(e.closed?'#34d399':'var(--muted)')+';font-size:10px;font-weight:700;padding:3px 10px;border-radius:20px;cursor:pointer;white-space:nowrap;flex-shrink:0">'+(e.closed?'✓ Venta cerrada':'Marcar venta cerrada')+'</button>'+
           '<button data-ldel="'+esc(e.id)+'" title="Eliminar" style="background:none;border:none;color:var(--muted);font-size:16px;cursor:pointer;line-height:1;padding:0 2px;flex-shrink:0">×</button>'+
         '</div>';
       }).join('');
@@ -4011,7 +4048,7 @@ CÓMO RESPONDER (PRIORITARIO)
         '<div style="background:var(--bg3);border-radius:10px;padding:13px 15px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);font-weight:700;margin-bottom:7px">Llamadas hechas</div><div style="display:flex;align-items:center;justify-content:space-between"><button data-ci="total-" style="background:var(--bg4);border:none;color:var(--text2);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">−</button><span style="font-size:30px;font-weight:800;color:var(--text)">'+tot+'</span><button data-ci="total+" style="background:#a3e635;border:none;color:#fff;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">+</button></div></div>'+
         '<div style="background:rgba(52,211,153,.07);border:1px solid rgba(52,211,153,.2);border-radius:10px;padding:13px 15px"><div style="font-size:9px;text-transform:uppercase;letter-spacing:.09em;color:#34d399;font-weight:700;margin-bottom:7px">Cerradas</div><div style="display:flex;align-items:center;justify-content:space-between"><button data-ci="closed-" style="background:var(--bg4);border:none;color:var(--text2);width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">−</button><span style="font-size:30px;font-weight:800;color:#34d399">'+clo+'</span><button data-ci="closed+" style="background:#34d399;border:none;color:#06231a;width:34px;height:34px;border-radius:9px;font-size:20px;cursor:pointer;line-height:1">+</button></div></div>'+
       '</div>'+
-      '<div style="font-size:11px;color:var(--muted);margin-top:11px;line-height:1.5">Pulsa <b style="color:var(--text2)">+</b> en «Llamadas hechas» y escribe el nombre del cliente al que llamaste. Se guarda el registro y el % de cierre se calcula solo.</div>'+
+      '<div style="font-size:11px;color:var(--muted);margin-top:11px;line-height:1.5">Pulsa <b style="color:var(--text2)">+</b> en «Llamadas hechas» y selecciona un lead o escribe un nombre nuevo. Una venta marcada como cerrada actualiza el lead y su conversión automáticamente.</div>'+
       regHtml+
       histHtml+
     '</div>'+
@@ -4019,14 +4056,15 @@ CÓMO RESPONDER (PRIORITARIO)
       '<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;max-width:420px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6);overflow:hidden">'+
         '<div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:8px"><span style="font-size:17px">📞</span><span style="font-size:14px;font-weight:800;color:var(--text)">Nueva llamada</span></div>'+
         '<div style="padding:18px 20px">'+
-          '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Cliente al que llamaste</label>'+
-          '<input id="_nfcall_name" type="text" placeholder="Nombre del cliente..." autocomplete="off" style="width:100%;background:var(--bg3);border:1px solid var(--bg4);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box">'+
+          '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">Selecciona un lead o escribe uno nuevo</label>'+
+          '<input id="_nfcall_name" type="text" placeholder="Buscar lead por nombre..." autocomplete="off" style="width:100%;background:var(--bg3);border:1px solid var(--bg4);border-radius:10px;padding:11px 13px;color:var(--text);font-size:14px;outline:none;box-sizing:border-box">'+
+          '<select id="_nfcall_select" aria-label="Leads encontrados" size="5" style="width:100%;margin-top:10px;background:var(--bg3);border:1px solid var(--bg4);border-radius:10px;padding:8px;color:var(--text);font-size:12px"></select>'+
           '<div id="_nfcall_match" style="font-size:11px;font-weight:700;margin-top:8px;min-height:14px"></div>'+
           '<div id="_nfcall_srcwrap" style="display:none;margin-top:8px">'+
             '<label style="display:block;font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px">¿De dónde viene?</label>'+
             '<select id="_nfcall_src" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:10px;padding:10px 12px;color:var(--text);font-size:13px;outline:none">'+srcOptions+'</select>'+
           '</div>'+
-          '<label style="display:flex;align-items:center;gap:8px;margin-top:13px;cursor:pointer;font-size:13px;color:var(--text2)"><input id="_nfcall_closed" type="checkbox" style="width:16px;height:16px;cursor:pointer">Cerré la venta en esta llamada</label>'+
+          '<label style="display:flex;align-items:center;gap:8px;margin-top:13px;cursor:pointer;font-size:13px;color:var(--text2)"><input id="_nfcall_closed" type="checkbox" style="width:16px;height:16px;cursor:pointer">Venta cerrada · actualizar también en Leads</label>'+
           '<div style="display:flex;gap:8px;margin-top:18px">'+
             '<button id="_nfcall_cancel" style="flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">Cancelar</button>'+
             '<button id="_nfcall_save" style="flex:2;background:#a3e635;border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer">Guardar llamada</button>'+
@@ -4036,36 +4074,39 @@ CÓMO RESPONDER (PRIORITARIO)
     '</div>';
     var pb=document.getElementById('_nfci_p');if(pb)pb.onclick=function(){off--;render();};
     var nb=document.getElementById('_nfci_n');if(nb)nb.onclick=function(){if(off<0){off++;render();}};
-    function openCallModal(){var m=document.getElementById('_nfcall_modal');if(!m)return;m.style.display='flex';setTimeout(function(){var i=document.getElementById('_nfcall_name');var cb=document.getElementById('_nfcall_closed');if(i){i.value='';i.style.borderColor='var(--bg4)';i.focus();i.oninput=checkCallMatch;}if(cb)cb.checked=false;var mm=document.getElementById('_nfcall_match');if(mm)mm.innerHTML='';var sw=document.getElementById('_nfcall_srcwrap');if(sw)sw.style.display='none';},30);}
+    function openCallModal(closed){
+      var modal=document.getElementById('_nfcall_modal');if(!modal)return;
+      modal.style.display='flex';_selectedLeadId=null;
+      var i=document.getElementById('_nfcall_name'),cb=document.getElementById('_nfcall_closed');
+      if(i){i.value='';i.oninput=function(){_selectedLeadId=null;checkCallMatch();};i.focus();}
+      if(cb)cb.checked=!!closed;
+      var select=document.getElementById('_nfcall_select');
+      if(select)select.onchange=function(){var l=getLeads().find(function(l){return l.id===select.value;});if(!l)return;_selectedLeadId=l.id;i.value=l.name;checkCallMatch();};
+      checkCallMatch();
+    }
     function closeCallModal(){var m=document.getElementById('_nfcall_modal');if(m)m.style.display='none';}
     function saveCall(){
-      var i=document.getElementById('_nfcall_name');var cb=document.getElementById('_nfcall_closed');
-      var nm=(i&&i.value||'').trim();
-      if(!nm){if(i){i.style.borderColor='#f87171';i.focus();}return;}
-      var wasClosed=!!(cb&&cb.checked);
-      var ex=findLeadByName(nm);
-      if(!ex){
-        var srcEl=document.getElementById('_nfcall_src');var src=(srcEl&&srcEl.value)||'Other';
-        var ls=getLeads();ex={id:pe(),name:nm,source:src,status:wasClosed?'Closed':'Contacted',note:'Añadido desde una llamada',date:todayStr()};ls.unshift(ex);saveLeadsArr(ls);
-      }else if(wasClosed&&ex.status!=='Closed'){
-        saveLeadsArr(getLeads().map(function(l){return l.id===ex.id?{id:l.id,name:l.name,source:l.source,status:'Closed',note:l.note,date:l.date}:l;}));
-      }
-      var c=loadCalls();var o=c[ck]||{total:0,closed:0};if(!o.log)o.log=[];
-      o.total=(o.total||0)+1;if(wasClosed)o.closed=(o.closed||0)+1;
-      o.log.push({id:uid(),leadId:ex.id,name:nm,ts:Date.now(),closed:wasClosed});
-      if((o.closed||0)>(o.total||0))o.closed=o.total;
-      c[ck]=o;saveCalls(c);render();
+      var i=document.getElementById('_nfcall_name'),cb=document.getElementById('_nfcall_closed'),nm=(i&&i.value||'').trim();
+      if(!nm){i.focus();return;}
+      var list=getLeads(),ex=_selectedLeadId?list.find(function(l){return l.id===_selectedLeadId;}):null;
+      if(_selectedLeadId&&!ex){alert('El lead seleccionado ya no está disponible. Vuelve a seleccionarlo.');return;}
+      if(!ex){var matches=exactLeads(nm);if(matches.length>1){alert('Hay varios leads con ese nombre. Selecciona el correcto en la lista.');return;}ex=matches[0];}
+      if(!ex){ex={id:pe(),name:nm,source:document.getElementById('_nfcall_src').value||'Other',status:'Contacted',note:'Añadido desde una llamada',date:todayStr()};list.unshift(ex);saveLeadsArr(list);}
+      var c=loadCalls(),o=c[ck]||{total:0,closed:0};if(!o.log)o.log=[];
+      var entry={id:uid(),leadId:ex.id,name:ex.name,ts:Date.now(),closed:!!(cb&&cb.checked)};
+      o.total=(o.total||0)+1;if(entry.closed)o.closed=(o.closed||0)+1;o.log.push(entry);c[ck]=o;saveCalls(c);
+      syncLeadSale(entry,c);render();
     }
     Array.prototype.forEach.call(root.querySelectorAll('[data-ci]'),function(b){
       b.onclick=function(){
         var act=b.getAttribute('data-ci');
-        if(act==='total+'){openCallModal();return;}
+        if(act==='total+'){openCallModal(false);return;}if(act==='closed+'){openCallModal(true);return;}if(act==='closed-'){alert('Para corregir una venta, desmarca «Venta cerrada» en su registro de llamada. Así se actualizará también el lead.');return;}
         var c=loadCalls();var o=c[ck]||{total:0,closed:0};if(!o.log)o.log=[];
         if(act==='total-'){if(o.log.length){var last=o.log.pop();if(last&&last.closed)o.closed=Math.max(0,(o.closed||0)-1);}o.total=Math.max(0,(o.total||0)-1);}
         else if(act==='closed+')o.closed=(o.closed||0)+1;
         else if(act==='closed-')o.closed=Math.max(0,(o.closed||0)-1);
         if((o.closed||0)>(o.total||0))o.closed=o.total;
-        c[ck]=o;saveCalls(c);render();
+        c[ck]=o;saveCalls(c);if(last)syncLeadSale(last,c);render();
       };
     });
     var mcancel=document.getElementById('_nfcall_cancel');if(mcancel)mcancel.onclick=closeCallModal;
@@ -4077,9 +4118,10 @@ CÓMO RESPONDER (PRIORITARIO)
         var id=b.getAttribute('data-lclose');var c=loadCalls();var o=c[ck]||{total:0,closed:0};if(!o.log)o.log=[];
         var e=null;for(var k=0;k<o.log.length;k++){if(o.log[k].id===id){e=o.log[k];break;}}
         if(!e)return;
+        if(!e.closed&&!ensureCallLead(e))return;
         if(e.closed){e.closed=false;o.closed=Math.max(0,(o.closed||0)-1);}else{e.closed=true;o.closed=(o.closed||0)+1;}
         if((o.closed||0)>(o.total||0))o.closed=o.total;
-        c[ck]=o;saveCalls(c);render();
+        c[ck]=o;saveCalls(c);syncLeadSale(e,c);render();
       };
     });
     Array.prototype.forEach.call(root.querySelectorAll('[data-ldel]'),function(b){
@@ -4089,7 +4131,7 @@ CÓMO RESPONDER (PRIORITARIO)
         if(idx<0)return;var e=o.log[idx];o.log.splice(idx,1);
         o.total=Math.max(0,(o.total||0)-1);if(e&&e.closed)o.closed=Math.max(0,(o.closed||0)-1);
         if((o.closed||0)>(o.total||0))o.closed=o.total;
-        c[ck]=o;saveCalls(c);render();
+        c[ck]=o;saveCalls(c);syncLeadSale(e,c);render();
       };
     });
   }
