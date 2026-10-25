@@ -179,7 +179,7 @@ function backupAntrop(){makeBackup(PRE+'antrop',PRE+'antrop_bk');}
 // ── EXTRA DATA SYNC (payments, pauses, sources, lead groups, calls, goal, weights) ──
 // Stored in the authenticated user's Supabase user_metadata as a single JSON blob.
 // No extra tables needed. Last-write-wins across devices.
-var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','calls','goal','leadclosed','weights','prof_ov','phones','wamsg','paiddates','gastos','cmethod'];
+var EXTRA_SUF=['payments','paused','sources','leadgroups','leadtags','leadmeta','calls','goal','leadclosed','weights','prof_ov','phones','wamsg','paiddates','gastos','cmethod'];
 function collectExtras(){
   var o={};
   EXTRA_SUF.forEach(function(s){var v=localStorage.getItem(PRE+s);if(v!=null)o[s]=v;});
@@ -3464,358 +3464,134 @@ CÓMO RESPONDER (PRIORITARIO)
 })();
 </script>
 <script>
-(function(){
-  function getPre(){try{var s=JSON.parse(localStorage.getItem('nf_session')||'{}');if(s&&s.email)return 'nf_'+s.email+'_';}catch(e){}var k=Object.keys(localStorage).find(function(k){return /^nf_.+_clients$/.test(k);});if(k)return k.replace(/_clients$/,'')+'_';var k2=Object.keys(localStorage).find(function(k){return /^nf_.+_leads$/.test(k);});return k2?k2.replace(/_leads$/,'')+'_':'';}
-  function getLeads(){try{return JSON.parse(localStorage.getItem(getPre()+'leads')||'[]');}catch(e){return[];}}
-  function leadLabel(l){if(l&&l.name&&String(l.name).trim())return String(l.name).trim();if(l&&l.note&&String(l.note).trim())return String(l.note).split('\n')[0].slice(0,40);var b=[];if(l&&l.source)b.push(l.source);if(l&&l.date)b.push(String(l.date).slice(0,10));return b.length?b.join(' \xb7 '):'(sin nombre)';}
-  function loadGroups(){var p=getPre();if(!p)return[];try{return JSON.parse(localStorage.getItem(p+'leadgroups')||'[]');}catch(e){return[];}}
-  function saveGroups(a){var p=getPre();if(p)localStorage.setItem(p+'leadgroups',JSON.stringify(a));}
-  function loadTags(){var p=getPre();if(!p)return{};try{return JSON.parse(localStorage.getItem(p+'leadtags')||'{}');}catch(e){return{};}}
-  function saveTags(o){var p=getPre();if(p)localStorage.setItem(p+'leadtags',JSON.stringify(o));}
-  function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
-
-  var PALETTE=['#a3e635','#34d399','#f59e0b','#ec4899','#a78bfa','#06b6d4','#f97316','#ef4444','#10b981','#8b5cf6'];
-  var _sel=null;      // selected group filter (null = all / assign view)
-  var _open=true;     // panel expanded
-  var _adding=false;  // showing new-group input
-  var _q='';          // search query
-  var _sort='az';     // list sort: az (nombre) | new (recientes) | old (antiguos)
-  function leadTs(l){if(!l||!l.date)return 0;var t=new Date(String(l.date).slice(0,10)).getTime();return isNaN(t)?0:t;}
-
-  function gColor(name){var g=loadGroups();for(var i=0;i<g.length;i++){if(g[i].name===name)return g[i].color;}return '#94a3b8';}
-  function leadGroups(id){var t=loadTags();return t[id]||[];}
-  function toggleTag(id,name){
-    var t=loadTags();if(!t[id])t[id]=[];
-    var i=t[id].indexOf(name);
-    if(i>=0)t[id].splice(i,1);else t[id].push(name);
-    if(!t[id].length)delete t[id];
-    saveTags(t);
+/* NutriFlow Leads workspace. Metadata follows the existing authenticated extras sync. */
+(function () {
+  'use strict';
+  var TYPES = [
+    ['mc_dm','ManyChat · conversación','#60a5fa'],
+    ['mc_keyword','ManyChat · comentario Protocolo','#c4b5fd'],
+    ['mc_unknown','ManyChat · sin clasificar','#94a3b8'],
+    ['protocol','Formulario · Protocolo','#a3e635'],
+    ['instagram','Instagram · sin clasificar','#f472b6'],
+    ['other','Otros canales','#fbbf24']
+  ];
+  var INTEREST = [['unknown','Sin valorar'],['high','Alto'],['medium','Medio'],['low','Bajo']];
+  var STATES = [['New','Nuevo'],['Contacted','En conversación'],['Call scheduled','Llamada agendada'],['Closed','Venta cerrada'],['Lost','Perdido']];
+  var COLORS = {New:'#a3e635',Contacted:'#fbbf24','Call scheduled':'#c4b5fd',Closed:'#34d399',Lost:'#fb7185'};
+  var view={type:'all',interest:'all',status:'all',group:'all',query:'',sort:'recent',month:'',page:1};
+  var editing=null, formOpen=false, lastSignature='', activePrefix='';
+  function pre(){try{var e=JSON.parse(localStorage.getItem('nf_session')||'{}').email;return e?'nf_'+e+'_':'';}catch(e){return '';}}
+  function read(k,fallback){try{return JSON.parse(localStorage.getItem(pre()+k)||'null')||fallback;}catch(e){return fallback;}}
+  function write(k,v){if(!pre())throw Error('No hay sesión activa');localStorage.setItem(pre()+k,JSON.stringify(v));}
+  function leads(){return read('leads',[]);}
+  function esc(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+  function norm(s){return String(s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();}
+  function today(){var d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+  function meta(l){return read('leadmeta',{})[l.id]||{};}
+  function typeOf(l,m){m=m||{};if(TYPES.some(function(t){return t[0]===m.type;}))return m.type;
+    if(/^ep_/.test(l.id||'')||/·\s*protocolo/i.test(l.name||''))return 'protocol';
+    if(/manychat/i.test(l.source||''))return 'mc_unknown';
+    if(norm(l.source)==='instagram')return 'instagram';
+    return 'other';
   }
-
-  function activeLeads(){return getLeads().filter(function(l){return l.status!=='Closed'&&l.status!=='Lost';});}
-  function getLeadById(id){var ls=getLeads();for(var i=0;i<ls.length;i++)if(ls[i].id===id)return ls[i];return null;}
-  function pe(){return Math.random().toString(36).slice(2)+Date.now().toString(36);}
-  function todayStr(){return new Date().toISOString().slice(0,10);}
-  function saveLeadsArr(a){var p=getPre();if(p)localStorage.setItem(p+'leads',JSON.stringify(a));}
-  function getSourcesList(){var out=[],seen={};function add(n){n=(n||'').toString().trim();if(n&&!seen[n.toLowerCase()]){seen[n.toLowerCase()]=1;out.push(n);}}['Instagram','GEIEG','Webinar','Referral','Àurea','Ads','Other'].forEach(add);try{JSON.parse(localStorage.getItem(getPre()+'sources')||'[]').forEach(function(x){if(x&&x.name)add(x.name);});}catch(e){}try{getLeads().forEach(function(l){if(l&&l.source)add(l.source);});}catch(e){}return out;}
-  function addLead(o){var ls=getLeads();ls.unshift({id:pe(),name:o.name,source:o.source||'Instagram',status:o.status||'New',note:o.note||'',date:o.date||todayStr()});saveLeadsArr(ls);}
-  function updateLead(id,o){saveLeadsArr(getLeads().map(function(l){return l.id===id?{id:l.id,name:o.name,source:o.source,status:o.status,note:o.note,date:o.date||l.date}:l;}));}
-  function deleteLead(id){saveLeadsArr(getLeads().filter(function(l){return l.id!==id;}));var t=loadTags();if(t[id]){delete t[id];saveTags(t);}}
-  function setStatus(id,st){saveLeadsArr(getLeads().map(function(l){if(l.id!==id)return l;return {id:l.id,name:l.name,source:l.source,status:st,note:l.note,date:l.date};}));}
-  function statusCounts(){var c={New:0,Contacted:0,'Call scheduled':0,Closed:0,Lost:0};getLeads().forEach(function(l){var s=l.status||'New';if(c[s]!=null)c[s]++;});return c;}
-  function daysAgo(d){if(!d)return 0;var t=new Date(d);if(isNaN(t.getTime()))return 0;return Math.floor((Date.now()-t.getTime())/86400000);}
-  function isCold(l){return l.status!=='Closed'&&l.status!=='Lost'&&l.date&&daysAgo(l.date)>=3;}
-  function coldCount(){return getLeads().filter(isCold).length;}
-  function isProto(l){var nm=String(l.name||'');var nt=String(l.note||'');return /protocolo/i.test(nm)||/el protocolo|asesor/i.test(nt);}
-  function protoCount(){return getLeads().filter(isProto).length;}
-  var _protoPulled=false;
-  function protoPull(cb){
-    try{
-      var _SBP='https://nrxltxmbpkplhgycodob.supabase.co';
-      var _KEYP='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im5yeGx0eG1icGtwbGhneWNvZG9iIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzY5NzMyNTMsImV4cCI6MjA5MjU0OTI1M30.BQTIOnx9U8xqb7brweOsccooqgWruNhdxWZ-YqG9JIs';
-      var _em='';try{_em=(JSON.parse(localStorage.getItem('nf_session')||'{}').email)||'';}catch(e){}
-      if(!_em){if(cb)cb(0);return;}
-      var _tp=(typeof window._nf_getToken==='function')?Promise.resolve(window._nf_getToken()):Promise.resolve(null);
-      _tp.then(function(t){
-        if(!t){try{var o=JSON.parse(localStorage.getItem('_nf_sb_tok_'+_em)||'null');if(o&&o.tok)t=o.tok;}catch(e){}}
-        if(!t){if(cb)cb(0);return;}
-        fetch(_SBP+'/rest/v1/leads?select=id,name,source,status,note,date&or=(name.ilike.*Protocolo*,note.ilike.*Protocolo*,note.ilike.*Asesor*)&order=date.desc',{headers:{apikey:_KEYP,Authorization:'Bearer '+t}})
-          .then(function(r){return r.ok?r.json():[];})
-          .then(function(cloud){
-            if(!Array.isArray(cloud)||!cloud.length){if(cb)cb(0);return;}
-            var _local=getLeads();var have={};_local.forEach(function(l){if(l&&l.id)have[l.id]=1;});
-            var add=0;cloud.forEach(function(l){if(l&&l.id&&!have[l.id]){_local.unshift({id:l.id,name:l.name,source:l.source||'Instagram',status:l.status||'New',note:l.note||'',date:l.date||''});add++;}});
-            if(add>0){try{localStorage.setItem('nf_'+_em+'_leads',JSON.stringify(_local));}catch(e){}if(window._nf_setLeads){try{window._nf_setLeads(_local.slice());}catch(e){}}}
-            if(cb)cb(add);
-          }).catch(function(){if(cb)cb(0);});
-      }).catch(function(){if(cb)cb(0);});
-    }catch(e){if(cb)cb(0);}
+  function typeLabel(t,l){var x=TYPES.find(function(x){return x[0]===t;});return t==='other'?(l.source||'Otro canal'):x[1];}
+  function interestOf(m){return INTEREST.some(function(i){return i[0]===m.interest;})?m.interest:'unknown';}
+  function saveLeads(list){write('leads',list);if(window._nf_setLeads)window._nf_setLeads(list.slice());window._nf_leads_ref=list;}
+  function stage(id,status){var all=read('leadmeta',{}),m=all[id]||{};if(status==='Call scheduled'&&!m.callReachedAt)m.callReachedAt=new Date().toISOString();all[id]=m;write('leadmeta',all);}
+  function setStatus(id,status){stage(id,status);saveLeads(leads().map(function(l){return l.id===id?Object.assign({},l,{status:status}):l;}));render();}
+  // Historical calls are matched by ID, or by a unique exact normalized name only.
+  function outcomes(list,metadata,calls){
+    var names=new Map(), ids=new Map(), result=new Map(), unmatched=0;
+    list.forEach(function(l){var n=norm(l.name);names.set(n,(names.get(n)||[]).concat(l.id));ids.set(l.id,l);var m=metadata[l.id]||{};result.set(l.id,{call:l.status==='Call scheduled'||!!m.callReachedAt,sale:l.status==='Closed'});});
+    Object.keys(calls).forEach(function(k){(calls[k].log||[]).forEach(function(c){var id=c.leadId;
+      if(!id){var matches=names.get(norm(c.name))||[];if(matches.length===1)id=matches[0];}
+      if(!id||!ids.has(id)){unmatched++;return;}var o=result.get(id);o.call=true;if(c.closed)o.sale=true;
+    });});
+    return {byId:result,unmatched:unmatched};
   }
-
-  var ST_LBL={New:'Nuevo',Contacted:'Contactado','Call scheduled':'Llamada',Closed:'Cerrado',Lost:'Perdido'};
-  var ST_COL={New:'#a3e635',Contacted:'#f59e0b','Call scheduled':'#a78bfa',Closed:'#34d399',Lost:'#f87171'};
-  var ST_ORDER=['New','Contacted','Call scheduled','Closed','Lost'];
-  var _selStatus=null,_formOpen=false,_editId=null;
-  function matchLead(l,q){
-    if(!q)return true;q=q.toLowerCase();
-    return String(leadLabel(l)).toLowerCase().indexOf(q)>=0 || String(l.note||'').toLowerCase().indexOf(q)>=0 || String(l.source||'').toLowerCase().indexOf(q)>=0;
+  function aggregate(list,metadata,events){var groups=new Map();
+    TYPES.forEach(function(t){if(t[0]!=='other')groups.set(t[0],{label:t[1],total:0,call:0,sale:0,callSale:0});});
+    list.forEach(function(l){var type=typeOf(l,metadata[l.id]),key=type==='other'?'other:'+String(l.source||'Otro canal'):type;
+      if(!groups.has(key))groups.set(key,{label:typeLabel(type,l),total:0,call:0,sale:0,callSale:0});
+      var g=groups.get(key),o=events.byId.get(l.id)||{call:false,sale:false};g.total++;if(o.call)g.call++;if(o.sale)g.sale++;if(o.call&&o.sale)g.callSale++;
+    });return Array.from(groups.values());
   }
-  function renderList(){
-    var box=document.getElementById('_nf_lg_list');if(!box)return;
-    var groups=loadGroups();var tags=loadTags();
-    var base=getLeads();
-    if(_sel!==null)base=base.filter(function(l){return (tags[l.id]||[]).indexOf(_sel)>=0;});
-    if(_selStatus==='__cold')base=base.filter(isCold);
-    else if(_selStatus==='__proto')base=base.filter(isProto);
-    else if(_selStatus!==null)base=base.filter(function(l){return (l.status||'New')===_selStatus;});
-    var listLeads=base.filter(function(l){return matchLead(l,_q);});
-    if(_sort==='new')listLeads.sort(function(a,b){return leadTs(b)-leadTs(a);});
-    else if(_sort==='old')listLeads.sort(function(a,b){return leadTs(a)-leadTs(b);});
-    else if(_selStatus==='__cold')listLeads.sort(function(a,b){return daysAgo(b.date)-daysAgo(a.date);});
-    else listLeads.sort(function(a,b){return (leadLabel(a)||'').localeCompare(leadLabel(b)||'');});
-    var rows=listLeads.map(function(l){
-      var myTags=(tags[l.id]||[]);
-      var lbl=leadLabel(l);
-      var initial=esc((String(lbl).trim().charAt(0)||'?').toUpperCase());
-      var ac=PALETTE[(String(l.id||lbl).charCodeAt(0)||0)%PALETTE.length];
-      var st=l.status||'New';var stcol=ST_COL[st]||'#94a3b8';
-      var stSel='<select data-stsel="'+esc(l.id)+'" title="Cambiar estado" style="background:'+stcol+'22;border:1px solid '+stcol+'55;border-radius:9px;padding:3px 6px;color:'+stcol+';font-size:10px;font-weight:800;outline:none;cursor:pointer">'+ST_ORDER.map(function(s){return '<option value="'+s+'"'+(s===st?' selected':'')+'>'+esc(ST_LBL[s])+'</option>';}).join('')+'</select>';
-      var tagPills=myTags.map(function(n){var c=gColor(n);return '<span data-untag="'+esc(l.id)+'|'+esc(n)+'" title="Quitar de '+esc(n)+'" style="cursor:pointer;font-size:10px;font-weight:700;padding:2px 8px;border-radius:11px;background:'+c+'22;color:'+c+';border:1px solid '+c+'55;white-space:nowrap">'+esc(n)+' ×</span>';}).join('');
-      var addable=groups.filter(function(g){return myTags.indexOf(g.name)<0;});
-      var addMenu=addable.length?'<select data-addsel="'+esc(l.id)+'" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:4px 7px;color:#a3e635;font-size:10.5px;font-weight:600;outline:none;cursor:pointer"><option value="">+ grupo</option>'+addable.map(function(g){return '<option value="'+esc(g.name)+'">'+esc(g.name)+'</option>';}).join('')+'</select>':'';
-      var note=l.note?'<div style="font-size:10.5px;color:var(--muted);margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;opacity:.85">'+esc(l.note)+'</div>':'';
-      return '<div class="nf-lg-row" style="display:flex;align-items:flex-start;gap:11px;padding:10px">'+
-        '<span style="width:34px;height:34px;flex-shrink:0;border-radius:50%;background:'+ac+'22;color:'+ac+';display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;margin-top:1px">'+initial+'</span>'+
-        '<div style="flex:1;min-width:0">'+
-          '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">'+
-            '<span style="font-size:13.5px;font-weight:700;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:170px">'+esc(lbl)+'</span>'+
-            stSel+
-            '<span style="font-size:10.5px;color:var(--muted)">'+(l.source?esc(l.source):'')+(l.date?' · '+esc(String(l.date).slice(0,10)):'')+'</span>'+
-            (isCold(l)?'<span title="Sin tocar hace '+daysAgo(l.date)+' días" style="font-size:9.5px;font-weight:800;color:'+(daysAgo(l.date)>=7?'#f87171':'#f59e0b')+';background:'+(daysAgo(l.date)>=7?'#f8717118':'#f59e0b18')+';padding:1px 7px;border-radius:20px">🔥 '+daysAgo(l.date)+'d</span>':'')+
-          '</div>'+
-          note+
-          '<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:6px">'+tagPills+addMenu+'</div>'+
-        '</div>'+
-        '<div style="display:flex;align-items:center;gap:5px;flex-shrink:0">'+
-          '<button data-ledit="'+esc(l.id)+'" title="Editar" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);width:28px;height:28px;border-radius:8px;font-size:12px;cursor:pointer;line-height:1">✎</button>'+
-          '<button data-ldel="'+esc(l.id)+'" title="Eliminar" style="background:var(--bg3);border:1px solid var(--bg4);color:#f87171;width:28px;height:28px;border-radius:8px;font-size:15px;cursor:pointer;line-height:1">×</button>'+
-        '</div>'+
-      '</div>';
-    }).join('');
-    if(!rows)rows='<div style="font-size:12px;color:var(--muted);padding:22px 0;text-align:center;font-style:italic">'+(_q?'Sin resultados para «'+esc(_q)+'»':'No hay leads en esta vista')+'</div>';
-    var head='<div style="font-size:10px;color:var(--muted);padding:2px 10px 8px;font-weight:600">'+listLeads.length+' lead'+(listLeads.length===1?'':'s')+'</div>';
-    box.innerHTML=head+rows;
-    bindListHandlers(box);
+  function pct(n,d){return d?(100*n/d).toLocaleString('es-ES',{maximumFractionDigits:1})+'%':'—';}
+  function options(items,value){return items.map(function(x){return '<option value="'+esc(x[0])+'"'+(x[0]===value?' selected':'')+'>'+esc(x[1])+'</option>';}).join('');}
+  function select(id,label,items,value){return '<label class="nfl-field">'+label+'<select id="'+id+'">'+options(items,value)+'</select></label>';}
+  function getCohort(){return leads().filter(function(l){return !view.month||String(l.date||'').slice(0,7)===view.month;});}
+  function filtered(){var metadata=read('leadmeta',{}),tags=read('leadtags',{});return getCohort().filter(function(l){var m=metadata[l.id]||{};return (view.type==='all'||typeOf(l,m)===view.type)&&(view.interest==='all'||interestOf(m)===view.interest)&&(view.status==='all'||(view.status==='active'?['Closed','Lost'].indexOf(l.status)<0:l.status===view.status))&&(view.group==='all'||(tags[l.id]||[]).indexOf(view.group)>=0)&&(!view.query||norm([l.name,l.note,l.source,typeLabel(typeOf(l,m),l)].join(' ')).indexOf(norm(view.query))>=0);}).sort(function(a,b){
+      if(view.sort==='name')return String(a.name||'').localeCompare(String(b.name||''),'es');
+      if(view.sort==='interest'){var rank={high:0,medium:1,low:2,unknown:3},d=rank[interestOf(metadata[a.id]||{})]-rank[interestOf(metadata[b.id]||{})];if(d)return d;}
+      return String(b.date||'').localeCompare(String(a.date||''))||String(a.name||'').localeCompare(String(b.name||''));
+    });}
+  function statsHtml(){var list=getCohort(),metadata=read('leadmeta',{}),events=outcomes(leads(),metadata,read('calls',{})),rows=aggregate(list,metadata,events),tot={total:0,call:0,sale:0,callSale:0};
+    rows.forEach(function(r){Object.keys(tot).forEach(function(k){tot[k]+=r[k];});});
+    var comparable=rows.filter(function(r){return r.total>=20&&r.sale>0;}).sort(function(a,b){return b.sale/b.total-a.sale/a.total;});
+    var insight=comparable.length?'Mayor conversión observada (entre captaciones con al menos 20 leads): '+comparable[0].label+' · '+pct(comparable[0].sale,comparable[0].total)+'. Compara también el volumen antes de priorizar.':'Todavía no hay suficiente volumen con ventas para destacar una captación. Compara los datos sin dar por ganador a un grupo pequeño.';
+    function tr(r,footer){return '<tr'+(footer?' class="nfl-total"':'')+'><th scope="row">'+esc(r.label)+'</th><td>'+r.total+'</td><td>'+r.call+'</td><td>'+pct(r.call,r.total)+'</td><td>'+r.sale+'</td><td><strong>'+pct(r.sale,r.total)+'</strong></td><td>'+pct(r.callSale,r.call)+'</td></tr>';}
+    return '<section class="nfl-card nfl-stats"><div class="nfl-heading"><div><span class="nfl-eyebrow">RESULTADOS POR CAPTACIÓN</span><h2>Qué leads convierten mejor</h2></div><span class="nfl-badge">'+(view.month?esc(view.month):'Todo el histórico')+'</span></div><p class="nfl-muted">Leads dados de alta en el periodo elegido y sus resultados registrados hasta hoy. Los filtros de búsqueda, interés, estado y grupo solo afectan a la lista.</p><div class="nfl-kpis">'+[['Leads',tot.total],['Llegaron a llamada',tot.call],['Ventas cerradas',tot.sale],['Lead → venta',pct(tot.sale,tot.total)]].map(function(k){return '<div><span>'+k[0]+'</span><strong>'+k[1]+'</strong></div>';}).join('')+'</div><div class="nfl-table-scroll"><table><caption class="nfl-sr">Conversión por captación; personas únicas, sin duplicar llamadas</caption><thead><tr><th>Captación</th><th>Leads</th><th>Con llamada</th><th>Lead → llamada</th><th>Ventas</th><th>Lead → venta</th><th>Llamada → venta</th></tr></thead><tbody>'+rows.map(function(r){return tr(r,false);}).join('')+'</tbody><tfoot>'+tr(Object.assign({label:'Total'},tot),true)+'</tfoot></table></div><p class="nfl-insight">'+esc(insight)+'</p><details><summary>Cómo se calculan estos datos</summary><p class="nfl-muted">Una persona cuenta una sola vez. «Con llamada» incluye una llamada agendada, una transición a ese estado registrada desde esta actualización o una llamada del apartado Ventas vinculada al lead. «Ventas» incluye el estado Venta cerrada o una llamada marcada como cerrada; no equivale a un cobro verificado. Llamada → venta solo cuenta ventas con constancia de llamada. No se presupone que todas las ventas históricas tuvieron llamada.</p><p class="nfl-muted">Las llamadas antiguas se relacionan por nombre exacto solo si es único. '+events.unmatched+' registros de llamada sin vínculo inequívoco quedan fuera. Los contadores manuales de Ventas sin persona asociada no se atribuyen a ningún origen. Un guion significa que no hay denominador.</p></details></section>';
   }
-
-  function bindListHandlers(box){
-    Array.prototype.forEach.call(box.querySelectorAll('[data-untag]'),function(el){
-      el.onclick=function(){var parts=el.getAttribute('data-untag').split('|');toggleTag(parts[0],parts[1]);render();};
-    });
-    Array.prototype.forEach.call(box.querySelectorAll('[data-addsel]'),function(sel){
-      sel.onchange=function(){var id=sel.getAttribute('data-addsel');var v=sel.value;if(v){toggleTag(id,v);render();}};
-    });
-    Array.prototype.forEach.call(box.querySelectorAll('[data-stsel]'),function(sel){
-      sel.onchange=function(){setStatus(sel.getAttribute('data-stsel'),sel.value);render();};
-    });
-    Array.prototype.forEach.call(box.querySelectorAll('[data-ledit]'),function(b){
-      b.onclick=function(){_editId=b.getAttribute('data-ledit');_formOpen=true;render();};
-    });
-    Array.prototype.forEach.call(box.querySelectorAll('[data-ldel]'),function(b){
-      b.onclick=function(){var id=b.getAttribute('data-ldel');var l=getLeadById(id);if(!confirm('¿Eliminar el lead "'+((l&&leadLabel(l))||'')+'"? No se puede deshacer.'))return;deleteLead(id);render();};
-    });
+  function formHtml(){if(!formOpen)return '';var l=leads().find(function(x){return x.id===editing;})||{name:'',source:'Instagram',status:'New',note:'',date:today()},m=meta(l),sources=Array.from(new Set(['Instagram','ManyChat','GEIEG','Webinar','Referral','Àurea','Ads','Other'].concat(read('sources',[]).map(function(x){return x.name;}),leads().map(function(x){return x.source;})).filter(Boolean)));
+    return '<form id="nfl-form" class="nfl-form"><h3>'+ (editing?'Editar lead':'Nuevo lead')+'</h3><div class="nfl-form-grid"><label class="nfl-field">Nombre<input id="nfl-name" required value="'+esc(l.name)+'"></label>'+select('nfl-source','Canal',sources.map(function(s){return [s,s];}),l.source)+select('nfl-type','Captación', [['auto','Sin clasificar / detectar formulario']].concat(TYPES.map(function(t){return [t[0],t[1]];})),m.type||'auto')+select('nfl-interest','Interés',INTEREST,interestOf(m))+select('nfl-status','Estado comercial',STATES,l.status)+'<label class="nfl-field">Fecha de alta<input id="nfl-date" type="date" required value="'+esc(l.date)+'"></label></div><label class="nfl-field">Notas<textarea id="nfl-note" rows="3">'+esc(l.note)+'</textarea></label><p class="nfl-muted">La captación distingue cómo llegó; el canal conserva tu origen actual. Valora el interés según la conversación, sin confundirlo con su estado comercial.</p><div class="nfl-actions"><button type="button" id="nfl-cancel">Cancelar</button><button class="nfl-primary" type="submit">Guardar lead</button></div></form>';
   }
-
-  function render(){
-    var root=document.getElementById('_nf_leadgroups_root');if(!root)return;
-    if(!_protoPulled){_protoPulled=true;protoPull(function(add){if(add)render();});}
-    var _plS=document.getElementById('_nf_lg_list');var _lgScroll=_plS?_plS.scrollTop:0;var _winScroll=(window.pageYOffset||document.documentElement.scrollTop||0);
-    var groups=loadGroups();
-    var tags=loadTags();
-    var leads=getLeads();
-    var leadById={};leads.forEach(function(l){leadById[l.id]=l;});
-
-    // Count leads per group
-    var counts={};groups.forEach(function(g){counts[g.name]=0;});
-    Object.keys(tags).forEach(function(lid){
-      if(!leadById[lid])return;
-      (tags[lid]||[]).forEach(function(n){if(counts[n]!=null)counts[n]++;});
-    });
-
-    // Group filter chips
-    var chips='<span data-gf="__all" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;'+(_sel===null?'background:var(--text);color:var(--bg)':'background:var(--bg3);color:var(--text2);border:1px solid var(--bg4)')+'">Todos</span>';
-    chips+=groups.map(function(g){
-      var on=_sel===g.name;
-      return '<span data-gf="'+esc(g.name)+'" style="cursor:pointer;display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;padding:5px 11px;border-radius:20px;white-space:nowrap;background:'+g.color+(on?'':'22')+';color:'+(on?'#fff':g.color)+';border:1px solid '+g.color+(on?'':'44')+'">'+
-        esc(g.name)+'<span style="font-size:10px;opacity:.85;background:rgba(0,0,0,.15);border-radius:10px;padding:0 6px">'+(counts[g.name]||0)+'</span>'+
-        '<span data-gdel="'+esc(g.name)+'" title="Eliminar grup" style="opacity:.6;margin-left:2px;font-size:12px">×</span>'+
-      '</span>';
-    }).join('');
-
-    var addBtn=_adding
-      ? '<span style="display:inline-flex;align-items:center;gap:4px"><input id="_nf_lg_new" type="text" placeholder="Nombre del grupo..." style="background:var(--bg3);border:1px solid var(--bg4);border-radius:20px;padding:5px 11px;color:var(--text);font-size:11px;font-weight:600;outline:none;width:130px"><button id="_nf_lg_newok" style="background:#a3e635;border:none;color:#fff;border-radius:20px;padding:5px 12px;font-size:11px;font-weight:700;cursor:pointer">OK</button></span>'
-      : '<span id="_nf_lg_add" style="cursor:pointer;font-size:11px;font-weight:700;padding:5px 12px;border-radius:20px;white-space:nowrap;background:var(--bg3);color:#a3e635;border:1px dashed #a3e63555">+ Nuevo grupo</span>';
-
-    // Status filter chips
-    var sc=statusCounts();
-    function schip(key,lbl,col,n){var on=(key==='__all'&&_selStatus===null)||_selStatus===key;var c=col||'#828ca8';return '<span data-sf="'+key+'" style="cursor:pointer;font-size:11px;font-weight:700;padding:4px 11px;border-radius:20px;white-space:nowrap;'+(on?'background:'+c+';color:#fff':'background:'+c+'1f;color:'+c+';border:1px solid '+c+'40')+'">'+lbl+' '+n+'</span>';}
-    var statusChips='<div style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:10px">'+
-      '<span style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-right:2px">Estado</span>'+
-      schip('__all','Todos',null,leads.length)+
-      schip('New',ST_LBL.New,ST_COL.New,sc.New)+
-      schip('Contacted',ST_LBL.Contacted,ST_COL.Contacted,sc.Contacted)+
-      schip('Call scheduled',ST_LBL['Call scheduled'],ST_COL['Call scheduled'],sc['Call scheduled'])+
-      schip('Closed',ST_LBL.Closed,ST_COL.Closed,sc.Closed)+
-      schip('Lost',ST_LBL.Lost,ST_COL.Lost,sc.Lost)+
-      '<span style="width:1px;height:16px;background:var(--bg4);margin:0 2px"></span>'+
-      schip('__cold','🔥 A seguir','#f59e0b',coldCount())+
-      '<span style="width:1px;height:16px;background:var(--bg4);margin:0 2px"></span>'+
-      schip('__proto','⭐ Protocolo','#a3e635',protoCount())+
-    '</div>';
-
-    // New-lead button
-    var newLeadBtn=_formOpen?'':'<button id="_nf_lf_new" style="width:100%;box-sizing:border-box;background:#a3e635;border:none;color:#fff;border-radius:11px;padding:11px;font-size:13px;font-weight:800;cursor:pointer;margin-bottom:10px">+ Nuevo lead</button>';
-
-    // Add / edit form
-    var ed=_editId?getLeadById(_editId):null;
-    var srcOpts=getSourcesList().map(function(s){return '<option value="'+esc(s)+'"'+(ed&&ed.source===s?' selected':'')+'>'+esc(s)+'</option>';}).join('');
-    var stOpts=ST_ORDER.map(function(s){return '<option value="'+s+'"'+(((ed&&ed.status===s)||(!ed&&s==='New'))?' selected':'')+'>'+esc(ST_LBL[s])+'</option>';}).join('');
-    var formHtml=_formOpen?(
-      '<div style="background:var(--bg3);border:1px solid var(--bg4);border-radius:12px;padding:14px;margin-bottom:12px">'+
-        '<div style="font-size:12px;font-weight:800;color:var(--text);margin-bottom:10px">'+(_editId?'Editar lead':'Nuevo lead')+'</div>'+
-        '<input id="_nf_lf_name" type="text" placeholder="Nombre*" value="'+esc(ed?ed.name:'')+'" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px 11px;color:var(--text);font-size:13px;outline:none;margin-bottom:8px">'+
-        '<div style="display:flex;gap:8px;margin-bottom:8px;flex-wrap:wrap">'+
-          '<select id="_nf_lf_src" style="flex:1;min-width:110px;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px;color:var(--text);font-size:12px;outline:none">'+srcOpts+'</select>'+
-          '<select id="_nf_lf_status" style="flex:1;min-width:110px;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px;color:var(--text);font-size:12px;outline:none">'+stOpts+'</select>'+
-          '<input id="_nf_lf_date" type="date" value="'+esc(ed&&ed.date?String(ed.date).slice(0,10):todayStr())+'" style="flex:1;min-width:110px;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px;color:var(--text);font-size:12px;outline:none">'+
-        '</div>'+
-        '<textarea id="_nf_lf_note" placeholder="Nota (opcional)" rows="2" style="width:100%;box-sizing:border-box;background:var(--bg2);border:1px solid var(--bg4);border-radius:9px;padding:9px 11px;color:var(--text);font-size:12px;outline:none;resize:vertical;margin-bottom:10px">'+esc(ed?ed.note:'')+'</textarea>'+
-        '<div style="display:flex;gap:8px">'+
-          '<button id="_nf_lf_cancel" style="flex:1;background:var(--bg2);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer">Cancelar</button>'+
-          '<button id="_nf_lf_save" style="flex:2;background:#a3e635;border:none;color:#fff;border-radius:9px;padding:9px;font-size:12px;font-weight:800;cursor:pointer">'+(_editId?'Guardar cambios':'Añadir lead')+'</button>'+
-        '</div>'+
-      '</div>'
-    ):'';
-
-    // (lead list is rendered by renderList() into #_nf_lg_list)
-
-    root.innerHTML=
-      '<style>.nf-lg-row{transition:background .12s}.nf-lg-row:hover{background:rgba(255,255,255,.04)}#_nf_lg_search::placeholder{color:var(--muted)}#_nf_lg_list::-webkit-scrollbar{width:8px}#_nf_lg_list::-webkit-scrollbar-thumb{background:var(--bg4);border-radius:8px}</style>'+
-      '<div style="margin-bottom:20px;background:var(--bg2);border-radius:14px;border:1px solid var(--border);overflow:hidden">'+
-        '<div id="_nf_lg_hdr" style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;cursor:pointer;user-select:none;border-bottom:'+(_open?'1px solid var(--border)':'none')+'">'+
-          '<div style="display:flex;align-items:center;gap:10px">'+
-            '<span style="font-size:16px">📋</span>'+
-            '<span style="font-size:13px;font-weight:700;color:var(--text)">Leads</span>'+
-            '<span style="background:#a3e63522;color:#a3e635;font-size:10px;font-weight:700;padding:2px 8px;border-radius:20px">'+leads.length+'</span>'+
-          '</div>'+
-          '<span style="color:var(--muted);font-size:11px">'+(_open?'▾':'▸')+'</span>'+
-        '</div>'+
-        (_open?
-          '<div style="padding:14px 20px">'+
-            '<div style="font-size:11px;color:var(--muted);margin-bottom:10px;line-height:1.5">Todos tus leads en un sitio: filtra por <b style="color:var(--text2)">estado</b> o <b style="color:var(--text2)">grupo</b>, busca, cambia el estado, edítalos o clasifícalos. Pulsa <b style="color:var(--text2)">+ Nuevo lead</b> para añadir.</div>'+
-            statusChips+
-            '<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:10px"><span style="font-size:10px;font-weight:800;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-right:2px">Grupos</span>'+chips+addBtn+'</div>'+
-            newLeadBtn+
-            formHtml+
-            '<div style="position:relative;margin-bottom:10px">'+
-              '<span style="position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:13px;opacity:.65;pointer-events:none">🔍</span>'+
-              '<input id="_nf_lg_search" type="text" autocomplete="off" placeholder="Buscar lead por nombre..." value="'+esc(_q)+'" style="width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:11px;padding:10px 34px 10px 38px;color:var(--text);font-size:13px;outline:none">'+
-              '<span id="_nf_lg_clear" title="Limpiar" style="position:absolute;right:11px;top:50%;transform:translateY(-50%);cursor:pointer;color:var(--muted);font-size:17px;line-height:1;display:'+(_q?'block':'none')+'">\xd7</span>'+
-            '</div>'+
-            '<div style="display:flex;justify-content:flex-end;margin-bottom:8px"><button id="_nf_lg_sort" title="Cambiar orden" style="background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:8px;padding:4px 11px;font-size:11px;font-weight:700;cursor:pointer;display:inline-flex;align-items:center;gap:5px">'+(_sort==="new"?"↓ Recientes":_sort==="old"?"↑ Antiguos":"⇅ Nombre")+'</button></div>'+
-            '<div id="_nf_lg_list" style="max-height:430px;overflow-y:auto;margin:0 -4px;padding:0 2px"></div>'+
-          '</div>'
-        :'')+
-      '</div>';
-
-    // Bind
-    document.getElementById('_nf_lg_hdr').onclick=function(){_open=!_open;render();};
-    if(_open){
-      Array.prototype.forEach.call(root.querySelectorAll('[data-gf]'),function(el){
-        el.onclick=function(ev){
-          if(ev.target&&ev.target.getAttribute('data-gdel'))return;
-          var g=el.getAttribute('data-gf');
-          _sel=(g==='__all')?null:g;
-          render();
-        };
-      });
-      Array.prototype.forEach.call(root.querySelectorAll('[data-gdel]'),function(el){
-        el.onclick=function(ev){
-          ev.stopPropagation();
-          var name=el.getAttribute('data-gdel');
-          if(!confirm('¿Eliminar el grupo "'+name+'"? (los leads no se borran, solo la etiqueta)'))return;
-          var g=loadGroups().filter(function(x){return x.name!==name;});saveGroups(g);
-          var t=loadTags();Object.keys(t).forEach(function(k){t[k]=(t[k]||[]).filter(function(n){return n!==name;});if(!t[k].length)delete t[k];});saveTags(t);
-          if(_sel===name)_sel=null;
-          render();
-        };
-      });
-      var addEl=document.getElementById('_nf_lg_add');
-      if(addEl)addEl.onclick=function(){_adding=true;render();setTimeout(function(){var i=document.getElementById('_nf_lg_new');if(i)i.focus();},20);};
-      var newOk=document.getElementById('_nf_lg_newok');
-      var newInp=document.getElementById('_nf_lg_new');
-      function commitNew(){
-        var v=(newInp&&newInp.value||'').trim();
-        if(v){var g=loadGroups();if(!g.find(function(x){return x.name===v;})){g.push({name:v,color:PALETTE[g.length%PALETTE.length]});saveGroups(g);}}
-        _adding=false;render();
-      }
-      if(newOk)newOk.onclick=commitNew;
-      if(newInp)newInp.onkeydown=function(e){if(e.key==='Enter')commitNew();if(e.key==='Escape'){_adding=false;render();}};
-      var sInp=document.getElementById('_nf_lg_search');
-      if(sInp){
-        sInp.oninput=function(){_q=this.value;var c=document.getElementById('_nf_lg_clear');if(c)c.style.display=this.value?'block':'none';renderList();};
-        sInp.onkeydown=function(e){if(e.key==='Escape'){_q='';render();}};
-      }
-      var clrEl=document.getElementById('_nf_lg_clear');
-      if(clrEl)clrEl.onclick=function(){_q='';render();setTimeout(function(){var i=document.getElementById('_nf_lg_search');if(i)i.focus();},20);};
-      var sortBtn=document.getElementById('_nf_lg_sort');
-      if(sortBtn)sortBtn.onclick=function(){_sort=_sort==='az'?'new':_sort==='new'?'old':'az';render();};
-      Array.prototype.forEach.call(root.querySelectorAll('[data-sf]'),function(el){
-        el.onclick=function(){var k=el.getAttribute('data-sf');_selStatus=(k==='__all')?null:k;render();if(k==='__proto'){protoPull(function(add){render();});}};
-      });
-      var nlBtn=document.getElementById('_nf_lf_new');
-      if(nlBtn)nlBtn.onclick=function(){_editId=null;_formOpen=true;render();setTimeout(function(){var i=document.getElementById('_nf_lf_name');if(i)i.focus();},20);};
-      var lfCancel=document.getElementById('_nf_lf_cancel');
-      if(lfCancel)lfCancel.onclick=function(){_formOpen=false;_editId=null;render();};
-      var lfSave=document.getElementById('_nf_lf_save');
-      if(lfSave)lfSave.onclick=function(){
-        var nameEl=document.getElementById('_nf_lf_name');
-        var nm=((nameEl&&nameEl.value)||'').trim();
-        if(!nm){if(nameEl){nameEl.style.borderColor='#f87171';nameEl.focus();}return;}
-        var o={name:nm,source:(document.getElementById('_nf_lf_src')||{}).value||'Instagram',status:(document.getElementById('_nf_lf_status')||{}).value||'New',note:(document.getElementById('_nf_lf_note')||{}).value||'',date:(document.getElementById('_nf_lf_date')||{}).value||todayStr()};
-        if(_editId)updateLead(_editId,o);else addLead(o);
-        _formOpen=false;_editId=null;render();
-      };
-      renderList();
-      var _flS=document.getElementById('_nf_lg_list');if(_flS&&_lgScroll)_flS.scrollTop=_lgScroll;
-      if(_winScroll){try{window.scrollTo(0,_winScroll);}catch(e){}}
-    }
+  function renderList(){var box=document.getElementById('nfl-list');if(!box)return;var list=filtered(),pages=Math.max(1,Math.ceil(list.length/25));view.page=Math.min(view.page,pages);var metadata=read('leadmeta',{}),tags=read('leadtags',{}),groups=read('leadgroups',[]);
+    document.getElementById('nfl-count').textContent=list.length+' de '+getCohort().length+' leads del periodo';
+    box.innerHTML=list.length?list.slice((view.page-1)*25,view.page*25).map(function(l){var m=metadata[l.id]||{},type=typeOf(l,m),color=(TYPES.find(function(t){return t[0]===type;})||[])[2]||'#a3e635';
+      return '<article class="nfl-row"><div class="nfl-avatar" style="color:'+color+'">'+esc(String(l.name||'?').charAt(0).toUpperCase())+'</div><div class="nfl-person"><div class="nfl-person-title"><strong>'+esc(l.name||'(sin nombre)')+'</strong><span class="nfl-badge" style="color:'+color+'">'+esc(typeLabel(type,l))+'</span></div><div class="nfl-muted">'+esc(l.source||'Sin canal')+' · Alta: '+esc(l.date||'Sin fecha')+'</div>'+(l.note?'<p class="nfl-note">'+esc(l.note)+'</p>':'')+'<div class="nfl-tags">'+(tags[l.id]||[]).map(function(g){return '<button data-untag="'+esc(l.id)+'" data-group="'+esc(g)+'" title="Quitar grupo">'+esc(g)+' ×</button>';}).join('')+(groups.length?'<select aria-label="Añadir grupo a '+esc(l.name)+'" data-addgroup="'+esc(l.id)+'">'+options([['','+ Grupo']].concat(groups.filter(function(g){return (tags[l.id]||[]).indexOf(g.name)<0;}).map(function(g){return [g.name,g.name];})), '')+'</select>':'')+'</div></div><div class="nfl-row-controls"><label>Interés<select data-interest="'+esc(l.id)+'">'+options(INTEREST,interestOf(m))+'</select></label><label>Estado<select style="color:'+(COLORS[l.status]||'#a3e635')+'" data-status="'+esc(l.id)+'">'+options(STATES,l.status)+'</select></label><button data-edit="'+esc(l.id)+'" aria-label="Editar '+esc(l.name)+'">Editar</button><button class="nfl-delete" data-delete="'+esc(l.id)+'" aria-label="Eliminar '+esc(l.name)+'">×</button></div></article>';
+    }).join(''):'<div class="nfl-empty"><strong>No hay leads con estos filtros</strong><p>Prueba otra captación o limpia los filtros.</p><button id="nfl-empty-reset">Limpiar filtros</button></div>';
+    document.getElementById('nfl-pagination').innerHTML='<button id="nfl-prev"'+(view.page<=1?' disabled':'')+'>← Anterior</button><span>Página '+view.page+' de '+pages+'</span><button id="nfl-next"'+(view.page>=pages?' disabled':'')+'>Siguiente →</button>';
+    document.getElementById('nfl-prev').onclick=function(){view.page--;renderList();};document.getElementById('nfl-next').onclick=function(){view.page++;renderList();};
+    box.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){editing=b.dataset.edit;formOpen=true;render();document.getElementById('nfl-name').focus();};});
+    box.querySelectorAll('[data-status]').forEach(function(b){b.onchange=function(){setStatus(b.dataset.status,b.value);};});
+    box.querySelectorAll('[data-interest]').forEach(function(b){b.onchange=function(){var all=read('leadmeta',{});all[b.dataset.interest]=Object.assign({},all[b.dataset.interest],{interest:b.value});write('leadmeta',all);render();};});
+    box.querySelectorAll('[data-delete]').forEach(function(b){b.onclick=function(){var l=leads().find(function(l){return l.id===b.dataset.delete;});if(!confirm('¿Eliminar a '+l.name+'? Esta acción no se puede deshacer.'))return;saveLeads(leads().filter(function(l){return l.id!==b.dataset.delete;}));['leadmeta','leadtags'].forEach(function(k){var all=read(k,{});delete all[b.dataset.delete];write(k,all);});render();};});
+    box.querySelectorAll('[data-addgroup]').forEach(function(b){b.onchange=function(){if(!b.value)return;var all=read('leadtags',{});all[b.dataset.addgroup]=(all[b.dataset.addgroup]||[]).concat(b.value);write('leadtags',all);render();};});
+    box.querySelectorAll('[data-untag]').forEach(function(b){b.onclick=function(){var all=read('leadtags',{});all[b.dataset.untag]=(all[b.dataset.untag]||[]).filter(function(g){return g!==b.dataset.group;});write('leadtags',all);render();};});
+    var reset=document.getElementById('nfl-empty-reset');if(reset)reset.onclick=resetFilters;
   }
-
-  // ── Floating button (only visible on the Leads tab) + modal ──
-  function onLeadsTab(){
-    // Reliable marker: our own root div is mounted by React only on the Leads tab.
-    return !!document.getElementById('_nf_leadgroups_root');
+  function resetFilters(){Object.assign(view,{type:'all',interest:'all',status:'all',group:'all',query:'',page:1});render();}
+  function signature(){var p=pre();return p+['leads','leadmeta','leadtags','leadgroups','calls'].map(function(k){return localStorage.getItem(p+k)||'';}).join('|');}
+  function render(){var root=document.getElementById('_nf_leadgroups_root');if(!root||!pre())return;
+    var metadata=read('leadmeta',{}),cohort=getCohort(),groups=read('leadgroups',[]),months=Array.from(new Set(leads().map(function(l){return String(l.date||'').slice(0,7);}).filter(function(m){return /^\d{4}-\d{2}$/.test(m);}))).sort().reverse();
+    var cards=[['all','Todas las captaciones','#a3e635']].concat(TYPES).map(function(t){var count=cohort.filter(function(l){return t[0]==='all'||typeOf(l,metadata[l.id])===t[0];}).length;return '<button class="nfl-origin'+(view.type===t[0]?' is-active':'')+'" data-type="'+t[0]+'" aria-pressed="'+(view.type===t[0])+'"><span style="color:'+t[2]+'">'+t[1]+'</span><strong>'+count+'</strong></button>';}).join('');
+    root.classList.add('nfl-workspace');root.innerHTML='<section class="nfl-card"><div class="nfl-heading"><div><span class="nfl-eyebrow">TU CARTERA DE OPORTUNIDADES</span><h1>Leads <span class="nfl-badge">'+leads().length+'</span></h1><p class="nfl-muted">Encuentra a quién contactar y entiende de dónde llegan tus mejores oportunidades.</p></div><button id="nfl-new" class="nfl-primary">+ Nuevo lead</button></div><div class="nfl-period">'+select('nfl-month','Fecha de alta',[['','Todo el histórico']].concat(months.map(function(m){return [m,m];})),view.month)+'<span class="nfl-muted">El periodo se aplica a la lista y a las estadísticas.</span></div><div class="nfl-origins">'+cards+'</div>'+formHtml()+'<div class="nfl-filters"><label class="nfl-field nfl-search">Buscar<input id="_nf_lg_search" type="search" placeholder="Nombre, notas o canal…" value="'+esc(view.query)+'"></label>'+select('nfl-filter-interest','Interés',[['all','Todos los niveles']].concat(INTEREST),view.interest)+select('nfl-filter-status','Estado',[['all','Todos los estados'],['active','Pendientes de avanzar']].concat(STATES),view.status)+select('nfl-filter-group','Grupo',[['all','Todos los grupos']].concat(groups.map(function(g){return [g.name,g.name];})),view.group)+'</div><div class="nfl-toolbar"><span id="nfl-count" role="status"></span><div><button id="nfl-reset">Limpiar filtros</button><button id="nfl-addgroup">+ Grupo</button>'+select('nfl-sort','Orden',[['recent','Más recientes'],['interest','Mayor interés'],['name','Nombre A–Z']],view.sort)+'</div></div><div id="nfl-list"></div><div id="nfl-pagination"></div></section>'+statsHtml();
+    root.querySelectorAll('[data-type]').forEach(function(b){b.onclick=function(){view.type=b.dataset.type;view.page=1;render();};});
+    [['nfl-month','month'],['nfl-filter-interest','interest'],['nfl-filter-status','status'],['nfl-filter-group','group'],['nfl-sort','sort']].forEach(function(pair){document.getElementById(pair[0]).onchange=function(){view[pair[1]]=this.value;view.page=1;render();};});
+    document.getElementById('_nf_lg_search').oninput=function(){view.query=this.value;view.page=1;renderList();};
+    document.getElementById('nfl-reset').onclick=resetFilters;
+    document.getElementById('nfl-new').onclick=function(){editing=null;formOpen=true;render();document.getElementById('nfl-name').focus();};
+    document.getElementById('nfl-addgroup').onclick=function(){var name=prompt('Nombre del nuevo grupo');if(!name||!name.trim())return;name=name.trim();var all=read('leadgroups',[]);if(!all.some(function(g){return norm(g.name)===norm(name);})){all.push({name:name,color:'#a3e635'});write('leadgroups',all);}render();};
+    if(formOpen){document.getElementById('nfl-cancel').onclick=function(){formOpen=false;editing=null;render();};document.getElementById('nfl-form').onsubmit=function(e){e.preventDefault();var name=document.getElementById('nfl-name').value.trim();if(!name)return;var id=editing||'lead_'+Date.now().toString(36)+'_'+Math.random().toString(36).slice(2,8),all=read('leadmeta',{}),m=Object.assign({},all[id]||{}),type=document.getElementById('nfl-type').value;
+      if(type==='auto')delete m.type;else m.type=type;m.interest=document.getElementById('nfl-interest').value;all[id]=m;write('leadmeta',all);
+      var update={name:name,source:document.getElementById('nfl-source').value,status:document.getElementById('nfl-status').value,note:document.getElementById('nfl-note').value,date:document.getElementById('nfl-date').value};stage(id,update.status);
+      var list=leads();if(editing)list=list.map(function(l){return l.id===id?Object.assign({},l,update):l;});else list.unshift(Object.assign({id:id},update));saveLeads(list);formOpen=false;editing=null;render();};}
+    renderList();lastSignature=signature();
   }
-  function openModal(){
-    var bg=document.getElementById('_nf_lg_modal');if(bg){bg.style.display='flex';render();return;}
-    bg=document.createElement('div');
-    bg.id='_nf_lg_modal';
-    bg.style.cssText='position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:9998;display:flex;align-items:flex-start;justify-content:center;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);padding:40px 16px;overflow-y:auto';
-    bg.innerHTML='<div style="background:var(--bg2);border-radius:16px;border:1px solid var(--border);max-width:620px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,0.6);max-height:86vh;display:flex;flex-direction:column;overflow:hidden">'+
-      '<div style="display:flex;justify-content:space-between;align-items:center;padding:16px 20px;border-bottom:1px solid var(--border)">'+
-        '<div style="display:flex;align-items:center;gap:8px"><span style="font-size:18px">📋</span><span style="font-size:15px;font-weight:700;color:var(--text)">Grups de leads</span></div>'+
-        '<button id="_nf_lg_x" style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:22px;line-height:1;padding:0 4px">\xd7</button>'+
-      '</div>'+
-      '<div id="_nf_lg_body" style="padding:16px 20px;overflow-y:auto"></div>'+
-    '</div>';
-    document.body.appendChild(bg);
-    bg.onclick=function(e){if(e.target===bg)bg.style.display='none';};
-    document.getElementById('_nf_lg_x').onclick=function(){bg.style.display='none';};
-    render();
-  }
-  function ensureBtn(){
-    var btn=document.getElementById('_nf_lg_btn');
-    if(!onLeadsTab()){if(btn)btn.style.display='none';return;}
-    if(btn){btn.style.display='flex';return;}
-    btn=document.createElement('button');
-    btn.id='_nf_lg_btn';
-    btn.innerHTML='📋 Grupos';
-    btn.style.cssText='position:fixed;bottom:70px;left:18px;z-index:797;background:#a3e635;border:none;color:#fff;border-radius:22px;padding:9px 16px;font-size:12px;font-weight:700;cursor:pointer;box-shadow:0 4px 14px rgba(0,0,0,0.45);display:flex;align-items:center;gap:6px';
-    btn.onclick=openModal;
-    document.body.appendChild(btn);
-  }
-  var _lastHash='';
-  function hash(){var p=getPre();if(!p)return '';return (localStorage.getItem(p+'leads')||'').length+':'+(localStorage.getItem(p+'leadgroups')||'').length+':'+(localStorage.getItem(p+'leadtags')||'').length+':'+_sel+':'+_adding;}
-  var _lgBtnHide=document.getElementById('_nf_lg_btn');if(_lgBtnHide)_lgBtnHide.style.display='none';
-  setInterval(function(){
-    var b=document.getElementById('_nf_lg_btn');if(b)b.style.display='none';
-    var root=document.getElementById('_nf_leadgroups_root');
-    if(!root)return;
-    var h=hash();
-    if(!root.innerHTML.trim()||h!==_lastHash){_lastHash=h;render();}
-  },400);
+  var style=document.createElement('style');style.textContent=`
+    .nfl-workspace{--nfl-accent:#a3e635;color:var(--text);font-family:inherit}.nfl-workspace *{box-sizing:border-box}
+    .nfl-card{background:var(--bg2,#0c0e11);border:1px solid var(--border,#242730);border-radius:16px;padding:24px;margin-bottom:24px}
+    .nfl-heading{display:flex;justify-content:space-between;align-items:center;gap:20px}.nfl-eyebrow{font-size:10px;letter-spacing:.12em;color:var(--muted);font-weight:700}
+    .nfl-workspace h1{font-size:24px;margin:8px 0}.nfl-workspace h2{font-size:20px;margin:8px 0}.nfl-workspace h3{margin:0 0 16px}.nfl-muted{font-size:12px;color:var(--muted,#8892a3);line-height:1.6}.nfl-badge{font-size:11px;font-weight:600;background:var(--bg3,#181b22);border-radius:6px;padding:5px 8px;display:inline-block}
+    .nfl-workspace button,.nfl-workspace select,.nfl-workspace input,.nfl-workspace textarea{font:inherit;font-size:12px;color:var(--text,#f3f4f6);background:var(--bg3,#171a20);border:1px solid var(--border,#2b3039);border-radius:9px;padding:9px 11px}
+    .nfl-workspace button{cursor:pointer}.nfl-workspace button:hover{border-color:var(--nfl-accent)}.nfl-workspace button:disabled{opacity:.35;cursor:default}.nfl-workspace :focus-visible{outline:2px solid #a3e635;outline-offset:3px}.nfl-workspace .nfl-primary{background:#a3e635;color:#101604;font-weight:800;border-color:#a3e635;padding:12px 18px;white-space:nowrap}
+    .nfl-period{display:flex;align-items:end;gap:16px;margin:18px 0}.nfl-field{display:flex;flex-direction:column;gap:7px;font-size:11px;color:var(--muted);font-weight:600;min-width:0}.nfl-field input,.nfl-field select{width:100%;min-width:0}.nfl-field textarea{resize:vertical;width:100%}
+    .nfl-origins{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin:20px 0}.nfl-workspace .nfl-origin{display:flex;flex-direction:column;align-items:start;text-align:left;gap:12px;padding:15px;min-height:91px}.nfl-origin span{font-size:11px;line-height:1.4}.nfl-origin strong{font-size:24px}.nfl-workspace .nfl-origin.is-active{border-color:#a3e635;background:#a3e6350d;box-shadow:inset 0 0 0 1px #a3e635}
+    .nfl-filters{display:grid;grid-template-columns:2fr 1fr 1.2fr 1fr;gap:12px;margin:24px 0 16px}.nfl-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;color:var(--muted);font-size:11px;padding-bottom:14px;border-bottom:1px solid var(--border)}.nfl-toolbar>div{display:flex;align-items:end;gap:8px}.nfl-toolbar .nfl-field{flex-direction:row;align-items:center}.nfl-toolbar select{max-width:150px}
+    .nfl-row{display:flex;gap:12px;align-items:flex-start;padding:18px 0;border-bottom:1px solid var(--border)}.nfl-avatar{width:38px;height:38px;border-radius:50%;background:var(--bg3);display:flex;align-items:center;justify-content:center;font-weight:800;flex-shrink:0}.nfl-person{flex:1;min-width:0}.nfl-person-title{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.nfl-person-title strong{font-size:14px;overflow-wrap:anywhere}.nfl-note{font-size:12px;color:var(--text2,#aab3c4);line-height:1.6;margin:6px 0;white-space:pre-wrap;overflow-wrap:anywhere}.nfl-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:6px}.nfl-tags button,.nfl-tags select{font-size:10px;padding:4px 7px;color:#a3e635}.nfl-row-controls{display:flex;gap:7px;align-items:end}.nfl-row-controls label{font-size:9px;color:var(--muted);display:flex;flex-direction:column;gap:5px}.nfl-row-controls select{font-size:11px;max-width:155px}.nfl-workspace .nfl-delete{color:#fb7185}
+    #nfl-list{max-height:600px;overflow-y:auto;padding-right:8px;scrollbar-color:var(--bg4) transparent;scrollbar-width:thin}#nfl-pagination{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:18px;font-size:12px;color:var(--muted)}.nfl-form{padding:20px;background:var(--bg3);border:1px solid #a3e63555;border-radius:12px;margin:20px 0}.nfl-form-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;margin-bottom:14px}.nfl-actions{display:flex;justify-content:end;gap:8px}.nfl-empty{text-align:center;padding:42px 12px;color:var(--muted);font-size:13px}
+    .nfl-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin:20px 0}.nfl-kpis>div{padding:18px;background:var(--bg3);border-radius:10px}.nfl-kpis span{display:block;color:var(--muted);font-size:11px}.nfl-kpis strong{display:block;font-size:27px;margin-top:9px}.nfl-kpis>div:last-child strong{color:#a3e635}.nfl-table-scroll{overflow-x:auto}.nfl-workspace table{width:100%;border-collapse:collapse;font-size:12px;min-width:760px}.nfl-workspace th,.nfl-workspace td{padding:14px 12px;text-align:right;border-bottom:1px solid var(--border);white-space:nowrap}.nfl-workspace th:first-child{text-align:left}.nfl-workspace thead th{font-size:10px;color:var(--muted)}.nfl-workspace tbody th{font-weight:500}.nfl-workspace td strong{color:#a3e635}.nfl-total{background:var(--bg3);font-weight:700}.nfl-insight{font-size:12px;line-height:1.6;padding:14px;background:#a3e6350b;border-left:3px solid #a3e635;margin:18px 0}.nfl-workspace summary{font-size:12px;color:var(--text2);cursor:pointer}.nfl-sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+    @media(min-width:1500px){.nfl-origins{grid-template-columns:repeat(7,minmax(0,1fr))}}
+    @media(max-width:1000px){.nfl-row{flex-wrap:wrap}.nfl-row-controls{width:100%;padding-left:50px}.nfl-filters{grid-template-columns:repeat(2,minmax(0,1fr))}}
+    @media(max-width:640px){.nfl-card{padding:16px;border-radius:12px}.nfl-heading{align-items:start;flex-wrap:wrap}.nfl-heading h1{font-size:22px}.nfl-origins{grid-template-columns:repeat(2,minmax(0,1fr))}.nfl-workspace .nfl-origin{min-height:90px;padding:12px}.nfl-period{align-items:start;flex-direction:column;gap:5px}.nfl-row-controls{padding-left:0;flex-wrap:wrap}.nfl-row-controls select{max-width:145px}.nfl-toolbar{align-items:start;flex-direction:column}.nfl-toolbar>div{flex-wrap:wrap}.nfl-toolbar .nfl-field{flex-direction:column;align-items:start}.nfl-form-grid{grid-template-columns:1fr}.nfl-kpis{grid-template-columns:repeat(2,1fr)}.nfl-kpis>div{padding:12px}.nfl-filters{gap:10px}.nfl-search{grid-column:1/-1}.nfl-person-title{gap:6px}.nfl-person-title .nfl-badge{white-space:normal}}
+  `;document.head.appendChild(style);
+  // Shared testable calculations, also useful to future ManyChat ingestion.
+  window.NutriFlowLeads={typeOf:typeOf,outcomes:outcomes,aggregate:aggregate};
+  setInterval(function(){var p=pre(),root=document.getElementById('_nf_leadgroups_root');if(p!==activePrefix){activePrefix=p;formOpen=false;editing=null;Object.assign(view,{type:'all',interest:'all',status:'all',group:'all',query:'',month:'',page:1});lastSignature='';}
+    if(!root)return;var s=signature();if(!root.querySelector('.nfl-card')||(!formOpen&&s!==lastSignature)){var focused=document.activeElement,id=focused&&focused.id,start=focused&&focused.selectionStart;render();if(id==='_nf_lg_search'){var input=document.getElementById(id);input.focus();if(start!=null)input.setSelectionRange(start,start);}}
+  },500);
 })();
+
 </script>
 <script>
 (function(){
@@ -4270,13 +4046,13 @@ CÓMO RESPONDER (PRIORITARIO)
       var ex=findLeadByName(nm);
       if(!ex){
         var srcEl=document.getElementById('_nfcall_src');var src=(srcEl&&srcEl.value)||'Other';
-        var ls=getLeads();ls.unshift({id:pe(),name:nm,source:src,status:wasClosed?'Closed':'Contacted',note:'Añadido desde una llamada',date:todayStr()});saveLeadsArr(ls);
+        var ls=getLeads();ex={id:pe(),name:nm,source:src,status:wasClosed?'Closed':'Contacted',note:'Añadido desde una llamada',date:todayStr()};ls.unshift(ex);saveLeadsArr(ls);
       }else if(wasClosed&&ex.status!=='Closed'){
         saveLeadsArr(getLeads().map(function(l){return l.id===ex.id?{id:l.id,name:l.name,source:l.source,status:'Closed',note:l.note,date:l.date}:l;}));
       }
       var c=loadCalls();var o=c[ck]||{total:0,closed:0};if(!o.log)o.log=[];
       o.total=(o.total||0)+1;if(wasClosed)o.closed=(o.closed||0)+1;
-      o.log.push({id:uid(),name:nm,ts:Date.now(),closed:wasClosed});
+      o.log.push({id:uid(),leadId:ex.id,name:nm,ts:Date.now(),closed:wasClosed});
       if((o.closed||0)>(o.total||0))o.closed=o.total;
       c[ck]=o;saveCalls(c);render();
     }
