@@ -49,6 +49,9 @@ begin
   v_name_key:=regexp_replace(translate(lower(v_name),'áéíóúüñ','aeiouun'),'[^a-z0-9]','','g');
   v_user_key:=regexp_replace(v_user,'[^a-z0-9]','','g');
   perform pg_catalog.pg_advisory_xact_lock(pg_catalog.hashtextextended(p_user::text,0));
+  if v_user<>'' and exists(select 1 from public.nf_deleted_leads where user_id=p_user and instagram_handle_hash=pg_catalog.md5(v_user)) then
+    return jsonb_build_object('ok',true,'action','deleted_lead_not_recreated');
+  end if;
   select * into v_link from public.nf_manychat_links where user_id=p_user and account_id=p_account and contact_id=p_contact for update;
   if found then
     if v_link.state='deleted' or (v_link.state='linked' and v_link.lead_id is null) then

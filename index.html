@@ -250,14 +250,7 @@ function restoreFromSnapshot(token){
         if(cdb.length)fetch(SB+'/rest/v1/clients',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(cdb)}).catch(function(){});
         console.warn('[NF] RECOVERY clients from cloud snapshot');
       }
-      var lled=[];try{lled=JSON.parse(localStorage.getItem(PRE+'leads')||'[]');}catch(e){}
-      if(!lled.length&&snap.leads&&snap.leads.length){
-        localStorage.setItem(PRE+'leads',JSON.stringify(snap.leads));
-        if(window._nf_setLeads){try{window._nf_setLeads(snap.leads.slice());}catch(e){}}
-        var ldb=snap.leads.map(function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
-        fetch(SB+'/rest/v1/leads',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(ldb)}).catch(function(){});
-        console.warn('[NF] RECOVERY leads from cloud snapshot:',snap.leads.length);
-      }
+      // Lead snapshots are retained as history, never restored automatically.
       var lan=[];try{lan=JSON.parse(localStorage.getItem(PRE+'antrop')||'[]');}catch(e){}
       if(!lan.length&&snap.antrop&&snap.antrop.length){
         localStorage.setItem(PRE+'antrop',JSON.stringify(snap.antrop));
@@ -287,7 +280,11 @@ function syncRead(token){
     fetch2('/rest/v1/antropometrias?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token)
   ]).then(function(r){
     var clients=Array.isArray(r[0])?r[0]:[];
-    var leads=Array.isArray(r[1])?r[1]:[];
+    var leads=Array.isArray(r[1])?keepLiveLeads(r[1]):keepLiveLeads(JSON.parse(localStorage.getItem(PRE+'leads')||'[]'));
+    if(Array.isArray(r[1])){
+      var beforeSync=window._nf_syncing;window._nf_syncing=true;
+      try{localStorage.setItem(PRE+'leads',JSON.stringify(leads));setSyncedIds('leads',leads);}finally{window._nf_syncing=beforeSync;}
+    }
     var antrop=Array.isArray(r[2])?r[2]:[];
 
     var fmtClients=clients.map(function(c){
@@ -351,24 +348,7 @@ function syncRead(token){
     var fmtLeads=leads.map(function(l){
       return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date,acquisition_type:l.acquisition_type,lead_interest:l.lead_interest};
     });
-    if(!leads.length){
-      var localLeads=[];
-      try{localLeads=JSON.parse(localStorage.getItem(PRE+'leads')||'[]');}catch(e){}
-      if(!localLeads.length){
-        try{
-          var lbk=JSON.parse(localStorage.getItem(PRE+'leads_bk')||'[]');
-          if(lbk.length&&lbk[0].data&&lbk[0].data.length){
-            console.warn('[NF] RECOVERY leads from backup:',lbk[0].data.length,'leads from',new Date(lbk[0].ts).toLocaleString());
-            fmtLeads=lbk[0].data;
-            // Restore to Supabase
-            var dbLeads=fmtLeads.map(function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};});
-            fetch(SB+'/rest/v1/leads',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(dbLeads)}).catch(function(){});
-          }
-        }catch(ex){}
-      } else {
-        fmtLeads=localLeads;
-      }
-    }
+    // Lead tables, including an empty list, are authoritative. Backups never auto-restore deletions.
 
     // RECOVERY for antrop: same pattern
     var fmtAntrop=antrop.map(function(a){
@@ -433,7 +413,7 @@ function refreshFromCloud(){
       var leadsOk=Array.isArray(r[1]);
       var antropOk=Array.isArray(r[2]);
       var clients=clientsOk?r[0]:[];
-      var leads=leadsOk?r[1]:[];
+      var leads=leadsOk?keepLiveLeads(r[1]):[];
       var antrop=antropOk?r[2]:[];
       // If NONE of the queries returned a valid array, it was almost certainly an
       // auth/network error — do nothing (never wipe local data on a glitch).
@@ -453,7 +433,7 @@ function refreshFromCloud(){
           if(window._nf_setLostClients){try{window._nf_setLostClients(lost.slice());}catch(e){}}
         }
         // LEADS: only overwrite when cloud returned some (never wipe on empty/error)
-        if(leadsOk&&leads.length){
+        if(leadsOk){
           var fmtLeads=leads.map(function(l){return{id:l.id,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date,acquisition_type:l.acquisition_type,lead_interest:l.lead_interest};});
           localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
           setSyncedIds('leads',fmtLeads);
@@ -523,11 +503,12 @@ function seedSyncedIdsIfMissing(){
 //  - Only records that were genuinely removed (present last sync, gone now) are deleted.
 //  - Empty local array → skip entirely (never wipe the cloud).
 function syncTable(table,records,storageKey,token){
+  if(table==='leads')records=keepLiveLeads(records);
   if(!records||!records.length){console.warn('[NF] syncTable '+table+': empty – skipping (never wipe cloud)');return;}
   var currentIds=records.map(function(r){return r.id;});
   var curSet={};currentIds.forEach(function(id){curSet[id]=1;});
   var lastIds=[];try{lastIds=JSON.parse(localStorage.getItem(syncedIdsKey(storageKey))||'[]');}catch(e){}
-  var toDelete=lastIds.filter(function(id){return !curSet[id];});
+  var toDelete=table==='leads'?[]:lastIds.filter(function(id){return !curSet[id];});
   // 1) UPSERT current records — no wipe window
   fetch(SB+'/rest/v1/'+table,{
     method:'POST',
@@ -576,6 +557,28 @@ function saveClients(token){
 }
 
 var _syncLeadsTimer=null;
+// Runs inside the existing authenticated cloud-sync closure.
+function removedLeadIds(){try{return JSON.parse(localStorage.getItem(PRE+'deletedleads')||'[]');}catch(e){return [];}}
+function keepLiveLeads(list){var ids=removedLeadIds();return (list||[]).filter(function(l){return l&&ids.indexOf(l.id)<0;});}
+window._nf_deleteLead=async function(id){
+ var owner=UID,email=currentEmail(),prefix=PRE;
+ if(!owner||!prefix||!id)throw Error('Vuelve a iniciar sesión para eliminar el lead.');
+ var token=await getToken();
+ if(!token)throw Error('Vuelve a iniciar sesión para eliminar el lead.');
+ if(owner!==UID||email!==currentEmail())throw Error('La sesión ha cambiado. Vuelve a intentarlo.');
+ var response;
+ try{response=await fetch(SB+'/rest/v1/rpc/nf_delete_lead',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({p_id:id})});}
+ catch(e){throw Error('No se ha podido eliminar el lead. Revisa tu conexión e inténtalo de nuevo.');}
+ if(!response.ok)throw Error(response.status===401||response.status===403?'Vuelve a iniciar sesión para eliminar el lead.':'No se ha podido eliminar el lead. Inténtalo de nuevo.');
+ var result=await response.json();
+ if(!result||result.deleted!==true||result.id!==id)throw Error('El servidor no ha confirmado el borrado. Inténtalo de nuevo.');
+ if(owner!==UID||email!==currentEmail())throw Error('El lead se ha eliminado en la cuenta anterior. La sesión ha cambiado.');
+ clearTimeout(_syncLeadsTimer);
+ var removed=removedLeadIds();if(removed.indexOf(id)<0)removed.push(id);
+ localStorage.setItem(prefix+'deletedleads',JSON.stringify(removed));
+ return true;
+};
+
 function saveLeads(val,token){
   clearTimeout(_syncLeadsTimer);
   _syncLeadsTimer=setTimeout(function(){
@@ -679,7 +682,7 @@ function recoverFromBackupIfEmpty(token){
       fetch(SB+'/rest/v1/'+table,{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(db)}).catch(function(){});
     }
   }
-  tryRestore('leads','leads_bk','_nf_setLeads',function(l){return{id:l.id,user_id:UID,name:l.name,source:l.source,status:l.status,note:l.note,date:l.date};},'leads');
+  // Deliberately deleted leads must not be restored from local backups.
   tryRestore('antrop','antrop_bk',null,function(a){return{id:a.id,user_id:UID,client:a.client,price:a.price,date:a.date,notes:a.notes};},'antropometrias');
 }
 
@@ -3552,7 +3555,7 @@ CÓMO RESPONDER (PRIORITARIO)
     box.querySelectorAll('[data-edit]').forEach(function(b){b.onclick=function(){editing=b.dataset.edit;formOpen=true;render();document.getElementById('nfl-name').focus();};});
     box.querySelectorAll('[data-status]').forEach(function(b){b.onchange=function(){setStatus(b.dataset.status,b.value);};});
     box.querySelectorAll('[data-interest]').forEach(function(b){b.onchange=function(){var all=read('leadmeta',{});all[b.dataset.interest]=Object.assign({},all[b.dataset.interest],{interest:b.value});write('leadmeta',all);render();};});
-    box.querySelectorAll('[data-delete]').forEach(function(b){b.onclick=function(){var l=leads().find(function(l){return l.id===b.dataset.delete;});if(!confirm('¿Eliminar a '+l.name+'? Esta acción no se puede deshacer.'))return;saveLeads(leads().filter(function(l){return l.id!==b.dataset.delete;}));['leadmeta','leadtags'].forEach(function(k){var all=read(k,{});delete all[b.dataset.delete];write(k,all);});render();};});
+    box.querySelectorAll('[data-delete]').forEach(function(b){b.onclick=async function(){var id=b.dataset.delete,l=leads().find(function(l){return l.id===id;});if(!l||b.disabled)return;if(!confirm('¿Eliminar a '+l.name+'? Esta acción no se puede deshacer.'))return;b.disabled=true;b.textContent='…';b.setAttribute('aria-label','Eliminando '+l.name);try{if(!window._nf_deleteLead)throw Error('La sincronización aún no está disponible. Vuelve a intentarlo.');await window._nf_deleteLead(id);saveLeads(leads().filter(function(l){return l.id!==id;}));['leadmeta','leadtags'].forEach(function(k){var all=read(k,{});delete all[id];write(k,all);});render();}catch(e){b.disabled=false;b.textContent='×';b.setAttribute('aria-label','Eliminar '+l.name);alert(e.message||'No se ha podido eliminar el lead. Inténtalo de nuevo.');}};});
     box.querySelectorAll('[data-addgroup]').forEach(function(b){b.onchange=function(){if(!b.value)return;var all=read('leadtags',{});all[b.dataset.addgroup]=(all[b.dataset.addgroup]||[]).concat(b.value);write('leadtags',all);render();};});
     box.querySelectorAll('[data-untag]').forEach(function(b){b.onclick=function(){var all=read('leadtags',{});all[b.dataset.untag]=(all[b.dataset.untag]||[]).filter(function(g){return g!==b.dataset.group;});write('leadtags',all);render();};});
     var reset=document.getElementById('nfl-empty-reset');if(reset)reset.onclick=resetFilters;

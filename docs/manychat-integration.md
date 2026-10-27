@@ -26,6 +26,7 @@ Each request contains contact ID, name, Instagram username, classification, and 
 - Ambiguous handles, display names, and canonical name/handle similarities are held for explicit review; they do not create or merge a lead automatically.
 - Canonical names ignore common Spanish accents, spaces, and punctuation only for review candidates, never automatic merging.
 - Once a mapped lead has been deleted, delivery does not silently recreate it.
+- Confirmed deletions also record owner-scoped tombstones. Stale browser upserts and backup restoration cannot reinsert a deleted ID. Legacy imported Instagram handles are retained only as hashes to prevent a later ManyChat event with a previously unseen contact ID from recreating the removed lead.
 - Existing names, notes, dates, and sales statuses are preserved. First known acquisition is retained; unknown acquisition can be upgraded.
 - Identity cannot be inferred with certainty when all identifying information differs. Pending review is the conservative fallback for detectable possible matches.
 
@@ -41,6 +42,14 @@ Commenters become ManyChat opted-in contacts after interacting with the opening 
 - Live New Contact event produced a linked lead without manual entry.
 - Rollback-only database tests: repeated identity, imported handle, ambiguous name, explicit resolution, closed-status preservation, canonical manual name candidates, and restricted RPC permissions.
 - Frontend: classification/manual override and review selection/request behavior verified with synthetic records. Cloud owner login was tested with mocked success and rejection after removing the legacy embedded password.
-- Database schema snapshot is `supabase/schema/manychat.sql`; deployed changes are tracked by Supabase migration history. Do not rerun the snapshot over the existing installation.
+- Database schema snapshots are `supabase/schema/manychat.sql` and `supabase/schema/lead-deletion.sql`; deployed changes are tracked by Supabase migration history. Do not rerun the snapshots over the existing installation. The deletion table must exist before using the current ingestion function.
+
+## Confirmed lead deletion
+
+The Leads delete button waits for the authenticated `nf_delete_lead` RPC acknowledgement before removing the row. Network/server errors leave the lead available with an explicit error. Deletion is atomic and scoped by `auth.uid()`; no owner ID supplied by the client is trusted.
+
+Deletion markers and ingestion share a per-owner transaction lock. Marker triggers protect against stale devices and keep ManyChat deletion links intact. Lead removal no longer relies on diffing full local snapshots. Successful empty lead responses are authoritative, including the last lead; local/cloud backups never automatically restore lead records. Other data types retain their existing behavior.
+
+Validation includes authenticated deletion, repeated deletion, unrelated-row preservation, blocked stale upserts, ManyChat retries, legacy import handles, delayed acknowledgement, failed requests, in-flight stale refresh responses, last-lead reload, and fresh authentication with an old backup. Database fixtures were rolled back and browser tests used synthetic records only.
 
 Operational note: removing an embedded credential from current source does not remove it from Git history. The account owner should rotate that previously exposed password through their normal account recovery/password process.
