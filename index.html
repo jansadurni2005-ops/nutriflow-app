@@ -561,8 +561,9 @@ var _syncLeadsTimer=null;
 function removedLeadIds(){try{return JSON.parse(localStorage.getItem(PRE+'deletedleads')||'[]');}catch(e){return [];}}
 function keepLiveLeads(list){var ids=removedLeadIds();return (list||[]).filter(function(l){return l&&ids.indexOf(l.id)<0;});}
 window._nf_deleteLead=async function(id){
+ if((!UID||!PRE||EM!==currentEmail())&&currentEmail())bootUser();
  var owner=UID,email=currentEmail(),prefix=PRE;
- if(!owner||!prefix||!id)throw Error('Vuelve a iniciar sesión para eliminar el lead.');
+ if(!owner||!prefix||!id||EM!==email||prefix!=='nf_'+email+'_')throw Error('La cuenta aún se está sincronizando. Espera unos segundos y vuelve a intentarlo.');
  var token=await getToken();
  if(!token)throw Error('Vuelve a iniciar sesión para eliminar el lead.');
  if(owner!==UID||email!==currentEmail())throw Error('La sesión ha cambiado. Vuelve a intentarlo.');
