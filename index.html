@@ -5019,8 +5019,8 @@ CÓMO RESPONDER (PRIORITARIO)
   function pe(){return "g"+Date.now().toString(36)+Math.random().toString(36).slice(2,6);}
   function eur(n){n=Math.round((n||0)*100)/100;try{return n.toLocaleString("es-ES",{minimumFractionDigits:(n%1?2:0),maximumFractionDigits:2})+" €";}catch(e){return n+" €";}}
   function perMonths(b){return b==="quarterly"?3:b==="semiannual"?6:b==="annual"?12:1;}
-  function perLabel(b){return b==="quarterly"?"Trimestral":b==="semiannual"?"Semestral":b==="annual"?"Anual":"Mensual";}
-  function monthlyOf(x){return (parseFloat(x.amount)||0)/perMonths(x.billing);}
+  function perLabel(b){return b==="onetime"?"Pago único":b==="quarterly"?"Trimestral":b==="semiannual"?"Semestral":b==="annual"?"Anual":"Mensual";}
+  function monthlyOf(x){return x.billing==="onetime"?0:(parseFloat(x.amount)||0)/perMonths(x.billing);}
   function mrr(){
     var cs=clients(),c=cfg(),sp=c.partnerSource||c.splitPartner||"GEIEG",pct=(c.splitPercent||70)/100;
     function R(amt,src){var com=window._nf_getSourcePct?window._nf_getSourcePct(src):null;if(com!=null&&com>0)return amt*(100-com)/100;if(src===sp)return amt*pct;return amt;}
@@ -5039,19 +5039,20 @@ CÓMO RESPONDER (PRIORITARIO)
     var rows=g.length?g.slice().sort(function(a,b){return monthlyOf(b)-monthlyOf(a);}).map(function(x){
       var recur=(x.billing&&x.billing!=="monthly");
       var sub=eur(x.amount)+" · "+perLabel(x.billing);
+      var amtHtml=x.billing==="onetime"?("−"+eur(x.amount)+"<span style=\"font-size:10px;color:var(--muted);font-weight:400\"> pago único</span>"):("−"+eur(monthlyOf(x))+"<span style=\"font-size:10px;color:var(--muted);font-weight:400\"> /mes</span>");
       return "<div data-gedit=\""+esc(x.id)+"\" style=\"display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--bg3);border-radius:10px;margin-bottom:8px;cursor:pointer\">"+
         "<div style=\"flex:1;min-width:0\">"+
           "<div style=\"font-size:13.5px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap\">"+esc(x.name||"—")+"</div>"+
           "<div style=\"font-size:10.5px;color:var(--muted);margin-top:2px\">"+sub+"</div>"+
         "</div>"+
-        "<span style=\"font-size:13px;font-weight:700;font-family:"+MONO+";color:#f87171;white-space:nowrap;text-align:right\">−"+eur(monthlyOf(x))+"<span style=\"font-size:10px;color:var(--muted);font-weight:400\"> /mes</span></span>"+
+        "<span style=\"font-size:13px;font-weight:700;font-family:"+MONO+";color:#f87171;white-space:nowrap;text-align:right\">"+amtHtml+"</span>"+
         "<button data-gdel=\""+esc(x.id)+"\" title=\"Eliminar\" style=\"background:transparent;border:1px solid var(--border);color:#f87171;width:28px;height:28px;border-radius:8px;cursor:pointer;font-size:15px;line-height:1;flex-shrink:0\">&times;</button>"+
       "</div>";
     }).join(""):"<div style=\"color:var(--muted);text-align:center;padding:26px 0;font-size:13px;font-style:italic\">Aún no has añadido gastos. Pulsa «+ Añadir gasto» (suscripciones, herramientas, publicidad, gestor…).</div>";
     root.innerHTML=
       "<div style=\"display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:6px\"><div style=\"font-size:22px;font-weight:700;color:var(--text)\">Gastos</div>"+
         "<button id=\"_nf_gasto_add\" style=\"background:"+LIME+";border:none;color:#0e1a05;border-radius:10px;padding:10px 16px;font-size:13px;font-weight:800;cursor:pointer\">+ Añadir gasto</button></div>"+
-      "<div style=\"font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5\">Lo que gastas para mantener el negocio (mensual, trimestral, semestral o anual — todo se calcula a <b style=\"color:var(--text2)\">coste/mes</b>). El <b style=\"color:var(--text2)\">% limpio</b> es lo que te queda de tu ingreso recurrente después de los gastos.</div>"+
+      "<div style=\"font-size:12px;color:var(--muted);margin-bottom:18px;line-height:1.5\">Lo que gastas para mantener el negocio (mensual, trimestral, semestral, anual o pago único). Los recurrentes se calculan a <b style=\"color:var(--text2)\">coste/mes</b>; el pago único no suma al mensual. El <b style=\"color:var(--text2)\">% limpio</b> es lo que te queda de tu ingreso recurrente después de los gastos.</div>"+
       "<div style=\"display:flex;gap:20px;align-items:center;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:18px 20px;margin-bottom:16px\">"+
         donut(pct,pcol)+
         "<div style=\"flex:1;min-width:220px;display:flex;flex-wrap:wrap;gap:10px;align-content:center\">"+
@@ -5070,7 +5071,7 @@ CÓMO RESPONDER (PRIORITARIO)
   function openModal(existing){
     var bg=document.getElementById("_nf_gasto_bg"); if(bg)bg.remove();
     var ed=existing||null;
-    var opts=[["monthly","Mensual"],["quarterly","Trimestral"],["semiannual","Semestral"],["annual","Anual"]].map(function(o){return "<option value=\""+o[0]+"\""+((ed&&ed.billing===o[0])||(!ed&&o[0]==="monthly")?" selected":"")+">"+o[1]+"</option>";}).join("");
+    var opts=[["monthly","Mensual"],["quarterly","Trimestral"],["semiannual","Semestral"],["annual","Anual"],["onetime","Pago único"]].map(function(o){return "<option value=\""+o[0]+"\""+((ed&&ed.billing===o[0])||(!ed&&o[0]==="monthly")?" selected":"")+">"+o[1]+"</option>";}).join("");
     bg=document.createElement("div"); bg.id="_nf_gasto_bg";
     bg.style.cssText="position:fixed;inset:0;z-index:10001;background:rgba(0,0,0,.6);display:flex;align-items:flex-start;justify-content:center;padding:64px 16px;overflow:auto";
     bg.innerHTML="<div style=\"background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:430px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6)\">"+
@@ -5084,7 +5085,7 @@ CÓMO RESPONDER (PRIORITARIO)
       "<div style=\"display:flex;gap:8px\"><button id=\"_nf_gasto_c\" style=\"flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer\">Cancelar</button><button id=\"_nf_gasto_s\" style=\"flex:2;background:"+LIME+";border:none;color:#0e1a05;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer\">"+(ed?"Guardar cambios":"Guardar gasto")+"</button></div>"+
     "</div>";
     document.body.appendChild(bg);
-    function upd(){var a=parseFloat(document.getElementById("_nf_gasto_a").value)||0;var b=document.getElementById("_nf_gasto_p").value;var h=document.getElementById("_nf_gasto_hint");if(a>0&&b!=="monthly"){h.innerHTML="Equivale a <b style=\"color:var(--text)\">"+eur(a/perMonths(b))+"/mes</b>";}else h.innerHTML="";}
+    function upd(){var a=parseFloat(document.getElementById("_nf_gasto_a").value)||0;var b=document.getElementById("_nf_gasto_p").value;var h=document.getElementById("_nf_gasto_hint");if(b==="onetime"){h.innerHTML=a>0?"Pago puntual de <b style=\"color:var(--text)\">"+eur(a)+"</b> — no cuenta como gasto mensual recurrente.":"";}else if(a>0&&b!=="monthly"){h.innerHTML="Equivale a <b style=\"color:var(--text)\">"+eur(a/perMonths(b))+"/mes</b>";}else h.innerHTML="";}
     document.getElementById("_nf_gasto_a").oninput=upd; document.getElementById("_nf_gasto_p").onchange=upd; upd();
     bg.onclick=function(e){if(e.target===bg)bg.remove();};
     document.getElementById("_nf_gasto_x").onclick=function(){bg.remove();};
