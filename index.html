@@ -630,6 +630,9 @@ function setupInterceptor(){
     // Never push until we've pulled the latest cloud data at least once this session,
     // so an app opened with stale local data can't overwrite a newer change from another device.
     if(!_pullReady)return;
+    // Mark when YOU made a local change, so the periodic 5s pull waits a few seconds
+    // before overwriting local data (fixes "I renewed a client, reloaded, and it reverted").
+    window._nf_lastLocalWrite=Date.now();
     var tokData=getCachedTok(EM);
     var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
     if(!tok){
@@ -772,7 +775,7 @@ setInterval(function(){
 },1000);
 
 // ── Keep every device in sync: re-pull cloud data on focus + periodically ──
-function safeRefresh(){var _e=EM||currentEmail();if(!_e)return;if(_repairDone&&EM&&sessionStorage.getItem(okKey(_e))){refreshFromCloud();}else{try{bootUser();}catch(e){}}}
+function safeRefresh(){if(window._nf_lastLocalWrite&&Date.now()-window._nf_lastLocalWrite<6000)return;var _e=EM||currentEmail();if(!_e)return;if(_repairDone&&EM&&sessionStorage.getItem(okKey(_e))){refreshFromCloud();}else{try{bootUser();}catch(e){}}}
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
 // Near-real-time sync: re-pull cloud data every 5s while the app is visible (was 45s).
