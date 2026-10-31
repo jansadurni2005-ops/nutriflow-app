@@ -5155,16 +5155,17 @@ CÓMO RESPONDER (PRIORITARIO)
 })();
 </script>
 <script>
-/* __nf_renova_modal_v2 : confirmacion de renovacion + registro de cobro (cuando pago, completo o fraccionado) -> facturacion exacta */
+/* __nf_renova_modal_v3 : renovacion. Jan da el TOTAL pagado; el CRM lo divide (plan/cuotas) y lo cuadra en facturacion */
 (function(){
-  if(window.__nf_renova_modal_v2)return; window.__nf_renova_modal_v2=true;
+  if(window.__nf_renova_modal_v3)return; window.__nf_renova_modal_v3=true;
   function esc(s){return String(s==null?'':s).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c];});}
   function bl(b){return b==='quarterly'?'Trimestral':b==='semiannual'?'Semestral':b==='annual'?'Anual':b==='onetime'?'Pago unico':'Mensual';}
-  function bm(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:b==='onetime'?1:1;}
+  function bm(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:1;}
   function eur(n){n=parseFloat(n)||0;try{return n.toLocaleString('es-ES',{minimumFractionDigits:(n%1?2:0),maximumFractionDigits:2})+' €';}catch(e){return n+' €';}}
   function today(){return new Date().toISOString().slice(0,10);}
   function perMonthNet(price,source){var p=parseFloat(price)||0;try{if(window._nf_getSourcePct){var cp=window._nf_getSourcePct(source);if(cp!=null)return p*(100-cp)/100;}}catch(e){}if(source==='GEIEG')return 0.70*p;return p;}
   function addMonthsStr(d,n){try{var p=String(d).split('-');var dt=new Date(Date.UTC(+p[0],(+p[1]-1)+n,+p[2]));return dt.toISOString().slice(0,10);}catch(e){return d;}}
+  function fmtD(d){try{var p=String(d).split('-');return p[2]+'/'+p[1]+'/'+p[0];}catch(e){return d;}}
   function genId(){return 'pay_'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);}
 
   window._nf_renovaAsk=function(client,renovaFn){
@@ -5172,31 +5173,38 @@ CÓMO RESPONDER (PRIORITARIO)
       if(!client){if(renovaFn)renovaFn();return;}
       var old=document.getElementById('_nf_renova_bg');if(old)old.remove();
       var em='';try{em=JSON.parse(localStorage.getItem('nf_session')||'{}').email||'';}catch(e){}
-      // Authoritative client (real price/billing/source/name) from storage by id -> robust for both green buttons
       var cli=client;
       try{if(em){var _all=JSON.parse(localStorage.getItem('nf_'+em+'_clients')||'[]');var f=_all.find(function(c){return c&&c.id===client.id;});if(f)cli=f;}}catch(e){}
-      var curPrice=(cli.price==null?'':String(cli.price)),curBill=cli.billing||'monthly',src=cli.source||'',nm=cli.name||client.name||'';
+      var curBill=cli.billing||'monthly',src=cli.source||'',nm=cli.name||client.name||'';
+      var defTotal=+(perMonthNet(cli.price,src)*bm(curBill)).toFixed(2); // total neto esperado del ciclo
       var opts=['monthly','quarterly','semiannual','annual'].map(function(b){return '<option value="'+b+'"'+(b===curBill?' selected':'')+'>'+bl(b)+'</option>';}).join('');
       if(['monthly','quarterly','semiannual','annual'].indexOf(curBill)<0){opts='<option value="'+esc(curBill)+'" selected>'+bl(curBill)+'</option>'+opts;}
 
-      if(!document.getElementById('_nf_rn_css')){var st=document.createElement('style');st.id='_nf_rn_css';st.textContent='._nf_lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:4px}._nf_inp{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 11px;color:var(--text);font-size:14px;outline:none}._nf_seg{flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer}._nf_seg_on{background:rgba(29,158,117,0.15);border-color:rgba(29,158,117,0.5);color:#6ee7b7}';document.head.appendChild(st);}
+      if(!document.getElementById('_nf_rn_css')){var st=document.createElement('style');st.id='_nf_rn_css';st.textContent='._nf_lbl{font-size:9.5px;color:var(--muted);text-transform:uppercase;font-weight:700;letter-spacing:.05em;margin-bottom:4px}._nf_inp{width:100%;box-sizing:border-box;background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:10px 11px;color:var(--text);font-size:14px;outline:none}._nf_seg{flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:9px;padding:9px;font-size:12px;font-weight:700;cursor:pointer}._nf_seg_on{background:rgba(29,158,117,0.15);border-color:rgba(29,158,117,0.5);color:#6ee7b7}._nf_stp{width:34px;height:34px;border-radius:9px;background:var(--bg3);border:1px solid var(--bg4);color:var(--text);font-size:18px;font-weight:800;cursor:pointer;line-height:1}';document.head.appendChild(st);}
 
       var bg=document.createElement('div');bg.id='_nf_renova_bg';
       bg.style.cssText='position:fixed;inset:0;z-index:10050;background:rgba(0,0,0,.62);display:flex;align-items:center;justify-content:center;padding:16px;backdrop-filter:blur(4px);overflow:auto';
-      bg.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:440px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6);margin:auto">'+
+      bg.innerHTML='<div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;padding:22px 24px;max-width:430px;width:96vw;box-shadow:0 16px 50px rgba(0,0,0,.6);margin:auto">'+
         '<div style="font-size:16px;font-weight:800;color:var(--text);margin-bottom:3px">Renovar a '+esc(nm)+'</div>'+
-        '<div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">Confirma la renovacion. Si cambio de plan, modificalo. Dime cuando pago y si fue de una vez o fraccionado, que yo lo cuadro en la facturacion.</div>'+
+        '<div style="font-size:12px;color:var(--muted);margin-bottom:16px;line-height:1.5">Dime el <b style="color:var(--text)">total que te ha pagado</b>, el plan y cuando. Si lo fracciono, yo reparto el total entre los meses.</div>'+
         '<div style="display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap">'+
-          '<div style="flex:1;min-width:120px"><div class="_nf_lbl">Precio (€/mes)</div><input id="_nf_rn_price" type="number" step="0.01" inputmode="decimal" value="'+esc(curPrice)+'" class="_nf_inp"></div>'+
+          '<div style="flex:1.3;min-width:150px"><div class="_nf_lbl">Total que te ha pagado (€)</div><input id="_nf_rn_total" type="number" step="0.01" inputmode="decimal" value="'+esc(defTotal)+'" class="_nf_inp" style="font-weight:700"></div>'+
           '<div style="flex:1;min-width:120px"><div class="_nf_lbl">Plan</div><select id="_nf_rn_bill" class="_nf_inp">'+opts+'</select></div>'+
         '</div>'+
         '<div style="margin-bottom:12px"><div class="_nf_lbl">¿Cuando pago?</div><input id="_nf_rn_paid" type="date" value="'+today()+'" class="_nf_inp"></div>'+
-        '<div class="_nf_lbl">Forma de cobro</div>'+
+        '<div class="_nf_lbl">¿Como lo cobro?</div>'+
         '<div style="display:flex;gap:8px;margin-bottom:10px">'+
-          '<button id="_nf_rn_mfull" type="button" class="_nf_seg _nf_seg_on">Pago completo</button>'+
+          '<button id="_nf_rn_mfull" type="button" class="_nf_seg _nf_seg_on">De una vez</button>'+
           '<button id="_nf_rn_msplit" type="button" class="_nf_seg">Fraccionado</button>'+
         '</div>'+
-        '<div id="_nf_rn_splitbox" style="display:none;margin-bottom:10px"></div>'+
+        '<div id="_nf_rn_splitbox" style="display:none;margin-bottom:10px">'+
+          '<div style="display:flex;align-items:center;gap:10px;margin-bottom:8px"><span class="_nf_lbl" style="margin:0">Nº de cuotas</span>'+
+            '<button id="_nf_rn_minus" type="button" class="_nf_stp">−</button>'+
+            '<span id="_nf_rn_ncuotas" style="font-size:16px;font-weight:800;color:var(--text);min-width:20px;text-align:center">2</span>'+
+            '<button id="_nf_rn_plus" type="button" class="_nf_stp">+</button>'+
+            '<span style="font-size:11px;color:var(--muted)">(una al mes)</span></div>'+
+          '<div id="_nf_rn_preview" style="background:var(--bg3);border:1px solid var(--bg4);border-radius:9px;padding:8px 10px;font-size:12px;color:var(--text2);line-height:1.7"></div>'+
+        '</div>'+
         '<div id="_nf_rn_hint" style="font-size:11.5px;color:var(--muted);margin:2px 2px 16px;min-height:14px;line-height:1.5"></div>'+
         '<div style="display:flex;gap:8px"><button id="_nf_rn_cancel" style="flex:1;background:var(--bg3);border:1px solid var(--bg4);color:var(--text2);border-radius:10px;padding:11px;font-size:13px;font-weight:700;cursor:pointer">Cancelar</button>'+
           '<button id="_nf_rn_ok" style="flex:2;background:#1D9E75;border:none;color:#fff;border-radius:10px;padding:11px;font-size:13px;font-weight:800;cursor:pointer">✓ Confirmar renovacion</button></div>'+
@@ -5204,54 +5212,44 @@ CÓMO RESPONDER (PRIORITARIO)
       document.body.appendChild(bg);
 
       var P=function(id){return document.getElementById(id);};
-      var mode='full',splits=null;
+      var mode='full',N=2;
 
-      function cycleNet(){return +(perMonthNet(P('_nf_rn_price').value,src)*bm(P('_nf_rn_bill').value)).toFixed(2);}
-      function buildSplits(){var total=cycleNet();var pd=P('_nf_rn_paid').value||today();if(!splits){var half=Math.round(total/2*100)/100;splits=[{amount:half,date:pd},{amount:+(total-half).toFixed(2),date:addMonthsStr(pd,1)}];}}
-      function renderSplits(){var box=P('_nf_rn_splitbox');if(mode!=='split'){box.style.display='none';return;}buildSplits();box.style.display='block';
-        var rows=splits.map(function(s,i){return '<div style="display:flex;gap:6px;margin-bottom:6px;align-items:center">'+
-          '<input data-i="'+i+'" class="_nf_sp_a _nf_inp" type="number" step="0.01" inputmode="decimal" value="'+esc(s.amount)+'" style="flex:1;padding:8px 9px;font-size:13px">'+
-          '<input data-i="'+i+'" class="_nf_sp_d _nf_inp" type="date" value="'+esc(s.date)+'" style="flex:1.2;padding:8px 9px;font-size:13px">'+
-          (splits.length>1?'<button data-i="'+i+'" class="_nf_sp_x" type="button" style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:8px;width:30px;height:34px;font-size:15px;cursor:pointer;flex-shrink:0">×</button>':'')+
-        '</div>';}).join('');
-        box.innerHTML='<div class="_nf_lbl">Cuotas (importe que recibes + fecha)</div>'+rows+'<button id="_nf_sp_add" type="button" style="background:var(--bg3);border:1px dashed var(--bg4);color:var(--text2);border-radius:8px;padding:7px;font-size:12px;font-weight:600;cursor:pointer;width:100%;margin-top:2px">+ Anadir cuota</button>';
-        Array.prototype.forEach.call(box.querySelectorAll('._nf_sp_a'),function(el){el.oninput=function(){splits[+el.dataset.i].amount=el.value;upd();};});
-        Array.prototype.forEach.call(box.querySelectorAll('._nf_sp_d'),function(el){el.onchange=function(){splits[+el.dataset.i].date=el.value;upd();};});
-        Array.prototype.forEach.call(box.querySelectorAll('._nf_sp_x'),function(el){el.onclick=function(){splits.splice(+el.dataset.i,1);renderSplits();upd();};});
-        P('_nf_sp_add').onclick=function(){var last=splits[splits.length-1]||{date:P('_nf_rn_paid').value};splits.push({amount:0,date:addMonthsStr(last.date||today(),1)});renderSplits();upd();};
+      function total(){return Math.max(0,parseFloat(P('_nf_rn_total').value)||0);}
+      function splitAmts(t,n){var per=Math.floor(t/n*100)/100,acc=0,a=[];for(var i=0;i<n;i++){var amt=(i<n-1)?per:+(t-acc).toFixed(2);acc=+(acc+per).toFixed(2);a.push(amt);}return a;}
+      function cuotas(){var t=total(),pd=P('_nf_rn_paid').value||today();var amts=splitAmts(t,N);return amts.map(function(a,i){return {amount:a,date:addMonthsStr(pd,i)};});}
+      function renderPreview(){var box=P('_nf_rn_preview');var cs=cuotas();box.innerHTML=cs.map(function(c,i){return '<div>Cuota '+(i+1)+': <b style="color:var(--text)">'+eur(c.amount)+'</b> · '+fmtD(c.date)+'</div>';}).join('');}
+      function upd(){var t=total(),h=P('_nf_rn_hint'),pd=P('_nf_rn_paid').value||today();
+        if(mode==='split'){P('_nf_rn_ncuotas').textContent=N;renderPreview();h.innerHTML='Reparto <b style="color:var(--text)">'+eur(t)+'</b> en '+N+' cuotas (una al mes). Cada una cuenta en su mes.';}
+        else{h.innerHTML='Se registra <b style="color:var(--text)">'+eur(t)+'</b> cobrado en el mes del '+fmtD(pd)+'.';}
       }
-      function upd(){var netT=cycleNet();var h=P('_nf_rn_hint');
-        var changed=(String(P('_nf_rn_price').value)!==curPrice)||(P('_nf_rn_bill').value!==curBill);
-        var planMsg=changed?('Plan nuevo: <b style="color:var(--text)">'+eur(P('_nf_rn_price').value)+'/mes · '+bl(P('_nf_rn_bill').value)+'</b>. '):'';
-        if(mode==='split'){var sum=(splits||[]).reduce(function(a,s){return a+(parseFloat(s.amount)||0);},0);var diff=Math.round((sum-netT)*100)/100;var warn=Math.abs(diff)>=0.5?(' <span style="color:#fbbf24">(suma '+eur(sum)+', el ciclo es '+eur(netT)+')</span>'):' <span style="color:#6ee7b7">✓</span>';h.innerHTML=planMsg+'Fraccionado en '+(splits||[]).length+' cuotas, total '+eur(sum)+warn;}
-        else{h.innerHTML=planMsg+'Se cuenta como cobrado <b style="color:var(--text)">'+eur(netT)+'</b> en el mes del '+(P('_nf_rn_paid').value||today())+'.';}
-      }
-      function setMode(m){mode=m;P('_nf_rn_mfull').className='_nf_seg'+(m==='full'?' _nf_seg_on':'');P('_nf_rn_msplit').className='_nf_seg'+(m==='split'?' _nf_seg_on':'');renderSplits();upd();}
+      function setMode(m){mode=m;P('_nf_rn_mfull').className='_nf_seg'+(m==='full'?' _nf_seg_on':'');P('_nf_rn_msplit').className='_nf_seg'+(m==='split'?' _nf_seg_on':'');P('_nf_rn_splitbox').style.display=(m==='split')?'block':'none';upd();}
 
-      P('_nf_rn_price').oninput=upd;P('_nf_rn_bill').onchange=upd;P('_nf_rn_paid').onchange=upd;
+      P('_nf_rn_total').oninput=upd;P('_nf_rn_bill').onchange=upd;P('_nf_rn_paid').onchange=upd;
       P('_nf_rn_mfull').onclick=function(){setMode('full');};P('_nf_rn_msplit').onclick=function(){setMode('split');};
+      P('_nf_rn_minus').onclick=function(){if(N>2){N--;upd();}};P('_nf_rn_plus').onclick=function(){if(N<12){N++;upd();}};
       upd();
       function cls(){bg.remove();}
       P('_nf_rn_cancel').onclick=cls;bg.onclick=function(e){if(e.target===bg)cls();};
 
       P('_nf_rn_ok').onclick=function(){
-        var newP=P('_nf_rn_price').value,newB=P('_nf_rn_bill').value,payDate=P('_nf_rn_paid').value||today();
-        var splitList=(mode==='split')?(splits||[]).filter(function(s){return (parseFloat(s.amount)||0)>0&&s.date;}):null;
-        var baseDate=(splitList&&splitList.length)?splitList.slice().sort(function(a,b){return (a.date||'').localeCompare(b.date||'');})[0].date:payDate;
-        var ren=(newB==='onetime')?null:addMonthsStr(baseDate,bm(newB));
+        var newB=P('_nf_rn_bill').value,payDate=P('_nf_rn_paid').value||today(),t=total();
+        var months=bm(newB),price=months>0?+(t/months).toFixed(2):t;
+        var list=(mode==='split')?cuotas():[{amount:t,date:payDate}];
+        list=list.filter(function(c){return (parseFloat(c.amount)||0)>0&&c.date;});
+        var baseDate=list.length?list.slice().sort(function(a,b){return (a.date||'').localeCompare(b.date||'');})[0].date:payDate;
+        var ren=(newB==='onetime')?null:addMonthsStr(baseDate,months);
         cls();
         try{
           if(em){
             var cl=JSON.parse(localStorage.getItem('nf_'+em+'_clients')||'[]');
-            cl=cl.map(function(c){if(!c||c.id!==client.id)return c;return Object.assign({},c,{price:newP,billing:newB,startDate:baseDate,renewalDate:ren,paidDate:baseDate,active:true});});
+            cl=cl.map(function(c){if(!c||c.id!==client.id)return c;return Object.assign({},c,{price:price,billing:newB,startDate:baseDate,renewalDate:ren,paidDate:baseDate,active:true});});
             localStorage.setItem('nf_'+em+'_clients',JSON.stringify(cl));
             try{var pm=JSON.parse(localStorage.getItem('nf_'+em+'_paiddates')||'{}');pm[client.id]=baseDate;localStorage.setItem('nf_'+em+'_paiddates',JSON.stringify(pm));if(window._nf_paidMap)window._nf_paidMap[client.id]=baseDate;}catch(e){}
-            if(splitList&&splitList.length){
-              var cmeth='cash';try{if(window._nf_cmethod&&window._nf_cmethod[client.id])cmeth=window._nf_cmethod[client.id];}catch(e){}
-              var pays=JSON.parse(localStorage.getItem('nf_'+em+'_payments')||'[]');
-              splitList.forEach(function(s){pays.push({id:genId(),clientId:client.id,cycleStart:baseDate,amount:+(parseFloat(s.amount)||0),date:s.date,notes:'Renovacion (fraccionado)',method:cmeth,reminderDate:''});});
-              localStorage.setItem('nf_'+em+'_payments',JSON.stringify(pays));
-            }
+            var cmeth='cash';try{if(window._nf_cmethod&&window._nf_cmethod[client.id])cmeth=window._nf_cmethod[client.id];}catch(e){}
+            var pays=JSON.parse(localStorage.getItem('nf_'+em+'_payments')||'[]');
+            var note=(list.length>1)?'Renovacion (fraccionado)':'Renovacion';
+            list.forEach(function(c){pays.push({id:genId(),clientId:client.id,cycleStart:baseDate,amount:+(parseFloat(c.amount)||0),date:c.date,notes:note,method:cmeth,reminderDate:''});});
+            localStorage.setItem('nf_'+em+'_payments',JSON.stringify(pays));
             if(window._nf_setClients){window._nf_syncing=true;try{window._nf_setClients(cl.slice());}catch(e){}setTimeout(function(){window._nf_syncing=false;},300);}
             else if(renovaFn){setTimeout(function(){try{renovaFn(client.id);}catch(e){}},50);}
           } else { if(renovaFn)renovaFn(client.id); }
