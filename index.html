@@ -393,7 +393,7 @@ var _refreshing=false;
 // opens with stale local data can never overwrite a newer change made on another device.
 // Turns true after the first successful refresh; 8s fallback so pushes are never blocked forever.
 var _pullReady=false;
-setTimeout(function(){_pullReady=true;},8000);
+setTimeout(function(){_pullReady=true;try{flushPending();}catch(e){}},8000);
 function refreshFromCloud(){
   if(_refreshing){if(Date.now()-(window._nf_refStart||0)>20000){_refreshing=false;}else return;}
   window._nf_refStart=Date.now();
@@ -422,7 +422,7 @@ function refreshFromCloud(){
       window._nf_syncing=true;
       try{
         // CLIENTS: only overwrite when cloud actually returned some
-        if(clientsOk&&clients.length){
+        if(clientsOk&&clients.length&&!(window._nf_lastLocalWrite&&Date.now()-window._nf_lastLocalWrite<12000)){
           var fmt=clients.map(function(c){return{id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,startDate:c.start_date,renewalDate:c.renewal_date,active:c.active};});
           var active=fmt.filter(function(c){return c.active;});
           var lost=fmt.filter(function(c){return !c.active;});
@@ -448,7 +448,7 @@ function refreshFromCloud(){
       }finally{window._nf_syncing=false;}
       return pullExtras(token);
     });
-  }).then(function(){_refreshing=false;_pullReady=true;})
+  }).then(function(){_refreshing=false;_pullReady=true;try{flushPending();}catch(e){}})
    .catch(function(){window._nf_syncing=false;_refreshing=false;});
 }
 window._nf_refreshFromCloud=refreshFromCloud;
@@ -629,10 +629,9 @@ function setupInterceptor(){
     if(isExtra&&window._nf_applyingExtras)return;
     // Never push until we've pulled the latest cloud data at least once this session,
     // so an app opened with stale local data can't overwrite a newer change from another device.
-    if(!_pullReady)return;
-    // Mark when YOU made a local change, so the periodic 5s pull waits a few seconds
-    // before overwriting local data (fixes "I renewed a client, reloaded, and it reverted").
     window._nf_lastLocalWrite=Date.now();
+    // Don't push until the first pull completes, but DON'T drop your change: remember it and push right after.
+    if(!_pullReady){if(isCore)window._nf_pendingCore=true;if(isExtra)window._nf_pendingExtras=true;return;}
     var tokData=getCachedTok(EM);
     var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
     if(!tok){
@@ -778,6 +777,12 @@ setInterval(function(){
 function safeRefresh(){if(window._nf_lastLocalWrite&&Date.now()-window._nf_lastLocalWrite<6000)return;var _e=EM||currentEmail();if(!_e)return;if(_repairDone&&EM&&sessionStorage.getItem(okKey(_e))){refreshFromCloud();}else{try{bootUser();}catch(e){}}}
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
+// Flush unsaved changes to the cloud NOW (skip the 300ms debounce) so a renovation made right before you leave always reaches the cloud (fixes the revert).
+function _nfPushNow(tok){try{var active=[],lost=[];try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}var byId={};active.forEach(function(c){if(!c||!c.id)return;byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:c.active!==false};});lost.forEach(function(c){if(!c||!c.id)return;byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};});var all=Object.keys(byId).map(function(k){return byId[k];});if(all.length)syncTable('clients',all,'clients',tok);}catch(e){}try{pushExtras(tok);}catch(e){}}
+function flushPending(){try{if(!window._nf_pendingCore&&!window._nf_pendingExtras)return;var td=getCachedTok(EM);var t=td&&td.exp>Date.now()?td.tok:null;window._nf_pendingCore=false;window._nf_pendingExtras=false;if(t){_nfPushNow(t);}else{getToken().then(function(nt){if(nt)_nfPushNow(nt);});}}catch(e){}}
+function nfFlushNow(){try{if(!_pullReady)return;var td=getCachedTok(EM);var t=td&&td.exp>Date.now()?td.tok:null;if(!t)return;clearTimeout(_syncClientsTimer);_nfPushNow(t);}catch(e){}}
+document.addEventListener('visibilitychange',function(){if(document.hidden)nfFlushNow();});
+window.addEventListener('pagehide',nfFlushNow);
 // Near-real-time sync: re-pull cloud data every 5s while the app is visible (was 45s).
 // The _refreshing guard prevents pile-ups on slow networks; hidden tabs don't poll (battery).
 setInterval(function(){if(!document.hidden)safeRefresh();},5000);
