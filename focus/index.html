@@ -382,7 +382,62 @@ function tasksCard(k){
   ${list.length?`<div class="bar" style="height:6px"><b style="width:${done/list.length*100}%;${done===list.length?'background:var(--ok)':''}"></b></div><div class="stack" style="gap:2px">${list.map(t=>taskItem(t,k)).join('')}</div>`:`<p class="muted">${past?'No había tareas este día.':isToday?'Añade lo que tienes que hacer hoy sí o sí.':'Sin tareas para este día. Añade las que tengas que hacer ese día.'}</p>`}
   ${past?'':`<div class="row"><input id="t-new" data-tk="${k}" placeholder="Añadir tarea para ${dayLabel(k)}…" aria-label="Nueva tarea" enterkeyhint="done"><button class="round acc" data-act="tadd" data-tk="${k}" aria-label="Añadir tarea" style="width:46px;height:46px">+</button></div>
   <div class="row" style="gap:16px;flex-wrap:wrap"><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewday" data-tk="${k}">📅 Tarea para otro día</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewdaily" data-tk="${k}">↻ Tarea que se repite</button></div>`}
+  ${isToday?(()=>{const td=keyToDate(k),mon=addDays(k,-((td.getDay()+6)%7)),w=taskPct(taskRange(mon,7)),st=taskStreak();return w.due||st.best?`<button class="between" data-tab="analytics" style="background:var(--card2);border-radius:14px;padding:10px 12px;font-size:12.5px;text-align:left"><span>Semana: <b style="color:${pctColor(w.pct)}">${w.pct==null?'—':Math.round(w.pct*100)+'%'}</b> cumplido (${w.done}/${w.due})</span><span>🔥 ${st.cur} día${st.cur===1?'':'s'} ›</span></button>`:''})():''}
   ${upcoming.length?`<div class="stack" style="gap:6px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Próximos días</span>${upcoming.map(([dk,t])=>`<button class="between" data-tedit="${t.id}" data-tk="${dk}" style="font-size:13.5px;text-align:left"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📅 ${esc(t.title)}</span><span class="chip" style="flex:none">${dayLabel(dk)}${t.time?' · '+t.time:''}</span></button>`).join('')}</div>`:''}</div>`;
+}
+/* ── Estadísticas de tareas ──
+   Una tarea cuenta cuando la marcas, cuando vence su hora o cuando termina su día.
+   Así el día de hoy no te penaliza por lo que aún tienes tiempo de hacer. */
+function taskDue(t,k){const today=dayKey(Date.now());return t.done||k<today||(k===today&&t.time&&Date.now()>=atMin(k,t2m(t.time)))}
+function taskDay(k){const l=dayTasks(k),due=l.filter(t=>taskDue(t,k));return {k,total:l.length,due:due.length,done:l.filter(t=>t.done).length}}
+function taskRange(start,n){return Array.from({length:n},(_,i)=>taskDay(addDays(start,i)))}
+function taskPct(a){const due=a.reduce((x,d)=>x+d.due,0),done=a.reduce((x,d)=>x+d.done,0);return {due,done,pct:due?done/due:null}}
+const perfect=d=>d.total>0&&d.done===d.total;
+function taskStreak(){
+  const today=dayKey(Date.now()),days=taskRange(addDays(today,-179),180);let best=0,run=0,cur=0;
+  for(const d of days){if(!d.total)continue;if(perfect(d)){run++;best=Math.max(best,run)}else if(d.k!==today)run=0}
+  for(let i=days.length-1;i>=0;i--){const d=days[i];if(!d.total)continue;if(perfect(d))cur++;else if(d.k===today)continue;else break}
+  return {cur,best:Math.max(best,cur)};
+}
+/* Cumplimiento por tarea que se repite (y global de las tareas de un día) en los últimos N días. */
+function habitStats(n){
+  const today=dayKey(Date.now()),map={};
+  for(let i=0;i<n;i++){const k=addDays(today,-i);for(const t of dayTasks(k)){if(!taskDue(t,k))continue;
+    const key=t.tplId||'__once';const tpl=t.tplId&&(S.taskTpl||[]).find(x=>x.id===t.tplId);
+    const m=map[key]=map[key]||{title:key==='__once'?'Tareas de un solo día':(tpl?.title||t.title),repeat:key!=='__once',due:0,done:0};
+    m.due++;if(t.done)m.done++}}
+  return Object.values(map).sort((a,b)=>(b.repeat-a.repeat)||(b.done/b.due-a.done/a.due));
+}
+const pctColor=v=>v==null?'var(--fg3)':v>=.9?'var(--ok)':v>=.6?'var(--accent)':v>=.4?'var(--warn)':'var(--bad)';
+function tasksAnalytics(){
+  const today=dayKey(Date.now()),stk=taskStreak();let main='';
+  if(period==='day'){
+    const d=taskDay(anaDay),p=d.due?d.done/d.due:null,pend=dayTasks(anaDay).filter(t=>!t.done);
+    if(!d.total)return '';
+    main=`<div class="row" style="gap:16px">${ring(p,96,10,pctColor(p),false,`<div class="num" style="font-size:24px">${p==null?'—':Math.round(p*100)+'%'}</div>`)}
+      <div class="stack" style="gap:4px;min-width:0"><b style="font-size:17px">${d.done} de ${d.total} tareas hechas</b><span class="muted" style="font-size:12.5px">${perfect(d)?'✅ Día cumplido al completo':pend.length?`Sin hacer: ${pend.map(t=>esc(t.title)).join(', ')}`:''}</span>${anaDay===today&&d.due<d.total?`<span class="muted" style="font-size:12px">${d.total-d.due} aún en plazo (no cuentan hasta que venzan o acabe el día)</span>`:''}</div></div>`;
+  }
+  if(period==='week'){
+    const td=keyToDate(today),mon=addDays(today,-((td.getDay()+6)%7)),wk=taskRange(mon,7),prev=taskRange(addDays(mon,-7),7);
+    const a=taskPct(wk),b=taskPct(prev),max=Math.max(1,...wk.map(d=>d.total));
+    if(!wk.some(d=>d.total)&&!prev.some(d=>d.total))return '';
+    main=`<div class="grid2"><div class="tile"><span class="over">Cumplimiento</span><div class="v" style="color:${pctColor(a.pct)}">${a.pct==null?'—':Math.round(a.pct*100)+'%'}</div><div class="f">${a.done} de ${a.due} tareas${b.pct!=null&&a.pct!=null?` · ${a.pct>=b.pct?'+':'−'}${Math.abs(Math.round((a.pct-b.pct)*100))} pts vs semana anterior`:''}</div></div><div class="tile"><span class="over">Días perfectos</span><div class="v">${wk.filter(perfect).length}/${wk.filter(d=>d.total).length}</div><div class="f">todas las tareas hechas</div></div></div>
+    <div class="bars" style="height:120px">${wk.map(d=>`<div class="col"><span style="font-size:10.5px;color:var(--fg2);font-variant-numeric:tabular-nums">${d.total?d.done+'/'+d.total:''}</span><div class="pair"><i style="height:${d.total/max*100}%;background:rgba(255,255,255,.14);width:55%;position:relative">${d.done?`<i style="position:absolute;left:0;right:0;bottom:0;height:${d.done/d.total*100}%;width:100%;background:${perfect(d)?'var(--ok)':'var(--accent)'};border-radius:5px 5px 2px 2px"></i>`:''}</i></div><span style="font-size:11px;color:${d.k===today?'var(--accent)':'var(--fg2)'}">${'LMXJVSD'[(keyToDate(d.k).getDay()+6)%7]}</span></div>`).join('')}</div>`;
+  }
+  if(period==='month'){
+    const td=keyToDate(today),first=dayKey(new Date(td.getFullYear(),td.getMonth(),1)),n=new Date(td.getFullYear(),td.getMonth()+1,0).getDate();
+    const m=taskRange(first,n),a=taskPct(m);
+    if(!m.some(d=>d.total))return '';
+    const lead=(keyToDate(first).getDay()+6)%7;
+    main=`<div class="grid2"><div class="tile"><span class="over">Cumplimiento del mes</span><div class="v" style="color:${pctColor(a.pct)}">${a.pct==null?'—':Math.round(a.pct*100)+'%'}</div><div class="f">${a.done} de ${a.due} tareas</div></div><div class="tile"><span class="over">Días perfectos</span><div class="v">${m.filter(perfect).length}</div><div class="f">de ${m.filter(d=>d.total&&d.k<=today).length} días con tareas</div></div></div>
+    <div class="heat">${'LMXJVSD'.split('').map(x=>`<span style="aspect-ratio:auto;font-weight:700;color:var(--fg3)">${x}</span>`).join('')}${'<span></span>'.repeat(lead)}${m.map(d=>{const v=d.due?d.done/d.due:null,fut=d.k>today;return `<button data-anaday="${d.k}" ${fut?'disabled':''} title="${d.done}/${d.total}" style="background:${!d.total||v==null?'rgba(255,255,255,.04)':perfect(d)?'var(--ok)':`rgba(255,101,0,${.15+.7*v})`};color:${perfect(d)?'#000':'var(--fg2)'};${d.k===today?'box-shadow:inset 0 0 0 1.5px var(--accent)':''}">${keyToDate(d.k).getDate()}</button>`}).join('')}</div>
+    <span class="muted" style="font-size:12px">Verde = todas hechas · naranja = parcial (más intenso, más cumplido).</span>`;
+  }
+  const habits=habitStats(period==='month'?30:period==='week'?7:30);
+  return `<div class="card stack"><div class="between"><span class="over">Tareas · cumplimiento</span><span class="chip ${stk.cur?'acc':''}">🔥 ${stk.cur} día${stk.cur===1?'':'s'} seguidos</span></div>
+  ${main}
+  ${habits.length&&period!=='day'?`<div class="stack" style="gap:10px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Por tarea · últimos ${period==='week'?7:30} días</span>${habits.map(h=>{const v=h.done/h.due;return `<div class="stack" style="gap:5px"><div class="between" style="font-size:13.5px;gap:8px"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${h.repeat?'↻':'📅'} ${esc(h.title)}</span><span style="flex:none;font-variant-numeric:tabular-nums;color:${pctColor(v)};font-weight:700">${h.done}/${h.due} · ${Math.round(v*100)}%</span></div><div class="bar" style="height:5px"><b style="width:${v*100}%;background:${pctColor(v)}"></b></div></div>`}).join('')}</div>`:''}
+  <span class="muted" style="font-size:12px">Mejor racha de días con todas las tareas hechas: ${stk.best}. Los días sin tareas no la rompen.</span></div>`;
 }
 /* Tareas de un solo día programadas en los próximos 14 días. */
 function upcomingTasks(){const t=dayKey(Date.now()),out=[];for(let i=1;i<=14;i++){const k=addDays(t,i);for(const x of dayTasks(k))if(!x.tplId&&!x.done)out.push([k,x])}return out.slice(0,8)}
@@ -468,6 +523,7 @@ function analytics(){
   return `<div class="head"><div><div class="over acc">Rendimiento</div><div class="h1">Analytics</div></div></div>
   <div class="seg">${['day','week','month'].map(p=>`<button class="${period===p?'on':''}" data-period="${p}">${{day:'Día',week:'Semana',month:'Mes'}[p]}</button>`).join('')}</div>
   ${content}
+  ${tasksAnalytics()}
   <div class="card stack"><span class="over">Progreso</span><div class="grid2"><div class="tile"><span class="over">Racha actual</span><div class="v">${st.cur} días</div></div><div class="tile"><span class="over">Mejor racha</span><div class="v">${st.best} días</div></div></div><p class="muted" style="font-size:12px">Un día suma a la racha si alcanzas ${S.goals.target}% de efectividad. Los días sin nada planificado no la rompen.</p>${ach.map(a=>`<div class="ach ${a[2]>=1?'on':''}"><span class="ic">${a[0]}</span><div style="flex:1;min-width:0"><div class="between" style="font-size:13.5px;font-weight:600"><span>${a[1]}</span><span style="font-size:11px;color:var(--fg3);flex:none">${a[3]}</span></div><div class="bar" style="height:4px;margin-top:6px"><b style="width:${a[2]*100}%"></b></div></div></div>`).join('')}</div>`;
 }
 function settings(){
