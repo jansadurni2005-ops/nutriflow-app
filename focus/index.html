@@ -429,6 +429,12 @@ function settings(){
   <p class="muted" style="font-size:12px">La rutina genera los bloques de cada día automáticamente. Los días ya creados no se modifican.</p></div>
   <div class="card stack"><span class="over">Objetivos</span>${goal('weekHours','Horas efectivas / semana',5,80,1,' h')}${goal('target','Efectividad objetivo',50,100,5,'%')}${goal('deepBlocks','Bloques profundos / día',0,10,1,'')}</div>
   <div class="card stack"><span class="over">Pesos de la puntuación</span>${sl('c','Concentración')}${sl('a','Cumplimiento de bloques')}${sl('t','Tareas completadas')}${sl('p','Puntualidad')}<button class="btn2" data-act="resetw">Restablecer 40 / 25 / 25 / 10</button></div>
+  <div class="card stack"><span class="over">Alarmas sonoras</span>
+   ${[['enabled','Sonido de alarmas activado'],['onEnd','Alarma al terminar el tiempo de la tarea'],['onStart','Sonido al empezar cada bloque']].map(([k,l])=>`<button class="between" data-act="alarm-toggle" data-key="${k}" style="font-size:14px;text-align:left"><span>${l}</span><span class="chip ${S.alarm[k]?'acc':''}">${S.alarm[k]?'Sí':'No'}</span></button>`).join('')}
+   <label class="f" for="al-s">Sonido<select id="al-s">${Object.entries(SOUNDS).map(([k,l])=>`<option value="${k}" ${S.alarm.sound===k?'selected':''}>${l}</option>`).join('')}</select></label>
+   <label class="f" for="al-v"><span class="between"><span style="color:var(--fg);font-size:14px">Volumen</span><b class="num" style="color:var(--accent);font-size:17px">${S.alarm.volume}%</b></span><input id="al-v" type="range" min="20" max="100" step="10" value="${S.alarm.volume}"></label>
+   <button class="btn2 acc" data-act="alarm-test">🔔 Probar sonido</button>
+   <p class="muted" style="font-size:12px">Suena con la app abierta en pantalla, aunque estés en otra pestaña de FOCUS OS. Quita el modo silencio del iPhone y sube el volumen. En DEEP WORK la pantalla se mantiene encendida para que la alarma llegue a sonar.</p></div>
   <div class="card stack"><span class="over">Avisos</span><p class="muted">${notif==='granted'?'Avisos activados: al empezar y terminar cada bloque y a los 90 min de concentración, <b>mientras la app esté abierta</b>.':notif==='denied'?'Has bloqueado los avisos. Actívalos en Ajustes del iPhone › Notificaciones › FOCUS OS.':notif==='unsupported'?'Para recibir avisos en iPhone, primero instala la app en la pantalla de inicio (iOS 16.4 o superior).':'Activa los avisos para que te avise al empezar y terminar cada bloque mientras la app está abierta.'}</p>${notif==='default'?'<button class="btn2 acc" data-act="notif">Activar avisos</button>':''}<p class="muted" style="font-size:12px">Una app web no puede programar alarmas con el móvil bloqueado ni bloquear TikTok o Instagram: eso solo lo hace la versión nativa (carpeta FocusOS del repositorio).</p></div>
   <div class="card stack"><span class="over">Datos</span><p class="muted">Todo se guarda solo en este dispositivo y navegador.</p><button class="btn2" data-act="csv">Exportar CSV</button><button class="btn2 bad" data-act="wipe">Borrar todos los datos</button></div>`;
 }
@@ -474,6 +480,7 @@ function overlayView(){
   if(o.type==='recover'){const s=sess();body=`<span class="over" style="color:var(--warn)">Sesión sin cerrar</span><b style="font-size:19px">«${esc(s.title)}» quedó abierta</b><p class="muted">Empezó a las ${hhmm(s.startedAt)} y debía terminar a las ${hhmm(s.plannedEnd)}. ¿Cuándo terminaste? Solo se contará el tiempo que confirmes.</p><button class="btn" data-act="rec-end">A la hora prevista (${hhmm(s.plannedEnd)})</button><button class="btn2" data-act="rec-now">Ahora</button><button class="btn2 bad" data-act="rec-discard">Descartar la sesión</button>`}
   if(o.type==='edit'){const [b]=o.id?findBlock(o.id):[null];const k=schedDay;const blank={title:'',kind:'work',color:'FF6500',obj:'',start:atMin(k,9*60),end:atMin(k,10*60),status:'pending',worked:0};body=editorSheet(false,b||o.draft||blank,!b)}
   if(o.type==='tpl'){const t=(S.template||[]).find(x=>x.id===o.id);body=editorSheet(true,t||{title:'',kind:'work',color:'FF6500',obj:'',start:'09:00',end:'10:00',days:[1,2,3,4,5]},!t)}
+  if(o.type==='alarm'){const s=sess();body=`<div style="text-align:center;font-size:46px">⏰</div><span class="over acc" style="text-align:center">Tiempo terminado</span><b style="font-size:22px;text-align:center">${esc(s?.title||'Sesión')}</b><p class="muted" style="text-align:center">Se ha acabado el tiempo que planificaste para esta tarea.</p><button class="btn" data-act="alarm-done">✓ He terminado</button><button class="btn2 acc" data-act="alarm-plus5">+5 min más</button><button class="btn2" data-act="alarm-stop">Parar alarma y seguir</button>`}
   if(o.type==='wipe')body=`<span class="over" style="color:var(--bad)">Borrar todos los datos</span><p class="muted">Se eliminarán tus bloques, rutina y estadísticas de este dispositivo. No se puede deshacer.</p><button class="btn" style="background:var(--bad)" data-act="wipe-yes">Borrar definitivamente</button>`;
   if(o.type==='review'){const r=score(dayKey(Date.now())),day=ensureDay(dayKey(Date.now()));const pend=day.blocks.filter(b=>(b.status==='missed'||b.status==='pending')&&b.kind!=='rest');
     const tips=[];const delays=day.blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/1e3));if(delays.length){const a=delays.reduce((x,y)=>x+y,0)/delays.length;tips.push(a>300?`Empezaste con ${dur(a)} de retraso medio. Deja preparado el primer bloque la noche anterior.`:`Puntualidad sólida: retraso medio de ${dur(a)}.`)}
@@ -538,15 +545,38 @@ async function notify(title,body){
   if(!('Notification' in window)||Notification.permission!=='granted'){toast(title+' · '+body);return}
   try{const reg=await navigator.serviceWorker?.getRegistration();if(reg)reg.showNotification(title,{body,icon:'icon-192.png',badge:'icon-192.png',tag:title});else new Notification(title,{body,icon:'icon-192.png'})}catch(e){toast(title)}
 }
+/* ───────────────────────── Alarmas sonoras ─────────────────────────
+   Sonido generado con Web Audio (no necesita archivos). iOS solo permite sonar
+   después de que toques la pantalla una vez y mientras la app está abierta. */
+const SOUNDS={pulse:'Pulse',chime:'Chime',rise:'Rise',bell:'Campana'};
+let AC=null,alarmTimer=null,alarmStop=0;
+function audio(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==='suspended')AC.resume();return AC}
+function unlockAudio(){const a=audio();if(!a)return;const b=a.createBuffer(1,1,22050),src=a.createBufferSource();src.buffer=b;src.connect(a.destination);src.start(0)}
+function tone(a,t,freq,len,vol){const o=a.createOscillator(),g=a.createGain(),o2=a.createOscillator(),g2=a.createGain();
+  o.type='sine';o.frequency.value=freq;o2.type='triangle';o2.frequency.value=freq*2;g2.gain.value=.25;
+  g.gain.setValueAtTime(0.0001,t);g.gain.exponentialRampToValueAtTime(vol,t+0.012);g.gain.exponentialRampToValueAtTime(0.0001,t+len);
+  o.connect(g);o2.connect(g2);g2.connect(g);g.connect(a.destination);o.start(t);o2.start(t);o.stop(t+len+.05);o2.stop(t+len+.05)}
+function pattern(name,t0,vol){const a=audio();if(!a)return 1;const t=Math.max(t0,a.currentTime+.02);
+  const P={pulse:[[880,0,.15],[880,.22,.15],[880,.55,.15],[880,.77,.15]],chime:[[1318.5,0,.45],[987.8,.38,.45],[659.3,.76,.8]],
+    rise:[[523.3,0,.13],[659.3,.14,.13],[784,.28,.13],[1046.5,.42,.4]],bell:[[1046.5,0,1.1],[1568,0,1.1],[1046.5,.6,1.1],[1568,.6,1.1]]}[name]||[];
+  P.forEach(([f,d,l])=>tone(a,t+d,f,l,vol));return 1.6}
+/* Suena una vez (aviso corto) */
+function chime(){if(!S.alarm.enabled)return;pattern(S.alarm.sound,0,S.alarm.volume/100*.6)}
+/* Alarma que se repite hasta pararla (máx. 60 s) */
+function startAlarm(){if(!S.alarm.enabled)return;stopAlarm();const a=audio();if(!a)return;alarmStop=Date.now()+60e3;
+  const loop=()=>{if(Date.now()>alarmStop){stopAlarm();return}pattern(S.alarm.sound,0,S.alarm.volume/100);vibrate([300,150,300]);alarmTimer=setTimeout(loop,1700)};loop()}
+function stopAlarm(){clearTimeout(alarmTimer);alarmTimer=null}
+document.addEventListener('pointerdown',()=>unlockAudio(),{capture:true,once:false,passive:true});
+
 const fired=new Set();
 function checkAlerts(){
   const n=Date.now(),k=dayKey(n),day=S.days[k];if(!day)return;
   for(const b of day.blocks){
     const pre=b.start-5*60e3;
     if(b.kind!=='rest'&&n>=pre&&n<pre+60e3&&!fired.has(b.id+'pre')){fired.add(b.id+'pre');notify(`En 5 min: ${b.title}`,b.obj?`Objetivo: ${b.obj}`:KINDS[b.kind])}
-    if(n>=b.start&&n<b.start+60e3&&!fired.has(b.id+'st')){fired.add(b.id+'st');notify(b.kind==='rest'?'Descanso':`Empieza: ${b.title}`,b.kind==='rest'?`Vuelves a las ${hhmm(b.end)}`:`Hasta las ${hhmm(b.end)}`)}
+    if(n>=b.start&&n<b.start+60e3&&!fired.has(b.id+'st')){fired.add(b.id+'st');if(S.alarm.onStart&&!sess())chime();notify(b.kind==='rest'?'Descanso':`Empieza: ${b.title}`,b.kind==='rest'?`Vuelves a las ${hhmm(b.end)}`:`Hasta las ${hhmm(b.end)}`)}
     if(b.kind!=='rest'&&!b.actualStart&&n>=b.start+5*60e3&&n<b.start+6*60e3&&!fired.has(b.id+'ns')){fired.add(b.id+'ns');notify(`Aún no has empezado «${b.title}»`,'El retraso se está registrando.')}
-    if(n>=b.end&&n<b.end+60e3&&!fired.has(b.id+'end')){fired.add(b.id+'end');notify(b.kind==='rest'?'Fin del descanso':`Fin del bloque: ${b.title}`,b.kind==='rest'?'Hora de volver.':'Márcalo como terminado.')}
+    if(n>=b.end&&n<b.end+60e3&&!fired.has(b.id+'end')){fired.add(b.id+'end');if(sess()?.blockId===b.id)continue;if(S.alarm.onEnd)chime();notify(b.kind==='rest'?'Fin del descanso':`Fin del bloque: ${b.title}`,b.kind==='rest'?'Hora de volver.':'Márcalo como terminado.')}
   }
   const s=sess();if(s&&!s.pauseAt&&!s.restAt){const m=Math.floor(sFocused(s,n)/60);if(m>=90&&!s.notified[90]){s.notified[90]=1;save();notify('Llevas 90 minutos concentrado','Sigue así.')}}
 }
@@ -604,11 +634,16 @@ document.addEventListener('click',e=>{
     case 'tomorrow':moveTomorrow(overlay.id);overlay=null;break;
     case 'del':{const [b,k]=findBlock(overlay.id);if(b){S.days[k].blocks=S.days[k].blocks.filter(x=>x.id!==b.id);if(S.session?.blockId===b.id){S.session=null;deep=false}}save();overlay=null;toast('Bloque eliminado');break}
     case 'deltpl':S.template=S.template.filter(x=>x.id!==overlay.id);save();overlay=null;toast('Eliminado de la rutina');break;
-    case 'close':if(e.target.closest('[data-sheet]')&&el.tagName!=='BUTTON')return;overlay=null;break;
+    case 'close':if(e.target.closest('[data-sheet]')&&el.tagName!=='BUTTON')return;if(overlay?.type==='alarm')stopAlarm();overlay=null;break;
     case 'fixov':{const m=fixOverlaps(schedDay);toast(m?`${m} bloques movidos para que no se solapen`:'Los bloques ya empezados no se mueven');break}
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
+    case 'alarm-stop':stopAlarm();overlay=null;break;
+    case 'alarm-done':stopAlarm();overlay=null;finish('completed');return;
+    case 'alarm-plus5':{stopAlarm();const s=sess();if(s){s.plannedEnd=Math.max(Date.now(),s.plannedEnd)+5*60e3;s.alarmDone=false;save();toast('5 minutos más. Te aviso al terminar.')}overlay=null;break}
+    case 'alarm-test':unlockAudio();chime();return;
+    case 'alarm-toggle':S.alarm[el.dataset.key]=!S.alarm[el.dataset.key];save();break;
     case 'wipe':overlay={type:'wipe'};break;
     case 'wipe-yes':try{localStorage.removeItem(KEY)}catch(x){}location.reload();return;
     case 'startfree':{const m=+($('#fs-m .on')?.dataset.min||50),kd=$('#fs-k .on')?.dataset.kind||'deep';startFree($('#fs-t').value.trim(),$('#fs-o').value.trim(),m,kd);return}
@@ -622,7 +657,9 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.w||t.dataset.g){if(t.dataset.w)S.weights[t.dataset.w]=+t.value;else S.goals[t.dataset.g]=+t.value;save();const y=window.scrollY,id=t.id;render();window.scrollTo(0,y);document.getElementById(id)?.focus()}
 });
-document.addEventListener('change',e=>{if(e.target.id==='ana-d'&&e.target.value){anaDay=e.target.value;render()}});
+document.addEventListener('change',e=>{if(e.target.id==='ana-d'&&e.target.value){anaDay=e.target.value;render()}
+  if(e.target.id==='al-s'){S.alarm.sound=e.target.value;save();unlockAudio();chime()}
+  if(e.target.id==='al-v'){S.alarm.volume=+e.target.value;save();const y=window.scrollY;render();window.scrollTo(0,y);chime()}});
 
 /* Arrastrar bloques en el calendario (mover / cambiar duración, ajuste a 5 min) */
 document.addEventListener('pointerdown',e=>{
@@ -648,6 +685,8 @@ let ticks=0;
 setInterval(()=>{
   ticks++;const s=sess();
   if(s){const n=Date.now(),rem=(s.plannedEnd-n)/1e3;document.querySelectorAll('[data-live=rem]').forEach(x=>x.textContent=(rem<0?'+':'')+clock(Math.abs(rem)));document.querySelectorAll('[data-live=acc]').forEach(x=>x.textContent=clock(sFocused(s,n)))}
+  if(s&&!s.alarmDone&&Date.now()>=s.plannedEnd&&Date.now()<s.plannedEnd+30*60e3){s.alarmDone=true;save();
+    if(S.alarm.onEnd){overlay={type:'alarm'};render();startAlarm();notify('⏰ Tiempo terminado',s.title)}}
   if(ticks%10===0)checkAlerts();
   if(ticks%15===0&&!overlay&&!drag&&!['INPUT','SELECT'].includes(document.activeElement?.tagName)){markMissed();render()}
 },1000);
@@ -657,6 +696,7 @@ function boot(){
   const s=sess();if(s&&!overlay&&Date.now()>s.plannedEnd+30*60e3)overlay={type:'recover'};
   save();render();
 }
+S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
 if(!S.onboarded){S.onboarded=true;if(!S.template){S.template=DEFAULT_TEMPLATE}}
 boot();
 if('serviceWorker' in navigator)window.addEventListener('load',()=>navigator.serviceWorker.register('sw.js').catch(()=>{}));
