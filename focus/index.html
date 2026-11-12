@@ -79,9 +79,14 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .weekstrip button.on{background:var(--accent);color:#000}
 .weekstrip button.today .d{color:var(--accent)} .weekstrip button.on .d{color:#000}
 .timeline{position:relative}
-.hour{display:flex;gap:8px;height:64px;border-top:1px solid var(--stroke);font-size:11px;color:var(--fg3);font-variant-numeric:tabular-nums}
+.hour{display:flex;gap:8px;height:96px;border-top:1px solid var(--stroke);font-size:11px;color:var(--fg3);font-variant-numeric:tabular-nums}
 .hour span{width:40px;text-align:right;transform:translateY(-7px)}
-.tl-blk{position:absolute;left:52px;right:2px;border-radius:10px;overflow:hidden;border-left:3px solid;display:flex}
+.tl-blk{position:absolute;border-radius:8px;overflow:hidden;border-left:3px solid;display:flex;box-sizing:border-box}
+.tl-blk.compact .body{padding:1px 6px;justify-content:center}
+.tl-blk.compact .t{font-size:11.5px}
+.tl-blk.compact .rs{height:7px;padding-bottom:1px}
+.tl-blk.compact .rs:after{height:2px}
+.tl-blk.narrow .grip{width:22px}
 .tl-blk .body{flex:1;min-width:0;padding:5px 8px;text-align:left;display:flex;flex-direction:column;justify-content:flex-start;align-items:stretch}
 .tl-blk .t{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis} .tl-blk .s{font-size:11px;color:var(--fg2)}
 .tl-blk .grip{width:34px;display:grid;place-items:center;color:var(--fg2);touch-action:none;cursor:grab;font-size:14px}
@@ -274,6 +279,21 @@ function streaks(){
 /* ───────────────────────── Vistas ───────────────────────── */
 let tab='home',deep=false,overlay=null,period='week',schedDay=dayKey(Date.now()),anaDay=dayKey(Date.now()),drag=null;
 const TABS=[['home','◉','HOME'],['schedule','▤','SCHEDULE'],['focus','◎','FOCUS'],['analytics','▮▮','ANALYTICS'],['settings','⚙','SETTINGS']];
+const PXH=96; // píxeles por hora en el calendario
+/* Reparte en columnas los bloques que coinciden en el tiempo (solo los que se solapan de verdad). */
+function columnLayout(blocks){
+  const sorted=blocks.slice().sort((a,b)=>a.start-b.start||a.end-b.end);const out={};let group=[],cols=[],gEnd=-Infinity;
+  const flush=()=>{group.forEach(b=>out[b.id].n=Math.max(1,cols.length));group=[];cols=[]};
+  for(const b of sorted){if(b.start>=gEnd)flush();let i=cols.findIndex(e=>e<=b.start);if(i<0){i=cols.length;cols.push(b.end)}else cols[i]=b.end;out[b.id]={col:i,n:1};group.push(b);gEnd=Math.max(gEnd,b.end)}
+  flush();return out;
+}
+function overlapCount(blocks){const L=columnLayout(blocks);return Object.values(L).filter(x=>x.n>1).length}
+/* Empuja hacia abajo los bloques pendientes que se solapan, manteniendo su duración. */
+function fixOverlaps(k){
+  const d=S.days[k];if(!d)return 0;d.blocks.sort((a,b)=>a.start-b.start||a.end-b.end);let moved=0,prevEnd=-Infinity;
+  for(const b of d.blocks){if(b.start<prevEnd&&b.status==='pending'&&!b.actualStart){const len=b.end-b.start;b.start=prevEnd;b.end=prevEnd+len;moved++}prevEnd=Math.max(prevEnd,b.end)}
+  save();return moved;
+}
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
 function blockRow(b){
@@ -322,15 +342,22 @@ function schedule(){
   if(!day.blocks.length){body=`<div class="card stack" style="text-align:center;align-items:center"><b style="font-size:16px">Sin bloques este día</b><p class="muted">Crea un bloque, copia el día anterior o aplica tu rutina.</p><div class="grid2" style="width:100%"><button class="btn2" data-act="copyprev">Copiar día anterior</button><button class="btn2 acc" data-act="applytpl">Aplicar rutina</button></div></div>`}
   else{
     const f=new Date(day.blocks[0].start);f.setMinutes(0,0,0);const start=f.getTime();
-    const endH=Math.ceil((Math.max(...day.blocks.map(b=>b.end))-start)/3600e3)+1;const px=64/3600e3;
+    const endH=Math.ceil((Math.max(...day.blocks.map(b=>b.end))-start)/3600e3)+1;const px=PXH/3600e3;
     const hours=Array.from({length:endH},(_,i)=>`<div class="hour" data-hour="${start+i*3600e3}"><span>${pad((f.getHours()+i)%24)}:00</span></div>`).join('');
-    const bl=day.blocks.map(b=>`<div class="tl-blk" id="tl-${b.id}" style="top:${(b.start-start)*px}px;height:${Math.max(24,(b.end-b.start)*px-2)}px;background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1}"><button class="body" data-edit="${b.id}"><div class="t">${esc(b.title)}</div>${(b.end-b.start)*px>36?`<div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)} · ${KINDS[b.kind]}</div>`:''}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`).join('');
+    const L=columnLayout(day.blocks);
+    const bl=day.blocks.map(b=>{
+      const h=Math.max(12,(b.end-b.start)*px-2),{col,n}=L[b.id],compact=h<34;
+      const left=`calc(52px + (100% - 54px) * ${col} / ${n})`,width=`calc((100% - 54px) / ${n} - ${n>1?3:0}px)`;
+      const label=compact?`<div class="t">${esc(b.title)} <span style="color:var(--fg2);font-weight:500">· ${hhmm(b.start)}</span></div>`:`<div class="t">${esc(b.title)}</div><div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)}${n>1?'':' · '+KINDS[b.kind]}</div>`;
+      return `<div class="tl-blk${compact?' compact':''}${n>1?' narrow':''}" id="tl-${b.id}" style="top:${(b.start-start)*px+1}px;height:${h}px;left:${left};width:${width};background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1};${n>1?'box-shadow:inset 0 0 0 1px var(--warn)':''}"><button class="body" data-edit="${b.id}">${label}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`}).join('');
     const nowTop=(Date.now()-start)*px;
-    body=`<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${k===today&&nowTop>0&&nowTop<endH*64?`<div class="now" style="top:${nowTop}px"></div>`:''}</div>`;
+    body=`<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${k===today&&nowTop>0&&nowTop<endH*PXH?`<div class="now" style="top:${nowTop}px"></div>`:''}</div>`;
   }
   const work=day.blocks.filter(b=>b.kind!=='rest').reduce((a,b)=>a+(b.end-b.start)/1e3,0);
+  const ov=overlapCount(day.blocks);
   return `<div class="head"><div><div class="over acc">${keyToDate(k).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</div><div class="h1">Schedule</div></div><button class="round acc" data-act="new" aria-label="Nuevo bloque">+</button></div>
   <div class="weekstrip">${strip}</div>
+  ${ov?`<div class="card between" style="padding:12px 14px;border-color:rgba(255,176,32,.4)"><span style="color:var(--warn);font-size:13px;font-weight:600">⚠ ${ov} bloques coinciden en el tiempo</span><button class="chip warn" data-act="fixov">Colocar seguidos</button></div>`:''}
   <div class="between muted" style="font-size:12px"><span>${day.blocks.length} bloques · ${dur(work)} de trabajo</span><button style="color:var(--accent);font-weight:600" data-act="copynext">Copiar a mañana →</button></div>
   ${body}`;
 }
@@ -471,7 +498,9 @@ function saveBlock(){
   if(!b){b={id:uid(),tplId:null,status:'pending',actualStart:null,actualEnd:null,worked:0,distraction:0,paused:0};ensureDay(k).blocks.push(b)}
   Object.assign(b,{title:v.title,obj:v.obj,kind:v.kind,color:v.color||b.color||'FF6500',start:atMin(bk,t2m(v.start)),end:atMin(bk,t2m(v.end))});
   const st=$('#e-st');if(st)b.status=st.value;const wv=$('#e-w');if(wv&&wv.value!=='')b.worked=Math.max(0,+wv.value)*60;
-  S.days[bk].blocks.sort((a,c)=>a.start-c.start);save();overlay=null;toast('Bloque guardado');render();
+  S.days[bk].blocks.sort((a,c)=>a.start-c.start);save();overlay=null;
+  const clash=S.days[bk].blocks.find(x=>x.id!==b.id&&x.start<b.end&&b.start<x.end);
+  toast(clash?`Guardado. Coincide con «${clash.title}»: pulsa «Colocar seguidos» para ordenarlos.`:'Bloque guardado');render();
 }
 function saveTpl(){
   const v=readEditor();if(!v)return;const days=[...document.querySelectorAll('#e-d .on')].map(x=>+x.dataset.wd);
@@ -576,6 +605,7 @@ document.addEventListener('click',e=>{
     case 'del':{const [b,k]=findBlock(overlay.id);if(b){S.days[k].blocks=S.days[k].blocks.filter(x=>x.id!==b.id);if(S.session?.blockId===b.id){S.session=null;deep=false}}save();overlay=null;toast('Bloque eliminado');break}
     case 'deltpl':S.template=S.template.filter(x=>x.id!==overlay.id);save();overlay=null;toast('Eliminado de la rutina');break;
     case 'close':if(e.target.closest('[data-sheet]')&&el.tagName!=='BUTTON')return;overlay=null;break;
+    case 'fixov':{const m=fixOverlaps(schedDay);toast(m?`${m} bloques movidos para que no se solapen`:'Los bloques ya empezados no se mueven');break}
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
@@ -601,10 +631,10 @@ document.addEventListener('pointerdown',e=>{
   drag={b,mode:h.dataset.mode,y0:e.clientY,start:b.start,end:b.end,moved:false,el:$('#tl-'+b.id)};drag.el.classList.add('drag');h.setPointerCapture(e.pointerId);
 });
 document.addEventListener('pointermove',e=>{
-  if(!drag)return;const px=64/3600e3;const dm=Math.round((e.clientY-drag.y0)/px/300e3)*300e3;if(dm!==0)drag.moved=true;
+  if(!drag)return;const px=PXH/3600e3;const dm=Math.round((e.clientY-drag.y0)/px/300e3)*300e3;if(dm!==0)drag.moved=true;
   const origin=+$('#tl').dataset.origin;
   if(drag.mode==='move'){drag.ns=drag.start+dm;drag.ne=drag.end+dm}else{drag.ns=drag.start;drag.ne=Math.max(drag.start+5*60e3,drag.end+dm)}
-  drag.el.style.top=(drag.ns-origin)*px+'px';drag.el.style.height=Math.max(24,(drag.ne-drag.ns)*px-2)+'px';
+  drag.el.style.top=((drag.ns-origin)*px+1)+'px';drag.el.style.height=Math.max(12,(drag.ne-drag.ns)*px-2)+'px';
   const tm=drag.el.querySelector('[data-tltime]');if(tm)tm.textContent=`${hhmm(drag.ns)}–${hhmm(drag.ne)} · ${KINDS[drag.b.kind]}`;
 });
 document.addEventListener('pointerup',()=>{

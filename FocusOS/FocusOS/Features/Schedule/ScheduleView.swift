@@ -168,7 +168,7 @@ struct DayTimelineView: View {
     let day: Date
     var onCreate: (Date) -> Void
 
-    static let hourHeight: CGFloat = 76
+    static let hourHeight: CGFloat = 96
     private let labelWidth: CGFloat = 48
 
     init(day: Date, onCreate: @escaping (Date) -> Void) {
@@ -336,7 +336,8 @@ struct DraggableBlock: View {
 
     var body: some View {
         let top = CGFloat(ScheduleService.minutes(of: block.start) - minuteOrigin) * pointsPerMinute
-        let height = max(22, CGFloat(block.plannedSeconds / 60) * pointsPerMinute + resizeOffset)
+        // Altura exacta (mín. 12 pt) para que un bloque corto nunca invada el siguiente.
+        let height = max(12, CGFloat(block.plannedSeconds / 60) * pointsPerMinute + resizeOffset - 2)
         let color = Color(hex: block.colorHex)
         let previewStart = block.start.addingTimeInterval(Double(snapped(dragOffset) * 60))
         let previewEnd = block.end.addingTimeInterval(Double(snapped(dragOffset) * 60 + snapped(resizeOffset) * 60))
