@@ -5353,18 +5353,18 @@ CÓMO RESPONDER (PRIORITARIO)
         '<div class="_nf_np_bar"><i data-k="bar"></i></div>'+
         '<div class="_nf_np_sub"><span>Pagado: <b data-k="paidtxt" style="color:#a3e635">0 €</b></span><span>Falta: <b data-k="remtxt" style="color:#fbbf24">0 €</b></span></div>'+
         '<div class="_nf_np_grid">'+
-          '<div><label class="_nf_np_lbl">¿Cuánto ha pagado ya? (€)</label><input class="_nf_np_in" data-k="paid" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Ej: 175">'+
+          '<div><label class="_nf_np_lbl">¿Cuánto te ha pagado ya? (€)</label><input class="_nf_np_in" data-k="paid" type="number" step="0.01" min="0" inputmode="decimal" placeholder="Ej: 175">'+
             '<div class="_nf_np_chips"><button type="button" data-q="half">La mitad</button><button type="button" data-q="third">Un tercio</button></div></div>'+
-          '<div><label class="_nf_np_lbl">Fecha de este pago</label><input class="_nf_np_in" data-k="pdate" type="date"></div>'+
+          '<div><label class="_nf_np_lbl">Pagado el</label><input class="_nf_np_in" data-k="pdate" type="date"></div>'+
         '</div>'+
-        '<label class="_nf_np_lbl">🔔 Avisarme del siguiente pago el</label><input class="_nf_np_in" data-k="rdate" type="date">'+
+        '<label class="_nf_np_lbl">🔔 ¿Cuándo te paga lo que falta? (te aviso ese día)</label><input class="_nf_np_in" data-k="rdate" type="date">'+
         '<div class="_nf_np_chips"><button type="button" data-r="15d">+15 días</button><button type="button" data-r="1m">+1 mes</button><button type="button" data-r="2m">+2 meses</button><button type="button" data-r="3m">+3 meses</button></div>'+
         '<div class="_nf_np_sum" data-k="sum"></div>'+
         '<div class="_nf_np_err" data-k="err"></div>'+
       '</div>';
     function q(k){return el.querySelector('[data-k="'+k+'"]');}
     el._q=q;el._root=root;
-    var t0=today();q('pdate').value=t0;q('rdate').value=addMonths(t0,1);
+    var t0=today();q('pdate').value=t0;q('pdate').max=t0;q('rdate').value=addMonths(t0,1);q('rdate').min=t0;
     el.querySelectorAll('[data-m]').forEach(function(b){b.onclick=function(){setMode(el,b.getAttribute('data-m'));};});
     el.querySelectorAll('[data-q]').forEach(function(b){b.onclick=function(){var t=totalOf(root);if(t>0){q('paid').value=(Math.round(t/(b.getAttribute('data-q')==='half'?2:3)*100)/100);upd(el);}};});
     el.querySelectorAll('[data-r]').forEach(function(b){b.onclick=function(){var base=q('pdate').value||today(),r=b.getAttribute('data-r');q('rdate').value=r==='15d'?addDays(base,15):addMonths(base,parseInt(r,10));upd(el);};});
@@ -5389,7 +5389,16 @@ CÓMO RESPONDER (PRIORITARIO)
     q('remtxt').textContent=eur(r);q('remtxt').style.color=r>0.01?'#fbbf24':'#a3e635';
     var rd=q('rdate').value;
     q('sum').innerHTML=(t>0&&p>0&&r>0.01)?('🔔 El '+fmtD(rd||'')+' te saldrá un aviso para cobrar los <b>'+eur(r)+'</b> que faltan.'):(t>0&&p>=t-0.01&&p>0?'<span style="color:#a3e635">Ya lo ha pagado todo: se guardará como "Pagado todo".</span>':'');
-    if(p>0)q('err').style.display='none';
+    var bad=dateProblem(el);
+    if(bad){q('err').textContent=bad;q('err').style.display='block';}
+    else if(p>0)q('err').style.display='none';
+  }
+  // el pago ya ha ocurrido: no puede ser futuro; el aviso sí tiene que ser futuro
+  function dateProblem(el){
+    var pd=el._q('pdate').value,rd=el._q('rdate').value,t=today();
+    if(pd&&pd>t)return '"Pagado el" no puede ser un día futuro. Si es cuándo te pagará lo que falta, ponlo en el 🔔.';
+    if(rd&&rd<t)return 'El aviso 🔔 tiene que ser hoy o un día futuro.';
+    return '';
   }
 
   function tick(){
@@ -5432,6 +5441,12 @@ CÓMO RESPONDER (PRIORITARIO)
       return;
     }
     if(p>=t-0.01)return;                                   // lo ha pagado todo
+    var bad=dateProblem(panel);
+    if(bad){
+      e.preventDefault();e.stopPropagation();if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      q('err').textContent=bad;q('err').style.display='block';q('pdate').focus();
+      return;
+    }
     var ms=fieldBy(root,'método de pago','select')||fieldBy(root,'metodo de pago','select');
     var before=[];try{before=JSON.parse(localStorage.getItem('nf_'+em()+'_clients')||'[]').map(function(c){return c&&c.id;});}catch(_){}
     pending={paid:Math.round(p*100)/100,total:t,payDate:q('pdate').value||today(),remDate:q('rdate').value||'',name:name,
@@ -5457,12 +5472,14 @@ CÓMO RESPONDER (PRIORITARIO)
         localStorage.setItem('nf_'+e+'_payments',JSON.stringify(pays));
       }
       // la facturación cuenta a este cliente en el mes en que pagó
+      var cl2=cl;
       if(nc.paidDate!==pd.payDate){
-        var cl2=cl.map(function(c){return (c&&c.id===nc.id)?Object.assign({},c,{paidDate:pd.payDate}):c;});
+        cl2=cl.map(function(c){return (c&&c.id===nc.id)?Object.assign({},c,{paidDate:pd.payDate}):c;});
         localStorage.setItem('nf_'+e+'_clients',JSON.stringify(cl2));
         try{var pm=JSON.parse(localStorage.getItem('nf_'+e+'_paiddates')||'{}');pm[nc.id]=pd.payDate;localStorage.setItem('nf_'+e+'_paiddates',JSON.stringify(pm));if(window._nf_paidMap)window._nf_paidMap[nc.id]=pd.payDate;}catch(_){}
-        if(window._nf_setClients){window._nf_syncing=true;try{window._nf_setClients(cl2.slice());}catch(_){}setTimeout(function(){window._nf_syncing=false;},300);}
       }
+      // el contador de ingresos solo se recalcula cuando cambia la lista de clientes: forzarlo siempre
+      if(window._nf_setClients){window._nf_syncing=true;try{window._nf_setClients(cl2.slice());}catch(_){}setTimeout(function(){window._nf_syncing=false;},300);}
       toast('✓ <b>'+nc.name+'</b>: pagado '+eur(pd.paid)+' · faltan '+eur(pd.total-pd.paid)+(pd.remDate?' · aviso el '+fmtD(pd.remDate):''));
     }catch(err){toast('⚠️ No he podido registrar el pago de <b>'+nc.name+'</b>. Añádelo desde su perfil.',true);}
   }
