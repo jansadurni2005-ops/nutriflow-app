@@ -294,6 +294,25 @@ function fixOverlaps(k){
   for(const b of d.blocks){if(b.start<prevEnd&&b.status==='pending'&&!b.actualStart){const len=b.end-b.start;b.start=prevEnd;b.end=prevEnd+len;moved++}prevEnd=Math.max(prevEnd,b.end)}
   save();return moved;
 }
+/* Recoloca el día para que nada se solape. El bloque que acabas de mover o editar
+   se queda donde lo pones: los anteriores que lo pisan se acortan hasta su inicio
+   (o pasan detrás si quedarían en menos de 5 min) y los siguientes se empujan en cadena.
+   Los bloques ya empezados o completados no se tocan. */
+function settle(k,pinId){
+  const d=S.days[k];if(!d)return 0;const pin=d.blocks.find(b=>b.id===pinId);if(!pin)return 0;
+  const movable=b=>b.id!==pin.id&&b.status==='pending'&&!b.actualStart&&!(S.session&&S.session.blockId===b.id);
+  let changed=0;const after=[];
+  for(const b of d.blocks){
+    if(!movable(b))continue;
+    if(b.start<pin.start&&b.end>pin.start){
+      if(pin.start-b.start>=5*60e3){b.end=pin.start;changed++}else after.push(b);
+    }else if(b.start>=pin.start)after.push(b);
+  }
+  after.sort((a,b)=>a.start-b.start);
+  let prevEnd=pin.end;
+  for(const b of after){if(b.start<prevEnd){const len=b.end-b.start;b.start=prevEnd;b.end=prevEnd+len;changed++}prevEnd=Math.max(prevEnd,b.end)}
+  d.blocks.sort((a,b)=>a.start-b.start||a.end-b.end);save();return changed;
+}
 const isStandalone=()=>window.matchMedia('(display-mode: standalone)').matches||navigator.standalone===true;
 
 function blockRow(b){
@@ -505,9 +524,8 @@ function saveBlock(){
   if(!b){b={id:uid(),tplId:null,status:'pending',actualStart:null,actualEnd:null,worked:0,distraction:0,paused:0};ensureDay(k).blocks.push(b)}
   Object.assign(b,{title:v.title,obj:v.obj,kind:v.kind,color:v.color||b.color||'FF6500',start:atMin(bk,t2m(v.start)),end:atMin(bk,t2m(v.end))});
   const st=$('#e-st');if(st)b.status=st.value;const wv=$('#e-w');if(wv&&wv.value!=='')b.worked=Math.max(0,+wv.value)*60;
-  S.days[bk].blocks.sort((a,c)=>a.start-c.start);save();overlay=null;
-  const clash=S.days[bk].blocks.find(x=>x.id!==b.id&&x.start<b.end&&b.start<x.end);
-  toast(clash?`Guardado. Coincide con «${clash.title}»: pulsa «Colocar seguidos» para ordenarlos.`:'Bloque guardado');render();
+  S.days[bk].blocks.sort((a,c)=>a.start-c.start);const moved=settle(bk,b.id);overlay=null;
+  toast(moved?`Guardado · ${moved} bloque${moved>1?'s':''} recolocado${moved>1?'s':''} para que no se solapen`:'Bloque guardado');render();
 }
 function saveTpl(){
   const v=readEditor();if(!v)return;const days=[...document.querySelectorAll('#e-d .on')].map(x=>+x.dataset.wd);
@@ -676,7 +694,7 @@ document.addEventListener('pointermove',e=>{
 });
 document.addEventListener('pointerup',()=>{
   if(!drag)return;const d=drag;
-  if(d.moved&&d.ns!=null&&dayKey(d.ns)===dayKey(d.start)){d.b.start=d.ns;d.b.end=d.ne;S.days[dayKey(d.start)].blocks.sort((a,c)=>a.start-c.start);save();vibrate(15)}
+  if(d.moved&&d.ns!=null&&dayKey(d.ns)===dayKey(d.start)){d.b.start=d.ns;d.b.end=d.ne;const k=dayKey(d.start);S.days[k].blocks.sort((a,c)=>a.start-c.start);const m=settle(k,d.b.id);save();vibrate(15);if(m)toast(`${m} bloque${m>1?'s':''} recolocado${m>1?'s':''} para que no se solapen`)}
   setTimeout(()=>{drag=null;render()},0);
 });
 
