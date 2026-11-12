@@ -94,8 +94,11 @@ button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid 
 .tl-blk .rs{position:absolute;left:0;right:34px;bottom:0;height:12px;touch-action:none;cursor:ns-resize;display:flex;justify-content:center;align-items:flex-end;padding-bottom:3px}
 .tl-blk .rs:after{content:"";width:26px;height:3px;border-radius:2px;background:rgba(255,255,255,.35)}
 .tl-blk.drag{box-shadow:0 0 0 2px var(--accent),0 10px 24px rgba(0,0,0,.5);z-index:3}
-.now{position:absolute;left:44px;right:0;height:2px;background:var(--accent);pointer-events:none;z-index:2}
-.now:before{content:"";position:absolute;left:-4px;top:-3.5px;width:9px;height:9px;border-radius:50%;background:var(--accent)}
+.now{position:absolute;left:0;right:0;height:2px;background:var(--accent);pointer-events:none;z-index:4;box-shadow:0 0 8px rgba(255,101,0,.8)}
+.now .lbl{position:absolute;left:0;top:-10px;background:var(--accent);color:#000;font-family:var(--num);font-weight:800;font-size:13px;line-height:20px;padding:0 6px;border-radius:6px;font-variant-numeric:tabular-nums}
+.now:after{content:"";position:absolute;left:46px;top:-4px;width:10px;height:10px;border-radius:50%;background:var(--accent)}
+.past{position:absolute;left:52px;right:0;top:0;background:rgba(9,9,9,.45);pointer-events:none;z-index:3;border-radius:0 0 4px 4px}
+.nowcard{position:sticky;top:calc(8px + env(safe-area-inset-top,0px));z-index:6;background:rgba(23,23,23,.96);-webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);border:1px solid rgba(255,101,0,.4);border-radius:18px;padding:12px 14px;display:flex;flex-direction:column;gap:8px}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:flex-end;justify-content:center;z-index:20}
 .sheet{width:100%;max-width:440px;background:var(--bg);border-radius:26px 26px 0 0;padding:20px max(16px,env(safe-area-inset-right,0px)) calc(20px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));border-top:1px solid var(--stroke);max-height:90%;overflow:auto}
 label.f{display:flex;flex-direction:column;gap:6px;font-size:12px;color:var(--fg2)}
@@ -441,6 +444,17 @@ function tasksAnalytics(){
 }
 /* Tareas de un solo día programadas en los próximos 14 días. */
 function upcomingTasks(){const t=dayKey(Date.now()),out=[];for(let i=1;i<=14;i++){const k=addDays(t,i);for(const x of dayTasks(k))if(!x.tplId&&!x.done)out.push([k,x])}return out.slice(0,8)}
+/* Tarjeta fija arriba del calendario: qué toca ahora y qué viene después. */
+function nowCard(day){
+  const n=Date.now(),cur=day.blocks.find(b=>b.start<=n&&n<b.end),next=day.blocks.find(b=>b.start>n);
+  const left=b=>dur((b.end-n)/1e3),inn=b=>dur((b.start-n)/1e3);
+  const line=(lbl,b,extra,btn)=>`<div class="row" style="gap:10px"><span class="over" style="width:72px;flex:none;color:${lbl==='Ahora'?'var(--accent)':'var(--fg2)'}">${lbl}</span><span style="width:4px;height:30px;border-radius:2px;background:#${b.color};flex:none"></span><span style="flex:1;min-width:0"><div style="font-weight:700;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title)}</div><div style="font-size:12px;color:var(--fg2)">${extra}</div></span>${btn}</div>`;
+  const startBtn=b=>b.kind!=='rest'&&b.status!=='completed'&&sess()?.blockId!==b.id?`<button class="chip acc" data-start="${b.id}" style="flex:none">▶ Empezar</button>`:'';
+  return `<div class="nowcard"><div class="between"><span class="over acc">● Son las <span data-live="now">${hhmm(n)}</span></span><button style="color:var(--accent);font-size:12px;font-weight:600" data-act="tonow">Ir a ahora ↓</button></div>
+   ${cur?line('Ahora',cur,`${hhmm(cur.start)}–${hhmm(cur.end)} · quedan ${left(cur)}`,startBtn(cur)):`<div class="row" style="gap:10px"><span class="over" style="width:72px;flex:none;color:var(--accent)">Ahora</span><span class="muted" style="font-size:13px">Hueco libre</span></div>`}
+   ${next?line('Después',next,`a las ${hhmm(next.start)} · en ${inn(next)}`,''):`<div class="row" style="gap:10px"><span class="over" style="width:72px;flex:none">Después</span><span class="muted" style="font-size:13px">No quedan más bloques hoy</span></div>`}</div>`;
+}
+function scrollToNow(){const el=$('#nowline');if(el){const r=el.getBoundingClientRect();window.scrollTo({top:window.scrollY+r.top-window.innerHeight*0.38,behavior:'smooth'})}}
 function schedule(){
   const k=schedDay,day=ensureDay(k);syncTasks(k);
   const today=dayKey(Date.now());const td=keyToDate(today);const mon=addDays(today,-((td.getDay()+6)%7));
@@ -448,8 +462,9 @@ function schedule(){
   let body;
   if(!day.blocks.length){body=`<div class="card stack" style="text-align:center;align-items:center"><b style="font-size:16px">Sin bloques este día</b><p class="muted">Crea un bloque, copia el día anterior o aplica tu rutina.</p><div class="grid2" style="width:100%"><button class="btn2" data-act="copyprev">Copiar día anterior</button><button class="btn2 acc" data-act="applytpl">Aplicar rutina</button></div></div>`}
   else{
-    const f=new Date(day.blocks[0].start);f.setMinutes(0,0,0);const start=f.getTime();
-    const endH=Math.ceil((Math.max(...day.blocks.map(b=>b.end))-start)/3600e3)+1;const px=PXH/3600e3;
+    const nowMs=Date.now(),isT=k===today;
+    const f=new Date(Math.min(day.blocks[0].start,isT?nowMs-30*60e3:Infinity));f.setMinutes(0,0,0);const start=f.getTime();
+    const endH=Math.ceil((Math.max(...day.blocks.map(b=>b.end),isT?nowMs+30*60e3:0)-start)/3600e3)+1;const px=PXH/3600e3;
     const hours=Array.from({length:endH},(_,i)=>`<div class="hour" data-hour="${start+i*3600e3}"><span>${pad((f.getHours()+i)%24)}:00</span></div>`).join('');
     const L=columnLayout(day.blocks);
     const bl=day.blocks.map(b=>{
@@ -457,8 +472,8 @@ function schedule(){
       const left=`calc(52px + (100% - 54px) * ${col} / ${n})`,width=`calc((100% - 54px) / ${n} - ${n>1?3:0}px)`;
       const label=compact?`<div class="t">${esc(b.title)} <span style="color:var(--fg2);font-weight:500">· ${hhmm(b.start)}</span></div>`:`<div class="t">${esc(b.title)}</div><div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)}${n>1?'':' · '+KINDS[b.kind]}</div>`;
       return `<div class="tl-blk${compact?' compact':''}${n>1?' narrow':''}" id="tl-${b.id}" style="top:${(b.start-start)*px+1}px;height:${h}px;left:${left};width:${width};background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1};${n>1?'box-shadow:inset 0 0 0 1px var(--warn)':''}"><button class="body" data-edit="${b.id}">${label}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`}).join('');
-    const nowTop=(Date.now()-start)*px;
-    body=`<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${k===today&&nowTop>0&&nowTop<endH*PXH?`<div class="now" style="top:${nowTop}px"></div>`:''}</div>`;
+    const nowTop=(nowMs-start)*px,showNow=isT&&nowTop>0&&nowTop<endH*PXH;
+    body=`${isT?nowCard(day):''}<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${showNow?`<div class="past" id="pastzone" style="height:${nowTop}px"></div><div class="now" id="nowline" style="top:${nowTop}px"><span class="lbl" data-live="now">${hhmm(nowMs)}</span></div>`:''}</div>`;
   }
   const work=day.blocks.filter(b=>b.kind!=='rest').reduce((a,b)=>a+(b.end-b.start)/1e3,0);
   const ov=overlapCount(day.blocks);
@@ -768,13 +783,13 @@ document.addEventListener('click',e=>{
   if(d.tday){$('#tk-date').value=d.tday;document.querySelectorAll('[data-tday]').forEach(b=>b.classList.toggle('acc',b===el));return}
   if(d.min){document.querySelectorAll('#fs-m button').forEach(b=>b.classList.remove('on'));el.classList.add('on');return}
   if(d.kind){document.querySelectorAll('#fs-k button').forEach(b=>b.classList.remove('on'));el.classList.add('on');return}
-  if(d.tab){tab=d.tab;deep=false;overlay=null;window.scrollTo(0,0)}
+  if(d.tab){tab=d.tab;deep=false;overlay=null;window.scrollTo(0,0);if(d.tab==='schedule'&&schedDay===dayKey(Date.now()))setTimeout(scrollToNow,60)}
   else if(d.start){overlay=null;startBlock(d.start);return}
   else if(d.edit){overlay={type:'edit',id:d.edit}}
   else if(d.tpl){overlay={type:'tpl',id:d.tpl}}
   else if(d.dis){distract(+d.dis);return}
   else if(d.period){period=d.period}
-  else if(d.sday){schedDay=d.sday}
+  else if(d.sday){schedDay=d.sday;if(d.sday===dayKey(Date.now()))setTimeout(scrollToNow,60)}
   else if(d.anaday){anaDay=d.anaday;period='day';window.scrollTo(0,0)}
   else if(d.move){moveTomorrow(d.move)}
   else if(d.tcheck){toggleTask(d.tcheck,d.tk)}
@@ -804,6 +819,7 @@ document.addEventListener('click',e=>{
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
+    case 'tonow':scrollToNow();return;
     case 'tadd':{const i=$('#t-new'),v=i.value.trim();if(!v){i.focus();return}const k=d.tk||dayKey(Date.now());const dd=ensureDay(k);dd.tasks=dd.tasks||[];dd.tasks.push({id:uid(),tplId:null,title:v,time:'',done:false,doneAt:null});sortTasks(dd);save();vibrate(10);if(k!==dayKey(Date.now()))toast(`Tarea añadida para ${dayLabel(k)}`);break}
     case 'tnewdaily':overlay={type:'task',id:null,daily:true,k:d.tk,title:$('#t-new')?.value.trim()||''};break;
     case 'tnewday':overlay={type:'task',id:null,k:d.tk===dayKey(Date.now())?addDays(d.tk,1):d.tk,title:$('#t-new')?.value.trim()||''};break;
@@ -861,6 +877,8 @@ setInterval(()=>{
   if(s){const n=Date.now(),rem=(s.plannedEnd-n)/1e3;document.querySelectorAll('[data-live=rem]').forEach(x=>x.textContent=(rem<0?'+':'')+clock(Math.abs(rem)));document.querySelectorAll('[data-live=acc]').forEach(x=>x.textContent=clock(sFocused(s,n)))}
   if(s&&!s.alarmDone&&Date.now()>=s.plannedEnd&&Date.now()<s.plannedEnd+30*60e3){s.alarmDone=true;save();
     if(S.alarm.onEnd){overlay={type:'alarm'};render();startAlarm();notify('⏰ Tiempo terminado',s.title)}}
+  {const nl=$('#nowline'),tl=$('#tl');if(nl&&tl){const top=(Date.now()-(+tl.dataset.origin))*PXH/3600e3;nl.style.top=top+'px';const pz=$('#pastzone');if(pz)pz.style.height=top+'px'}
+   const hm=hhmm(Date.now());document.querySelectorAll('[data-live=now]').forEach(x=>{if(x.textContent!==hm)x.textContent=hm})}
   if(ticks%10===0)checkAlerts();
   if(ticks%15===0&&!overlay&&!drag&&!['INPUT','SELECT'].includes(document.activeElement?.tagName)){markMissed();render()}
 },1000);
