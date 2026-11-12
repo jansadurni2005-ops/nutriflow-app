@@ -170,7 +170,8 @@ const DEFAULT_TEMPLATE=[
 let S=null;
 try{S=JSON.parse(localStorage.getItem(KEY))}catch(e){}
 if(!S||!S.days)S={template:null,days:{},session:null,weights:{c:40,a:25,t:25,p:10},goals:{weekHours:35,target:90,deepBlocks:4,maxDistraction:30},onboarded:false};
-const save=()=>{try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('No se pudo guardar en este dispositivo.')}};
+S=normalizeState(S);
+const save=(touch=true)=>{if(touch)S.updatedAt=Date.now();try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){toast('No se pudo guardar en este dispositivo.')}if(touch)scheduleCloud()};
 const t2m=t=>{const [h,m]=t.split(':').map(Number);return h*60+m};
 
 function ensureDay(k){
@@ -192,7 +193,7 @@ function syncTasks(k){
   for(const t of S.taskTpl||[])if(t.days.includes(wd)&&!d.tasks.some(x=>x.tplId===t.id)&&!(d.skipTpl||[]).includes(t.id))d.tasks.push({id:uid(),tplId:t.id,title:t.title,time:t.time||'',done:false,doneAt:null});
   sortTasks(d);
 }
-function sortTasks(d){d.tasks.sort((a,b)=>(a.done-b.done)||((a.time||'99')<(b.time||'99')?-1:(a.time||'99')>(b.time||'99')?1:0))}
+function sortTasks(d){d.tasks.sort((a,b)=>(a.done-b.done)||((b.top?1:0)-(a.top?1:0))||((a.topOrder??9)-(b.topOrder??9))||((a.time||'99')<(b.time||'99')?-1:(a.time||'99')>(b.time||'99')?1:0))}
 const dayTasks=k=>(S.days[k]&&S.days[k].tasks)||[];
 function newBlock(k,t){return {id:uid(),tplId:t.id||null,title:t.title,kind:t.kind,color:t.color,obj:t.obj||'',start:atMin(k,t2m(t.start)),end:atMin(k,t2m(t.end)),status:'pending',actualStart:null,actualEnd:null,worked:0,distraction:0,paused:0}}
 function markMissed(){
@@ -342,6 +343,7 @@ function sessionCard(){
   <div class="bar"><b style="width:${Math.min(100,(n-s.startedAt)/(s.plannedEnd-s.startedAt)*100)}%"></b></div>
   <div><div style="font-size:12px;color:var(--fg3)">Tarea</div><div style="font-weight:700;font-size:19px">${esc(s.title)}</div>${s.obj?`<p class="muted">◎ ${esc(s.obj)}</p>`:''}</div>
   <div class="ctrls"><button class="ctrl ${s.pauseAt||s.restAt?'fill':''}" data-act="pause"><i>${s.pauseAt||s.restAt?'▶':'❚❚'}</i>${s.pauseAt||s.restAt?'Reanudar':'Pausar'}</button><button class="ctrl" data-act="finish"><i style="color:var(--ok)">⚑</i>Finalizar</button><button class="ctrl" data-act="distract"><i style="color:var(--bad)">!</i>Distracción</button><button class="ctrl" data-act="switch"><i>⇄</i>Cambiar</button></div>
+  ${s.blockId?blockTasksList(s.day,s.blockId):''}
   <button class="btn2 acc" data-act="deep">Abrir modo DEEP WORK</button></div>`;
 }
 function installCard(){
@@ -359,8 +361,10 @@ function home(){
   else if(!day.blocks.length)current=`<div class="card stack" style="text-align:center;align-items:center"><div class="round" style="background:var(--accent-soft);color:var(--accent);width:60px;height:60px">＋</div><b style="font-size:17px">Tu día está en blanco</b><p class="muted">Crea bloques en Schedule o carga tu rutina para empezar a medir tu efectividad.</p><button class="btn" data-tab="schedule">Planificar hoy</button></div>`;
   else{const next=day.blocks.find(b=>b.start>n&&b.kind!=='rest');current=next?`<div class="card stack"><span class="over">Sin bloque en curso</span><b style="font-size:19px">Siguiente: ${esc(next.title)}</b><p class="muted">Empieza a las ${hhmm(next.start)} · ${KINDS[next.kind]}</p><button class="btn2" data-start="${next.id}">⏩ Adelantar y empezar ahora</button></div>`:`<div class="card stack"><span class="over">Jornada planificada completada</span><div class="grid2"><button class="btn2" data-act="review">Revisión diaria</button><button class="btn2 acc" data-tab="focus">Sesión libre</button></div></div>`}
   const tl=day.blocks.length?(()=>{const f=day.blocks[0].start,t=Math.max(...day.blocks.map(b=>b.end))-f;return day.blocks.map(b=>`<i style="position:absolute;left:${(b.start-f)/t*100}%;width:calc(${(b.end-b.start)/t*100}% - 2px);height:6px;border-radius:3px;background:#${b.color};opacity:${b.status==='completed'?1:b.status==='missed'?.2:.45}"></i>`).join('')})():'';
-  return `<div class="head"><div><div class="over acc">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</div><div class="h1">${h<13?'Buenos días':h<20?'Buenas tardes':'Buenas noches'}</div></div><button class="round acc" data-act="new" aria-label="Nuevo bloque">+</button></div>
+  return `<div class="head"><div><div class="over acc">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</div><div class="h1">${h<13?'Buenos días':h<20?'Buenas tardes':'Buenas noches'}</div></div><div class="row" style="gap:8px"><button class="round" data-act="inbox" aria-label="Bandeja de entrada" style="background:var(--card);position:relative;font-size:17px">📥${S.inbox.length?`<span style="position:absolute;top:-4px;right:-4px;background:var(--accent);color:#000;border-radius:99px;font-size:10px;font-weight:800;min-width:17px;height:17px;display:grid;place-items:center">${S.inbox.length}</span>`:''}</button><button class="round acc" data-act="new" aria-label="Nuevo bloque">+</button></div></div>
   ${installCard()}
+  ${weekFocusLine()}
+  ${!(S.plans[k]||{}).planned?`<button class="card between" data-act="morning" style="border-color:rgba(255,101,0,.4);text-align:left"><span><span class="over acc">☀️ Plan del día</span><div style="font-weight:700;font-size:16px;margin-top:4px">Elige tus 3 prioridades</div><div class="muted" style="font-size:12.5px">2 minutos · revisa lo pendiente de ayer</div></span><span style="font-size:20px;color:var(--accent)">›</span></button>`:''}
   <div class="card stack"><div class="between"><span class="over">Efectividad</span><span class="chip ${r.conf==='Datos completos'?'ok':r.sc==null?'':'warn'}">${r.conf}</span></div>
   <button data-act="breakdown" aria-label="Ver cómo se calcula">${ring(r.sc,210,9,scoreColor(r.sc),r.conf==='Estimada',`<div class="num" style="font-size:66px;font-weight:800;line-height:.9">${r.sc==null?'—':Math.round(r.sc*100)}</div><div class="over" style="color:var(--fg3);margin-top:4px">${r.sc==null?'sin datos':'% · ver detalle'}</div>`)}</button>
   <div class="grid2"><div class="tile"><span class="over" style="color:var(--accent)">⚡ Efectivo</span><div class="v">${dur(r.eff)}</div></div><div class="tile"><span class="over" style="color:var(--info)">Planificado</span><div class="v">${dur(r.planned)}</div></div><div class="tile"><span class="over" style="color:var(--bad)">Distracciones</span><div class="v">${dur(r.dis)}</div><div class="f">registro manual</div></div><div class="tile"><span class="over" style="color:var(--warn)">Restante</span><div class="v">${dur(r.remaining)}</div><div class="f">hasta fin de jornada</div></div></div>
@@ -375,7 +379,7 @@ function taskItem(t,k){
   const n=Date.now(),late=!t.done&&((t.time&&n>=atMin(k,t2m(t.time)))||k<dayKey(n));
   return `<div class="row" style="gap:12px;padding:4px 0">
     <button data-tcheck="${t.id}" data-tk="${k}" aria-label="${t.done?'Desmarcar':'Completar'} ${esc(t.title)}" style="width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;font-weight:800;${t.done?'background:var(--accent);color:#000':'border:2px solid '+(late?'var(--bad)':'var(--fg3)')}">${t.done?'✓':''}</button>
-    <button data-tedit="${t.id}" data-tk="${k}" style="flex:1;min-width:0;text-align:left"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${t.done?'color:var(--fg3);text-decoration:line-through':''}">${esc(t.title)}</div>${t.time||t.tplId||late?`<div style="font-size:11.5px;color:${late?'var(--bad)':'var(--fg3)'}">${[late?'Vencida':'',t.time?(late?t.time:'Antes de las '+t.time):'',t.tplId?'↻ se repite':'📅 solo este día'].filter(Boolean).join(' · ')}</div>`:''}</button></div>`;
+    <button data-tedit="${t.id}" data-tk="${k}" style="flex:1;min-width:0;text-align:left"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${t.done?'color:var(--fg3);text-decoration:line-through':''}">${esc(t.title)}</div>${t.time||t.tplId||late||t.top||t.blockId?`<div style="font-size:11.5px;color:${late?'var(--bad)':t.top?'var(--accent)':'var(--fg3)'}">${[t.top?'★ prioridad':'',late?'Vencida':'',t.time?(late?t.time:'Antes de las '+t.time):'',t.blockId?'▦ '+((ensureDay(k).blocks.find(b=>b.id===t.blockId)||{}).title||'bloque'):'',t.tplId?'↻ se repite':'📅 solo este día'].filter(Boolean).join(' · ')}</div>`:''}</button></div>`;
 }
 /* Tarjeta de tareas de un día (HOME usa hoy; SCHEDULE el día elegido). */
 function tasksCard(k){
@@ -384,7 +388,7 @@ function tasksCard(k){
   return `<div class="card stack" id="tasks"><div class="between"><span class="over">Tareas de ${dayLabel(k)}</span><span class="num" style="font-size:19px;color:${list.length&&done===list.length?'var(--ok)':'var(--fg)'}">${done}/${list.length}</span></div>
   ${list.length?`<div class="bar" style="height:6px"><b style="width:${done/list.length*100}%;${done===list.length?'background:var(--ok)':''}"></b></div><div class="stack" style="gap:2px">${list.map(t=>taskItem(t,k)).join('')}</div>`:`<p class="muted">${past?'No había tareas este día.':isToday?'Añade lo que tienes que hacer hoy sí o sí.':'Sin tareas para este día. Añade las que tengas que hacer ese día.'}</p>`}
   ${past?'':`<div class="row"><input id="t-new" data-tk="${k}" placeholder="Añadir tarea para ${dayLabel(k)}…" aria-label="Nueva tarea" enterkeyhint="done"><button class="round acc" data-act="tadd" data-tk="${k}" aria-label="Añadir tarea" style="width:46px;height:46px">+</button></div>
-  <div class="row" style="gap:16px;flex-wrap:wrap"><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewday" data-tk="${k}">📅 Tarea para otro día</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewdaily" data-tk="${k}">↻ Tarea que se repite</button></div>`}
+  <div class="row" style="gap:16px;flex-wrap:wrap"><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewday" data-tk="${k}">📅 Tarea para otro día</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewdaily" data-tk="${k}">↻ Tarea que se repite</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="inbox">📥 Bandeja${S.inbox.length?` (${S.inbox.length})`:''}</button></div>`}
   ${isToday?(()=>{const td=keyToDate(k),mon=addDays(k,-((td.getDay()+6)%7)),w=taskPct(taskRange(mon,7)),st=taskStreak();return w.due||st.best?`<button class="between" data-tab="analytics" style="background:var(--card2);border-radius:14px;padding:10px 12px;font-size:12.5px;text-align:left"><span>Semana: <b style="color:${pctColor(w.pct)}">${w.pct==null?'—':Math.round(w.pct*100)+'%'}</b> cumplido (${w.done}/${w.due})</span><span>🔥 ${st.cur} día${st.cur===1?'':'s'} ›</span></button>`:''})():''}
   ${upcoming.length?`<div class="stack" style="gap:6px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Próximos días</span>${upcoming.map(([dk,t])=>`<button class="between" data-tedit="${t.id}" data-tk="${dk}" style="font-size:13.5px;text-align:left"><span style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">📅 ${esc(t.title)}</span><span class="chip" style="flex:none">${dayLabel(dk)}${t.time?' · '+t.time:''}</span></button>`).join('')}</div>`:''}</div>`;
 }
@@ -470,7 +474,8 @@ function schedule(){
     const bl=day.blocks.map(b=>{
       const h=Math.max(12,(b.end-b.start)*px-2),{col,n}=L[b.id],compact=h<34;
       const left=`calc(52px + (100% - 54px) * ${col} / ${n})`,width=`calc((100% - 54px) / ${n} - ${n>1?3:0}px)`;
-      const label=compact?`<div class="t">${esc(b.title)} <span style="color:var(--fg2);font-weight:500">· ${hhmm(b.start)}</span></div>`:`<div class="t">${esc(b.title)}</div><div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)}${n>1?'':' · '+KINDS[b.kind]}</div>`;
+      const bt=blockTasks(k,b.id),badge=bt.length?` <span style="font-size:10.5px;color:var(--fg2)">☐ ${bt.filter(t=>t.done).length}/${bt.length}</span>`:'';
+      const label=compact?`<div class="t">${esc(b.title)}${badge} <span style="color:var(--fg2);font-weight:500">· ${hhmm(b.start)}</span></div>`:`<div class="t">${esc(b.title)}${badge}</div><div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)}${n>1?'':' · '+KINDS[b.kind]}</div>`;
       return `<div class="tl-blk${compact?' compact':''}${n>1?' narrow':''}" id="tl-${b.id}" style="top:${(b.start-start)*px+1}px;height:${h}px;left:${left};width:${width};background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1};${n>1?'box-shadow:inset 0 0 0 1px var(--warn)':''}"><button class="body" data-edit="${b.id}">${label}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`}).join('');
     const nowTop=(nowMs-start)*px,showNow=isT&&nowTop>0&&nowTop<endH*PXH;
     body=`${isT?nowCard(day):''}<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${showNow?`<div class="past" id="pastzone" style="height:${nowTop}px"></div><div class="now" id="nowline" style="top:${nowTop}px"><span class="lbl" data-live="now">${hhmm(nowMs)}</span></div>`:''}</div>`;
@@ -535,7 +540,7 @@ function analytics(){
   }
   const st=streaks(),all=st.h;const totH=all.reduce((a,[,r])=>a+r.eff,0)/3600,deepH=all.reduce((a,[,r])=>a+r.deepSec,0)/3600,clean=all.reduce((a,[,r])=>a+r.clean,0),ontime=all.reduce((a,[,r])=>a+r.ontime,0);
   const ach=[['⚡','Primer bloque profundo',all.some(([,r])=>r.deepDone>0)?1:0,all.some(([,r])=>r.deepDone>0)?'Conseguido':'0/1'],['🔥','Siete de siete',Math.min(1,st.best/7),`${Math.min(st.best,7)}/7 días`],['◈','20 h de profundidad',Math.min(1,deepH/20),`${deepH.toLocaleString('es-ES',{maximumFractionDigits:1})}/20 h`],['✓','Diez bloques limpios',Math.min(1,clean/10),`${Math.min(clean,10)}/10`],['⏱','Reloj suizo: 25 bloques puntuales',Math.min(1,ontime/25),`${Math.min(ontime,25)}/25`],['☑','Siete días con todas las tareas hechas',Math.min(1,all.filter(([,r])=>r.tasksTotal>0&&r.tasksDone===r.tasksTotal).length/7),`${Math.min(7,all.filter(([,r])=>r.tasksTotal>0&&r.tasksDone===r.tasksTotal).length)}/7 días`],['⌛','Centenario: 100 h efectivas',Math.min(1,totH/100),`${Math.floor(totH)}/100 h`]];
-  return `<div class="head"><div><div class="over acc">Rendimiento</div><div class="h1">Analytics</div></div></div>
+  return `<div class="head"><div><div class="over acc">Rendimiento</div><div class="h1">Analytics</div></div><button class="chip acc" data-act="weekly">📊 Revisión semanal</button></div>
   <div class="seg">${['day','week','month'].map(p=>`<button class="${period===p?'on':''}" data-period="${p}">${{day:'Día',week:'Semana',month:'Mes'}[p]}</button>`).join('')}</div>
   ${content}
   ${tasksAnalytics()}
@@ -560,6 +565,9 @@ function settings(){
    <button class="btn2 acc" data-act="alarm-test">🔔 Probar sonido</button>
    <p class="muted" style="font-size:12px">Suena con la app abierta en pantalla, aunque estés en otra pestaña de FOCUS OS. Quita el modo silencio del iPhone y sube el volumen. En DEEP WORK la pantalla se mantiene encendida para que la alarma llegue a sonar.</p></div>
   <div class="card stack"><span class="over">Avisos</span><p class="muted">${notif==='granted'?'Avisos activados: al empezar y terminar cada bloque y a los 90 min de concentración, <b>mientras la app esté abierta</b>.':notif==='denied'?'Has bloqueado los avisos. Actívalos en Ajustes del iPhone › Notificaciones › FOCUS OS.':notif==='unsupported'?'Para recibir avisos en iPhone, primero instala la app en la pantalla de inicio (iOS 16.4 o superior).':'Activa los avisos para que te avise al empezar y terminar cada bloque mientras la app está abierta.'}</p>${notif==='default'?'<button class="btn2 acc" data-act="notif">Activar avisos</button>':''}<p class="muted" style="font-size:12px">Una app web no puede programar alarmas con el móvil bloqueado ni bloquear TikTok o Instagram: eso solo lo hace la versión nativa (carpeta FocusOS del repositorio).</p></div>
+  ${cloudCard()}
+  ${backupCard()}
+  <div class="card stack"><span class="over">Rituales</span><button class="between" data-act="rituals" style="font-size:14px;text-align:left"><span>Plan de la mañana, cierre del día y revisión semanal</span><span class="chip ${S.rituals!==false?'acc':''}">${S.rituals!==false?'Sí':'No'}</span></button><div class="grid2"><button class="btn2" data-act="morning">☀️ Plan del día</button><button class="btn2" data-act="weekly">📊 Revisión semanal</button></div></div>
   <div class="card stack"><span class="over">Datos</span><p class="muted">Todo se guarda solo en este dispositivo y navegador.</p><button class="btn2" data-act="csv">Exportar CSV</button><button class="btn2 bad" data-act="wipe">Borrar todos los datos</button></div>`;
 }
 function deepView(){
@@ -571,6 +579,7 @@ function deepView(){
   ${ring(prog,280,5,col,false,`<div class="num" data-live="rem" style="font-size:56px;font-weight:800;line-height:1;color:${rem<0?'var(--accent)':'var(--fg)'}">${rem<0?'+':''}${clock(Math.abs(rem))}</div><div class="over" style="color:${col};margin-top:6px">${s.restAt?'Descanso':s.pauseAt?'En pausa':rem<0?'Tiempo extra':'Restantes'}</div>`)}
   <div style="display:flex;justify-content:center;gap:30px;text-align:center"><div><div class="num" data-live="acc" style="font-size:21px">${clock(sFocused(s,n))}</div><div class="over" style="font-size:8.5px;color:var(--fg3)">Acumulado</div></div><div><div class="num" style="font-size:21px">${dur(s.distraction)}</div><div class="over" style="font-size:8.5px;color:var(--fg3)">Distracción</div></div><div><div class="num" style="font-size:21px">${hhmm(s.plannedEnd)}</div><div class="over" style="font-size:8.5px;color:var(--fg3)">Fin</div></div></div>
   <div class="stack" style="gap:6px"><div class="between"><span class="over">Concentración</span><span class="num" style="font-size:16px">${c==null?'midiendo…':pct(c)}</span></div><div class="bar" style="height:6px"><b style="width:${(c||0)*100}%;background:${scoreColor(c)}"></b></div></div>
+  ${s.blockId?blockTasksList(s.day,s.blockId):''}
   <div style="flex:1"></div>
   <button class="btn" data-act="finish-yes">✓ He terminado</button>
   <button class="btn2" data-act="rest" style="${s.restAt?'color:var(--info)':''}">${s.restAt?'Volver al trabajo':'Necesito descansar'}</button>
@@ -616,17 +625,29 @@ function overlayView(){
     <div id="tk-rep" ${repeat?'':'hidden'} class="stack" style="gap:8px"><span style="font-size:12px;color:var(--fg2)">Días que se repite</span>
       <div class="weekstrip" id="tk-d">${[1,2,3,4,5,6,0].map(d=>`<button type="button" class="${days.includes(d)?'on':''}" data-wd="${d}"><b>${'DLMXJVS'[d]}</b></button>`).join('')}</div></div>
     <label class="f" for="tk-h">Hora límite (opcional)<input id="tk-h" type="time" value="${t?.time||''}"></label>
+    ${(()=>{const bl=ensureDay(k<dayKey(Date.now())?dayKey(Date.now()):k).blocks.filter(b=>b.kind!=='rest');return bl.length?`<label class="f" for="tk-b">Hacerla dentro del bloque (opcional)<select id="tk-b"><option value="">— Ninguno —</option>${bl.map(b=>`<option value="${b.id}" ${t?.blockId===b.id?'selected':''}>${hhmm(b.start)} · ${esc(b.title)}</option>`).join('')}</select></label>`:''})()}
     <p id="tk-err" class="muted" style="color:var(--bad)" hidden></p>
     <button class="btn" data-act="tsave">Guardar</button>
     ${t&&!t.done&&!t.tplId?`<button class="btn2" data-act="ttomorrow">Pasar al día siguiente</button>`:''}
     ${t?`<button class="btn2 bad" data-act="tdel">${t.tplId?'Quitar solo de este día':'Eliminar'}</button>${t.tplId?'<button class="btn2 bad" data-act="tstop">Dejar de repetirla</button>':''}`:''}`}
+  if(o.type==='morning')body=morningSheet();
+  if(o.type==='inbox')body=inboxSheet();
+  if(o.type==='pickblock')body=pickBlockSheet(o.id);
+  if(o.type==='weekly')body=weeklySheet(o.k);
+  if(o.type==='cloud')body=`<span class="over acc">☁️ Tu cuenta de FOCUS OS</span><p class="muted">Con una cuenta tus datos se guardan en la nube (solo tú puedes verlos) y puedes activar avisos con el móvil bloqueado.</p>
+    <label class="f" for="cl-e">Email<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com"></label>
+    <label class="f" for="cl-p">Contraseña (mín. 8 caracteres)<input id="cl-p" type="password" autocomplete="current-password"></label>
+    <p id="cl-err" class="muted" style="color:var(--bad)" hidden></p>
+    <button class="btn" data-act="cl-in">Entrar</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
+    <p class="muted" style="font-size:11.5px">Al entrar por primera vez se suben los datos de este móvil. Si ya tenías datos en la nube, se usa la versión más reciente y se guarda una copia local de la otra.</p>`;
+  if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
   if(o.type==='wipe')body=`<span class="over" style="color:var(--bad)">Borrar todos los datos</span><p class="muted">Se eliminarán tus bloques, rutina y estadísticas de este dispositivo. No se puede deshacer.</p><button class="btn" style="background:var(--bad)" data-act="wipe-yes">Borrar definitivamente</button>`;
   if(o.type==='review'){const r=score(dayKey(Date.now())),day=ensureDay(dayKey(Date.now()));const pend=day.blocks.filter(b=>(b.status==='missed'||b.status==='pending')&&b.kind!=='rest');
     const tips=[];const delays=day.blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/1e3));if(delays.length){const a=delays.reduce((x,y)=>x+y,0)/delays.length;tips.push(a>300?`Empezaste con ${dur(a)} de retraso medio. Deja preparado el primer bloque la noche anterior.`:`Puntualidad sólida: retraso medio de ${dur(a)}.`)}
     if(r.dis>S.goals.maxDistraction*60)tips.push(`${dur(r.dis)} de distracciones. Deja el móvil en otra habitación durante el trabajo profundo.`);
     if(r.deepDone<S.goals.deepBlocks)tips.push(`${r.deepDone} de ${S.goals.deepBlocks} bloques de trabajo profundo. Protege la primera hora de la mañana.`);
     if(pend.length)tips.push(`${pend.length} bloque(s) sin realizar: muévelos a mañana o elimínalos.`);
-    body=`<span class="over acc">Revisión diaria</span><div class="grid2"><div class="tile"><span class="over">Efectividad</span><div class="v">${pct(r.sc)}</div></div><div class="tile"><span class="over">Horas trabajadas</span><div class="v">${dur(r.eff)}</div></div></div><span class="over">Pendiente</span>${pend.length?pend.map(b=>`<div class="between" style="font-size:13.5px"><span>${esc(b.title)}</span><button style="color:var(--accent);font-weight:600;font-size:12.5px" data-move="${b.id}">Mover a mañana</button></div>`).join(''):'<p class="muted">Nada pendiente. Día cerrado.</p>'}<span class="over">Tareas sin completar</span>${dayTasks(dayKey(Date.now())).filter(t=>!t.done).map(t=>`<div class="between" style="font-size:13.5px"><span>☐ ${esc(t.title)}</span><button style="color:var(--accent);font-weight:600;font-size:12.5px" data-tmove="${t.id}">Mover a mañana</button></div>`).join('')||'<p class="muted">Todas las tareas hechas. 🔥</p>'}<span class="over">Qué puedo mejorar mañana</span>${tips.map(t=>`<p class="muted">• ${t}</p>`).join('')||'<p class="muted">Sin datos suficientes todavía.</p>'}<span class="over acc">¿Quieres preparar tu jornada de mañana?</span><button class="btn" data-act="dup-tomorrow">Duplicar la planificación de hoy</button><button class="btn2" data-act="plan-tomorrow">Planificar a mano</button>`}
+    body=`<span class="over acc">Revisión diaria</span><div class="grid2"><div class="tile"><span class="over">Efectividad</span><div class="v">${pct(r.sc)}</div></div><div class="tile"><span class="over">Horas trabajadas</span><div class="v">${dur(r.eff)}</div></div></div><span class="over">Pendiente</span>${pend.length?pend.map(b=>`<div class="between" style="font-size:13.5px"><span>${esc(b.title)}</span><button style="color:var(--accent);font-weight:600;font-size:12.5px" data-move="${b.id}">Mover a mañana</button></div>`).join(''):'<p class="muted">Nada pendiente. Día cerrado.</p>'}<span class="over">Tareas sin completar</span>${dayTasks(dayKey(Date.now())).filter(t=>!t.done).map(t=>`<div class="between" style="font-size:13.5px"><span>☐ ${esc(t.title)}</span><button style="color:var(--accent);font-weight:600;font-size:12.5px" data-tmove="${t.id}">Mañana</button>${!t.tplId?`<button style="color:var(--fg2);font-weight:600;font-size:12.5px;margin-left:10px" data-act="t-inbox" data-id="${t.id}">📥</button>`:''}</div>`).join('')||'<p class="muted">Todas las tareas hechas. 🔥</p>'}<span class="over">Qué puedo mejorar mañana</span>${tips.map(t=>`<p class="muted">• ${t}</p>`).join('')||'<p class="muted">Sin datos suficientes todavía.</p>'}${eveningExtras()}<span class="over acc">¿Quieres preparar tu jornada de mañana?</span><button class="btn" data-act="dup-tomorrow">Duplicar la planificación de hoy</button><button class="btn2" data-act="plan-tomorrow">Planificar a mano</button>`}
   return `<div class="modal" data-act="close"><div class="sheet stack" data-sheet>${body}<button style="color:var(--fg3);font-size:14px;padding:6px" data-act="close">Cerrar</button></div></div>`;
 }
 
@@ -689,7 +710,9 @@ function saveTask(){
   if(t&&targetK!==oldK&&!repeat){od.tasks=od.tasks.filter(x=>x.id!==t.id);if(t.tplId)(od.skipTpl=od.skipTpl||[]).push(t.tplId)}
   const d=ensureDay(targetK);d.tasks=d.tasks||[];
   if(!t||(targetK!==oldK&&!repeat)){const prev=t;t={id:uid(),tplId:null,done:false,doneAt:null};if(prev&&!prev.tplId)Object.assign(t,{done:prev.done,doneAt:prev.doneAt});d.tasks.push(t)}
-  t.title=title;t.time=time;S.taskTpl=S.taskTpl||[];
+  t.title=title;t.time=time;const bsel=$('#tk-b');t.blockId=bsel&&!repeat&&targetK===oldK?(bsel.value||null):(bsel&&!repeat&&bsel.value&&ensureDay(targetK).blocks.some(b=>b.id===bsel.value)?bsel.value:null);
+  if(overlay.fromInbox){const ii=S.inbox.findIndex(x=>x.id===overlay.fromInbox);if(ii>=0)S.inbox.splice(ii,1)}
+  S.taskTpl=S.taskTpl||[];
   if(repeat){let tpl=t.tplId&&S.taskTpl.find(x=>x.id===t.tplId);if(!tpl){tpl={id:uid()};S.taskTpl.push(tpl);t.tplId=tpl.id}
     Object.assign(tpl,{title,time,days});
     for(const dk in S.days)if(dk>targetK&&S.days[dk].tasks)S.days[dk].tasks.forEach(x=>{if(x.tplId===tpl.id&&!x.done){x.title=title;x.time=time}});
@@ -714,6 +737,7 @@ function exportCSV(){
 /* ───────────────────────── Avisos (mientras la app está abierta) ───────────────────────── */
 async function notify(title,body){
   vibrate([200,100,200]);
+  if(S.pushOn){toast(title+(body?' · '+body:''));return}
   if(!('Notification' in window)||Notification.permission!=='granted'){toast(title+' · '+body);return}
   try{const reg=await navigator.serviceWorker?.getRegistration();if(reg)reg.showNotification(title,{body,icon:'icon-192.png',badge:'icon-192.png',tag:title});else new Notification(title,{body,icon:'icon-192.png'})}catch(e){toast(title)}
 }
@@ -819,6 +843,38 @@ document.addEventListener('click',e=>{
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
+    case 'morning':overlay={type:'morning'};break;
+    case 'mp-sugg':{const e=[0,1,2].map(i=>$('#mp-'+i)).find(x=>!x.value.trim());if(e)e.value=d.t;return}
+    case 'mp-save':saveMorning();return;
+    case 'mp-skip':plan(dayKey(Date.now())).skipped=true;save();overlay=null;break;
+    case 'plan-go-sched':plan(dayKey(Date.now())).planned=true;save();overlay=null;tab='schedule';schedDay=dayKey(Date.now());break;
+    case 'lo-today':moveLeftover(d.id,d.k,'today');overlay={type:'morning'};break;
+    case 'lo-inbox':moveLeftover(d.id,d.k,'inbox');overlay={type:'morning'};break;
+    case 'lo-drop':moveLeftover(d.id,d.k,'drop');overlay={type:'morning'};break;
+    case 'lo-all':leftovers().forEach(([dk,t])=>moveLeftover(t.id,dk,'today'));toast('Pendientes pasados a hoy');overlay={type:'morning'};break;
+    case 'rv-close':{const k=dayKey(Date.now());Object.assign(plan(k),{closed:true,closedAt:Date.now(),note:($('#rv-note')?.value||'').trim()});save();overlay=null;toast('🌙 Día cerrado. ¡Buen descanso!');break}
+    case 't-inbox':{const k=dayKey(Date.now()),dd=S.days[k],t=dd&&dd.tasks.find(x=>x.id===d.id);if(t){addToInbox(t.title);dd.tasks=dd.tasks.filter(x=>x.id!==t.id);save();toast('Enviada a la bandeja')}overlay={type:'review'};break}
+    case 'inbox':overlay={type:'inbox'};break;
+    case 'ib-add':{const i=$('#ib-new'),v=i.value.trim();if(!v){i.focus();return}addToInbox(v);overlay={type:'inbox'};render();setTimeout(()=>$('#ib-new')?.focus(),50);return}
+    case 'ib-to':inboxToDay(d.id,d.k);overlay={type:'inbox'};break;
+    case 'ib-del':S.inbox=S.inbox.filter(x=>x.id!==d.id);save();overlay={type:'inbox'};break;
+    case 'ib-date':{const it=S.inbox.find(x=>x.id===d.id);overlay={type:'task',id:null,k:addDays(dayKey(Date.now()),1),title:it?.title||'',fromInbox:d.id};break}
+    case 'ib-block':overlay={type:'pickblock',id:d.id};break;
+    case 'ib-toblock':inboxToDay(d.id,d.k,d.b);overlay={type:'inbox'};break;
+    case 'weekly':overlay={type:'weekly',k:reviewWeekStart()};break;
+    case 'wk-save':{const mon=d.k,next=addDays(mon,7),f=($('#wk-focus')?.value||'').trim();S.weekly[mon]={done:true,at:Date.now()};if(f)S.weekly[next+'-focus']=f;else delete S.weekly[next+'-focus'];save();overlay=null;toast('📊 Revisión semanal guardada');break}
+    case 'wk-skip':S.weekly[d.k]=Object.assign(S.weekly[d.k]||{},{skipped:true});save();overlay=null;break;
+    case 'rituals':S.rituals=S.rituals===false;save();break;
+    case 'cl-open':overlay={type:'cloud'};break;
+    case 'cl-in':cloudAuth(false);return;
+    case 'cl-up':cloudAuth(true);return;
+    case 'cl-out':cloudSignOut();return;
+    case 'cl-sync':cloud.status='sync';render();cloudPull().then(()=>{toast(cloud.status==='error'?'⚠ '+cloud.msg:'☁️ Sincronizado');render()});return;
+    case 'push-on':el.disabled=true;enablePush().then(()=>{toast('🔔 Avisos push activados');render()}).catch(e=>{toast(e.message||String(e));render()});return;
+    case 'push-off':disablePush().then(()=>{toast('Avisos push desactivados');render()});return;
+    case 'push-test':testPush().then(r=>toast(r.sent?'🔔 Aviso de prueba enviado. Debería llegarte en segundos.':'No hay dispositivos suscritos. Desactiva y vuelve a activar los avisos.')).catch(e=>toast('⚠ '+(e.message||e)));return;
+    case 'bk-down':downloadBackup();return;
+    case 'bk-apply':{const keep={cloudOn:S.cloudOn,pushOn:S.pushOn};S=normalizeState(JSON.parse(JSON.stringify(overlay.data)));Object.assign(S,keep);save();overlay=null;toast('Copia restaurada');break}
     case 'tonow':scrollToNow();return;
     case 'tadd':{const i=$('#t-new'),v=i.value.trim();if(!v){i.focus();return}const k=d.tk||dayKey(Date.now());const dd=ensureDay(k);dd.tasks=dd.tasks||[];dd.tasks.push({id:uid(),tplId:null,title:v,time:'',done:false,doneAt:null});sortTasks(dd);save();vibrate(10);if(k!==dayKey(Date.now()))toast(`Tarea añadida para ${dayLabel(k)}`);break}
     case 'tnewdaily':overlay={type:'task',id:null,daily:true,k:d.tk,title:$('#t-new')?.value.trim()||''};break;
@@ -846,8 +902,8 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.w||t.dataset.g){if(t.dataset.w)S.weights[t.dataset.w]=+t.value;else S.goals[t.dataset.g]=+t.value;save();const y=window.scrollY,id=t.id;render();window.scrollTo(0,y);document.getElementById(id)?.focus()}
 });
-document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.id==='t-new'){e.preventDefault();$('[data-act=tadd]').click()}});
-document.addEventListener('change',e=>{if(e.target.id==='ana-d'&&e.target.value){anaDay=e.target.value;render()}
+document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='t-new'){e.preventDefault();$('[data-act=tadd]').click()}if(e.target.id==='ib-new'){e.preventDefault();$('[data-act=ib-add]').click()}if(e.target.id==='cl-p'){e.preventDefault();$('[data-act=cl-in]').click()}});
+document.addEventListener('change',e=>{if(e.target.id==='bk-file'&&e.target.files[0]){readBackup(e.target.files[0]);e.target.value='';return}if(e.target.id==='ana-d'&&e.target.value){anaDay=e.target.value;render()}
   if(e.target.id==='al-s'){S.alarm.sound=e.target.value;save();unlockAudio();chime()}
   if(e.target.id==='al-v'){S.alarm.volume=+e.target.value;save();const y=window.scrollY;render();window.scrollTo(0,y);chime()}});
 
@@ -883,10 +939,326 @@ setInterval(()=>{
   if(ticks%15===0&&!overlay&&!drag&&!['INPUT','SELECT'].includes(document.activeElement?.tagName)){markMissed();render()}
 },1000);
 
+/* ═════════════════════ 1 · 2  NUBE: CUENTA, SINCRONIZACIÓN Y AVISOS PUSH ═════════════════════
+   Cuenta propia en Supabase (email + contraseña). El estado completo se guarda en la tabla
+   focus_state (RLS: solo tú). Los avisos de las próximas 72 h se suben a focus_alerts y un
+   cron del servidor los envía como Web Push, así llegan con el iPhone bloqueado. */
+const SB_URL='https://nrxltxmbpkplhgycodob.supabase.co',SB_KEY='sb_publishable_D1OctYCf99xWxNjODMXWTg_8tBfcxMB';
+const PUSH_FN=SB_URL+'/functions/v1/focus-push';
+let sb=null,sbUser=null,cloudTimer=null,cloud={status:'off',msg:'',last:0};
+const isIOS=/iphone|ipad|ipod/i.test(navigator.userAgent);
+function loadSB(){
+  if(sb)return Promise.resolve(sb);
+  return new Promise((res,rej)=>{
+    const go=async()=>{try{
+      sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'focusos-auth'}});
+      const {data}=await sb.auth.getSession();sbUser=data.session?.user||null;
+      sb.auth.onAuthStateChange((_e,ses)=>{sbUser=ses?.user||null});
+      res(sb)}catch(e){rej(e)}};
+    if(window.supabase)return go();
+    const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
+    s.onload=go;s.onerror=()=>rej(new Error('Sin conexión: no se pudo cargar la nube.'));document.head.appendChild(s);
+  });
+}
+function scheduleCloud(){if(!sbUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,1500)}
+async function cloudPush(){
+  if(!sbUser)return;cloud.status='sync';
+  try{
+    const {error}=await sb.from('focus_state').upsert({user_id:sbUser.id,data:S,client_updated_at:S.updatedAt||Date.now(),device:navigator.userAgent.slice(0,100),updated_at:new Date().toISOString()});
+    if(error)throw error;
+    S.syncedAt=S.updatedAt;save(false);cloud={status:'ok',msg:'',last:Date.now()};
+    if(S.pushOn)await pushAlerts();
+  }catch(e){cloud={status:'error',msg:e.message||String(e),last:cloud.last}}
+}
+async function cloudPull(){
+  if(!sbUser)return;
+  try{
+    const {data,error}=await sb.from('focus_state').select('data,client_updated_at').eq('user_id',sbUser.id).maybeSingle();
+    if(error)throw error;
+    if(!data){await cloudPush();return}
+    const remote=+data.client_updated_at||0,local=+S.updatedAt||0;
+    if(remote>local){
+      try{localStorage.setItem(KEY+'-antes-de-sincronizar',JSON.stringify(S))}catch(e){}
+      S=normalizeState(data.data);S.updatedAt=remote;S.syncedAt=remote;save(false);
+      if(remote-local>5000)toast('☁️ Datos actualizados desde otro dispositivo');render();
+      if(S.pushOn)await pushAlerts();
+    }else if(local>remote)await cloudPush();
+    else if(S.pushOn)await pushAlerts();
+    cloud={status:'ok',msg:'',last:Date.now()};
+  }catch(e){cloud={status:'error',msg:e.message||String(e),last:cloud.last}}
+}
+async function cloudAuth(create){
+  const email=$('#cl-e').value.trim(),pass=$('#cl-p').value,err=$('#cl-err');
+  const fail=m=>{err.textContent=m;err.hidden=false};
+  if(!/^\S+@\S+\.\S+$/.test(email))return fail('Escribe un email válido.');
+  if(pass.length<8)return fail('La contraseña debe tener al menos 8 caracteres.');
+  try{
+    await loadSB();
+    const {data,error}=create
+      ?await sb.auth.signUp({email,password:pass,options:{emailRedirectTo:location.href.split('#')[0]}})
+      :await sb.auth.signInWithPassword({email,password:pass});
+    if(error)throw error;
+    if(create&&!data.session){overlay=null;toast('📧 Te hemos enviado un email. Confírmalo y luego entra aquí con tu contraseña.');render();return}
+    sbUser=data.user;S.cloudOn=true;save(false);overlay=null;toast('☁️ Sesión iniciada. Sincronizando…');render();
+    await cloudPull();render();
+  }catch(e){
+    const m=e.message||String(e);
+    fail(/invalid login/i.test(m)?'Email o contraseña incorrectos.':/already registered/i.test(m)?'Ese email ya tiene cuenta: pulsa «Entrar».':/confirm/i.test(m)?'Confirma primero tu email (revisa tu correo).':m);
+  }
+}
+async function cloudSignOut(){
+  try{await disablePush();await sb?.auth.signOut()}catch(e){}
+  sbUser=null;S.cloudOn=false;S.pushOn=false;save(false);toast('Sesión cerrada. Tus datos siguen en este dispositivo.');render();
+}
+function b64uToU8(s){const p='='.repeat((4-s.length%4)%4),b=atob((s+p).replace(/-/g,'+').replace(/_/g,'/'));return Uint8Array.from(b,c=>c.charCodeAt(0))}
+async function enablePush(){
+  if(!sbUser)throw new Error('Primero entra en tu cuenta (arriba).');
+  if(!('serviceWorker' in navigator)||!('PushManager' in window)||!('Notification' in window))
+    throw new Error(isIOS&&!isStandalone()?'En iPhone primero añade la app a la pantalla de inicio (Compartir › Añadir a pantalla de inicio) y ábrela desde ese icono.':'Este navegador no admite avisos push. En iPhone necesitas iOS 16.4 o superior.');
+  const perm=await Notification.requestPermission();
+  if(perm!=='granted')throw new Error('Has denegado los avisos. Actívalos en Ajustes del iPhone › Notificaciones › FOCUS OS.');
+  const reg=await navigator.serviceWorker.ready;
+  const r=await fetch(PUSH_FN+'?action=vapid');if(!r.ok)throw new Error('El servidor de avisos no responde ('+r.status+').');
+  const {publicKey}=await r.json();
+  let sub=await reg.pushManager.getSubscription();
+  if(sub){const cur=sub.options?.applicationServerKey;if(cur&&btoa(String.fromCharCode(...new Uint8Array(cur)))!==btoa(String.fromCharCode(...b64uToU8(publicKey)))){await sub.unsubscribe();sub=null}}
+  if(!sub)sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:b64uToU8(publicKey)});
+  const j=sub.toJSON();
+  const {error}=await sb.from('focus_push_subs').upsert({user_id:sbUser.id,endpoint:j.endpoint,p256dh:j.keys.p256dh,auth:j.keys.auth,user_agent:navigator.userAgent.slice(0,150)},{onConflict:'endpoint'});
+  if(error)throw error;
+  S.pushOn=true;save(false);await pushAlerts();
+}
+async function disablePush(){
+  try{const reg=await navigator.serviceWorker?.getRegistration();const sub=await reg?.pushManager?.getSubscription();
+    if(sub){if(sbUser)await sb.from('focus_push_subs').delete().eq('endpoint',sub.endpoint);await sub.unsubscribe()}
+    if(sbUser)await sb.rpc('focus_replace_alerts',{alerts:[]});}catch(e){}
+  S.pushOn=false;save(false);
+}
+async function testPush(){
+  const {data}=await sb.auth.getSession();
+  const r=await fetch(PUSH_FN,{method:'POST',headers:{'Content-Type':'application/json',Authorization:'Bearer '+data.session.access_token},body:JSON.stringify({action:'test'})});
+  const j=await r.json();if(!r.ok)throw new Error(j.error||('Error '+r.status));return j;
+}
+/* Avisos de las próximas 72 h (bloques, tareas con hora, sesión activa, rituales y revisión semanal). */
+function buildAlerts(){
+  const n=Date.now(),lim=n+72*3600e3,out=[];
+  const add=(t,title,body,tag)=>{if(t>n+20e3&&t<lim)out.push({fire_at:new Date(t).toISOString(),title,body:body||'',tag})};
+  const today=dayKey(n),days=[today,addDays(today,1),addDays(today,2)],s=sess();
+  for(const k of days){const d=S.days[k];if(!d)continue;
+    for(const b of d.blocks){if(b.status==='completed'||b.status==='missed')continue;const act=s&&s.blockId===b.id;
+      if(b.kind!=='rest'&&!act)add(b.start-5*60e3,`En 5 min: ${b.title}`,b.obj?`Objetivo: ${b.obj}`:KINDS[b.kind],'pre-'+b.id);
+      if(S.alarm.onStart&&!act)add(b.start,b.kind==='rest'?'☕ Descanso':`▶ Empieza: ${b.title}`,b.kind==='rest'?`Vuelves a las ${hhmm(b.end)}`:`Hasta las ${hhmm(b.end)}`,'st-'+b.id);
+      if(b.kind!=='rest'&&!b.actualStart&&!act)add(b.start+5*60e3,`Aún no has empezado «${b.title}»`,'El retraso se está registrando.','ns-'+b.id);
+      if(S.alarm.onEnd&&!act)add(b.end,b.kind==='rest'?'Fin del descanso':`Fin del bloque: ${b.title}`,b.kind==='rest'?'Hora de volver.':'Márcalo como terminado.','end-'+b.id);
+    }
+    for(const t of d.tasks||[]){if(t.done||!t.time)continue;const at=atMin(k,t2m(t.time));
+      add(at-15*60e3,`Tarea pendiente: ${t.title}`,`Te quedan 15 min (antes de las ${t.time}).`,'t15-'+t.id);
+      add(at,`⏰ Se acabó el plazo: ${t.title}`,'Márcala como hecha o pásala a mañana.','t0-'+t.id)}
+    const plan=(S.plans||{})[k]||{};
+    if(S.rituals!==false){
+      const first=d.blocks.find(b=>b.kind!=='rest');
+      if(!plan.planned)add(first?Math.min(first.start-15*60e3,atMin(k,9*60)):atMin(k,8*60),'☀️ Planifica tu día','2 minutos: lo pendiente de ayer y tus 3 prioridades.','am-'+k);
+      if(!plan.closed)add(atMin(k,21*60),'🌙 Cierra el día','Revisa lo hecho y pasa lo pendiente a mañana.','pm-'+k);
+    }
+  }
+  if(s){
+    if(S.alarm.onEnd&&!s.alarmDone)add(s.plannedEnd,'⏰ Tiempo terminado',s.title,'send-'+s.startedAt);
+    if(!s.pauseAt&&!s.restAt&&!(s.notified||{})[90]){const f=sFocused(s,n);add(n+(90*60-f)*1e3,'Llevas 90 minutos concentrado','Sigue así.','m90-'+s.startedAt)}
+  }
+  if(S.rituals!==false){const wd=new Date(n).getDay(),sun=addDays(today,(7-wd)%7),wk=weekOf(sun);
+    if(!((S.weekly||{})[wk]||{}).done)add(atMin(sun,19*60),'📊 Tu revisión semanal','Cómo ha ido la semana y el foco de la próxima.','wk-'+wk)}
+  return out.sort((a,b)=>a.fire_at<b.fire_at?-1:1).slice(0,190);
+}
+async function pushAlerts(){
+  if(!sbUser||!S.pushOn)return;
+  const {error}=await sb.rpc('focus_replace_alerts',{alerts:buildAlerts()});
+  if(error)cloud={status:'error',msg:'Avisos: '+error.message,last:cloud.last};
+}
+function cloudCard(){
+  const on=!!sbUser,ago=cloud.last?Math.max(0,Math.round((Date.now()-cloud.last)/60e3)):null;
+  const pushSupported='PushManager' in window&&'serviceWorker' in navigator;
+  return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este móvil</span>'}</div>
+  ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago} min`:''}.</p>
+    ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12px">${esc(cloud.msg)}</p>`:''}
+    <button class="btn2" data-act="cl-sync">↻ Sincronizar ahora</button>
+    <div class="stack" style="gap:8px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Avisos con el móvil bloqueado</span>
+     ${S.pushOn?`<p class="muted">✅ Activados en este dispositivo. Te llegarán los avisos de bloques, tareas con hora, fin de sesión y rituales aunque la app esté cerrada.</p><div class="grid2"><button class="btn2 acc" data-act="push-test">🔔 Probar</button><button class="btn2" data-act="push-off">Desactivar</button></div>`
+      :`<p class="muted">${!pushSupported&&isIOS&&!isStandalone()?'Para activarlos en iPhone: instala la app (Compartir › Añadir a pantalla de inicio), ábrela desde el icono y vuelve aquí.':'Recibe los avisos aunque tengas el iPhone bloqueado o la app cerrada.'}</p><button class="btn" data-act="push-on">🔔 Activar avisos push</button>`}
+     <p class="muted" style="font-size:11.5px">Se programan las próximas 72 h cada vez que abres o cambias algo. Si pasas más de 3 días sin abrir la app, ábrela para renovarlos.</p></div>
+    <button style="color:var(--fg3);font-size:13px;text-align:left" data-act="cl-out">Cerrar sesión</button>`
+  :`<p class="muted">Crea una cuenta para no perder nunca tus datos, usarlos en varios dispositivos y recibir avisos con el móvil bloqueado.</p><button class="btn" data-act="cl-open">☁️ Crear cuenta o entrar</button>`}</div>`;
+}
+function backupCard(){
+  return `<div class="card stack"><span class="over">Copia de seguridad</span><p class="muted">Descarga un archivo con todos tus datos o restaura uno anterior.${S.lastBackup?` Última copia: ${new Date(S.lastBackup).toLocaleDateString('es-ES')}.`:''}</p>
+  <div class="grid2"><button class="btn2 acc" data-act="bk-down">⬇ Descargar copia</button><label class="btn2" for="bk-file" style="cursor:pointer">⬆ Restaurar copia</label></div><input id="bk-file" type="file" accept="application/json,.json" hidden></div>`;
+}
+function downloadBackup(){
+  const blob=new Blob([JSON.stringify({app:'FOCUS OS',version:1,exportedAt:new Date().toISOString(),data:S},null,1)],{type:'application/json'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`focusos-copia-${dayKey(Date.now())}.json`;document.body.appendChild(a);a.click();a.remove();
+  S.lastBackup=Date.now();save();toast('Copia descargada. Guárdala en Archivos o iCloud Drive.');
+}
+async function readBackup(file){
+  try{const txt=await file.text(),j=JSON.parse(txt),data=j&&j.data&&j.data.days?j.data:j;
+    if(!data||typeof data.days!=='object')throw new Error('Este archivo no es una copia de FOCUS OS.');
+    overlay={type:'restore',data,exportedAt:j.exportedAt||null,days:Object.keys(data.days).length};render();
+  }catch(e){toast(e.message||'No se pudo leer el archivo.')}
+}
+function normalizeState(x){
+  x=x||{};x.days=x.days||{};x.weights=x.weights||{c:40,a:25,t:25,p:10};
+  x.goals=Object.assign({weekHours:35,target:90,deepBlocks:4,maxDistraction:30},x.goals||{});
+  x.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},x.alarm||{});
+  x.inbox=x.inbox||[];x.plans=x.plans||{};x.weekly=x.weekly||{};x.taskTpl=x.taskTpl||[];
+  return x;
+}
+
+/* ═════════════════════ 4  RITUALES: PLAN DE LA MAÑANA Y CIERRE DE LA NOCHE ═════════════════════ */
+const plan=k=>(S.plans[k]=S.plans[k]||{});
+function leftovers(){ // tareas de un día sin hacer de los últimos 3 días
+  const today=dayKey(Date.now()),out=[];
+  for(let i=1;i<=3;i++){const k=addDays(today,-i);for(const t of dayTasks(k))if(!t.done&&!t.tplId&&!t.handled)out.push([k,t])}
+  return out;
+}
+function morningSheet(){
+  const k=dayKey(Date.now()),day=ensureDay(k),lo=leftovers(),tops=dayTasks(k).filter(t=>t.top);
+  const sugg=[...dayTasks(k).filter(t=>!t.done&&!t.top).map(t=>t.title),...S.inbox.map(i=>i.title)].filter((v,i,a)=>a.indexOf(v)===i).slice(0,8);
+  const work=day.blocks.filter(b=>b.kind!=='rest'),hrsP=work.reduce((a,b)=>a+(b.end-b.start)/1e3,0);
+  return `<span class="over acc">☀️ Plan del día · 2 minutos</span><b style="font-size:21px">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'long'})}</b>
+  ${weekFocusLine()}
+  <div class="stack" style="gap:8px"><span class="over">1 · Pendiente de días anteriores</span>
+   ${lo.length?lo.map(([dk,t])=>`<div class="row" style="gap:8px;font-size:14px"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(t.title)} <span style="color:var(--fg3);font-size:11.5px">· ${dayLabel(dk)}</span></span><button class="chip acc" data-act="lo-today" data-id="${t.id}" data-k="${dk}">Hoy</button><button class="chip" data-act="lo-inbox" data-id="${t.id}" data-k="${dk}" aria-label="A la bandeja">📥</button><button class="chip" data-act="lo-drop" data-id="${t.id}" data-k="${dk}" aria-label="Descartar">✕</button></div>`).join('')+`<button style="color:var(--accent);font-size:13px;font-weight:600;text-align:left" data-act="lo-all">Pasar todo a hoy</button>`:'<p class="muted">Nada pendiente. Empiezas limpio. ✅</p>'}</div>
+  <div class="stack" style="gap:8px"><span class="over">2 · Tus 3 prioridades de hoy</span>
+   ${[0,1,2].map(i=>`<input id="mp-${i}" placeholder="Prioridad ${i+1}" value="${esc(tops[i]?.title||'')}" aria-label="Prioridad ${i+1}">`).join('')}
+   ${sugg.length?`<div class="row" style="gap:6px;flex-wrap:wrap">${sugg.map(t=>`<button class="chip" data-act="mp-sugg" data-t="${esc(t)}">+ ${esc(t)}</button>`).join('')}</div>`:''}</div>
+  <div class="stack" style="gap:6px"><span class="over">3 · Tu día</span><p class="muted">${work.length?`${work.length} bloques · ${dur(hrsP)} de trabajo · empiezas a las ${hhmm(work[0].start)}`:'Sin bloques planificados hoy.'} · ${dayTasks(k).length} tarea${dayTasks(k).length===1?'':'s'}${S.inbox.length?` · ${S.inbox.length} en la bandeja`:''}</p>
+   ${!work.length?'<button class="btn2" data-act="plan-go-sched">Planificar bloques en Schedule</button>':''}</div>
+  <button class="btn" data-act="mp-save">Empezar el día</button><button style="color:var(--fg3);font-size:14px" data-act="mp-skip">Ahora no</button>`;
+}
+function saveMorning(){
+  const k=dayKey(Date.now()),d=ensureDay(k);d.tasks=d.tasks||[];
+  const titles=[0,1,2].map(i=>$('#mp-'+i).value.trim()).filter(Boolean);
+  d.tasks.forEach(t=>t.top=false);
+  titles.forEach((title,i)=>{
+    let t=d.tasks.find(x=>x.title.toLowerCase()===title.toLowerCase());
+    if(!t){const ib=S.inbox.findIndex(x=>x.title.toLowerCase()===title.toLowerCase());if(ib>=0)S.inbox.splice(ib,1);
+      t={id:uid(),tplId:null,title,time:'',done:false,doneAt:null};d.tasks.push(t)}
+    t.top=true;t.topOrder=i;
+  });
+  sortTasks(d);Object.assign(plan(k),{planned:true,plannedAt:Date.now()});save();overlay=null;
+  toast(titles.length?`🎯 Día planificado: ${titles.length} prioridad${titles.length>1?'es':''}`:'Día planificado');render();
+}
+function moveLeftover(id,k,where){
+  const d=S.days[k],t=d&&(d.tasks||[]).find(x=>x.id===id);if(!t)return;
+  if(where==='today'){const td=ensureDay(dayKey(Date.now()));td.tasks=td.tasks||[];td.tasks.push({...t,id:uid(),done:false,doneAt:null,top:false,handled:false});sortTasks(td)}
+  if(where==='inbox')S.inbox.unshift({id:uid(),title:t.title,created:Date.now()});
+  t.handled=true;save();
+}
+function eveningExtras(){
+  const k=dayKey(Date.now()),p=plan(k);
+  return `<label class="f" for="rv-note">Nota del día (qué ha funcionado, qué cambiarías)<input id="rv-note" value="${esc(p.note||'')}" placeholder="p. ej. Empezar sin el móvil cerca ha funcionado"></label>
+  <button class="btn" data-act="rv-close">🌙 Cerrar el día</button>`;
+}
+
+/* ═════════════════════ 5  BANDEJA DE ENTRADA Y TAREAS DENTRO DE BLOQUES ═════════════════════ */
+function inboxSheet(){
+  const today=dayKey(Date.now());
+  return `<span class="over acc">📥 Bandeja de entrada</span><p class="muted" style="font-size:12.5px">Apunta aquí todo lo que se te ocurra sin pensar cuándo. Luego decide: hoy, mañana, otro día o dentro de un bloque.</p>
+  <div class="row"><input id="ib-new" placeholder="Apuntar algo…" aria-label="Nueva idea o tarea" enterkeyhint="done"><button class="round acc" data-act="ib-add" aria-label="Añadir a la bandeja" style="width:46px;height:46px">+</button></div>
+  ${S.inbox.length?S.inbox.map(i=>`<div class="stack" style="gap:6px;padding:8px 0;border-bottom:1px solid var(--stroke)"><div style="font-size:15px;font-weight:600">${esc(i.title)}</div>
+   <div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip acc" data-act="ib-to" data-id="${i.id}" data-k="${today}">Hoy</button><button class="chip" data-act="ib-to" data-id="${i.id}" data-k="${addDays(today,1)}">Mañana</button><button class="chip" data-act="ib-date" data-id="${i.id}">📅 Otro día</button><button class="chip" data-act="ib-block" data-id="${i.id}">▦ A un bloque</button><button class="chip" data-act="ib-del" data-id="${i.id}" aria-label="Eliminar">✕</button></div></div>`).join('')
+  :'<p class="muted">La bandeja está vacía. 👌</p>'}`;
+}
+function addToInbox(title){if(!title)return;S.inbox.unshift({id:uid(),title,created:Date.now()});save();vibrate(10)}
+function inboxToDay(id,k,blockId){
+  const i=S.inbox.findIndex(x=>x.id===id);if(i<0)return;const it=S.inbox[i];
+  const d=ensureDay(k);d.tasks=d.tasks||[];d.tasks.push({id:uid(),tplId:null,title:it.title,time:'',done:false,doneAt:null,blockId:blockId||null});sortTasks(d);
+  S.inbox.splice(i,1);save();toast(blockId?'Tarea asignada al bloque':`Tarea para ${dayLabel(k)}`);
+}
+function pickBlockSheet(inboxId){
+  const today=dayKey(Date.now()),n=Date.now();
+  const opts=[today,addDays(today,1)].flatMap(k=>ensureDay(k).blocks.filter(b=>b.kind!=='rest'&&b.status!=='completed'&&b.end>n).map(b=>[k,b]));
+  return `<span class="over acc">¿En qué bloque la haces?</span>${opts.length?opts.map(([k,b])=>`<button class="blk" data-act="ib-toblock" data-id="${inboxId}" data-k="${k}" data-b="${b.id}"><span class="stripe" style="background:#${b.color}"></span><span style="flex:1;min-width:0"><div class="t">${esc(b.title)}</div><div class="s">${dayLabel(k)} · ${hhmm(b.start)}–${hhmm(b.end)}</div></span></button>`).join(''):'<p class="muted">No hay bloques pendientes hoy ni mañana.</p>'}`;
+}
+const blockTasks=(k,blockId)=>dayTasks(k).filter(t=>t.blockId===blockId);
+function blockTasksList(k,blockId){
+  const list=blockTasks(k,blockId);if(!list.length)return '';
+  return `<div class="stack" style="gap:2px;border-top:1px solid var(--stroke);padding-top:10px"><span class="over">Tareas de este bloque · ${list.filter(t=>t.done).length}/${list.length}</span>${list.map(t=>taskItem(t,k)).join('')}</div>`;
+}
+
+/* ═════════════════════ 6  REVISIÓN SEMANAL ═════════════════════ */
+function mondayOf(k){const d=keyToDate(k);return addDays(k,-((d.getDay()+6)%7))}
+function weekOf(k){return mondayOf(k)}
+function reviewWeekStart(){const today=dayKey(Date.now()),wd=new Date().getDay();return wd===0&&new Date().getHours()>=12?mondayOf(today):addDays(mondayOf(today),-7)}
+function weekFocusLine(){const f=S.weekly[mondayOf(dayKey(Date.now()))+'-focus'];return f?`<div class="row" style="gap:8px;background:var(--accent-soft);border-radius:12px;padding:10px 12px;font-size:13.5px"><span>🎯</span><span><b>Foco de la semana:</b> ${esc(f)}</span></div>`:''}
+function weeklyData(mon){
+  const keys=Array.from({length:7},(_,i)=>addDays(mon,i)),prevKeys=keys.map(k=>addDays(k,-7));
+  const sc=keys.map(k=>[k,score(k)]),pv=prevKeys.map(k=>score(k));
+  const eff=sc.reduce((a,[,r])=>a+r.eff,0),pEff=pv.reduce((a,r)=>a+r.eff,0);
+  const scored=sc.filter(([,r])=>r.sc!=null),avg=scored.length?scored.reduce((a,[,r])=>a+r.sc,0)/scored.length:null;
+  const pScored=pv.filter(r=>r.sc!=null),pAvg=pScored.length?pScored.reduce((a,r)=>a+r.sc,0)/pScored.length:null;
+  const tk=taskPct(keys.map(taskDay)),pTk=taskPct(prevKeys.map(taskDay));
+  const best=scored.slice().sort((a,b)=>b[1].sc-a[1].sc)[0],worst=scored.slice().sort((a,b)=>a[1].sc-b[1].sc)[0];
+  const dis=sc.reduce((a,[,r])=>a+r.dis,0);
+  // franjas horarias
+  const fr={Mañana:{n:0,ok:0,delay:0,d:0},Mediodía:{n:0,ok:0,delay:0,d:0},Tarde:{n:0,ok:0,delay:0,d:0}};
+  for(const k of keys)for(const b of (S.days[k]||{blocks:[]}).blocks){if(b.kind==='rest')continue;if(b.status!=='completed'&&b.status!=='missed'&&b.end>Date.now())continue;
+    const h=new Date(b.start).getHours(),f=h<12?'Mañana':h<16?'Mediodía':'Tarde';fr[f].n++;if(b.status==='completed')fr[f].ok++;
+    if(b.actualStart){fr[f].delay+=Math.max(0,(b.actualStart-b.start)/60e3);fr[f].d++}}
+  const franjas=Object.entries(fr).filter(([,v])=>v.n).map(([name,v])=>({name,n:v.n,rate:v.ok/v.n,delay:v.d?v.delay/v.d:0}));
+  const worstF=franjas.filter(f=>f.n>=2).sort((a,b)=>a.rate-b.rate)[0];
+  // hábitos de la semana
+  const map={};for(const k of keys)for(const t of dayTasks(k)){if(!taskDue(t,k)||!t.tplId)continue;const m=map[t.tplId]=map[t.tplId]||{title:((S.taskTpl||[]).find(x=>x.id===t.tplId)||t).title,due:0,done:0};m.due++;if(t.done)m.done++}
+  const habits=Object.values(map).sort((a,b)=>a.done/a.due-b.done/b.due);
+  const delays=keys.flatMap(k=>(S.days[k]||{blocks:[]}).blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/60e3)));
+  const avgDelay=delays.length?delays.reduce((a,b)=>a+b,0)/delays.length:0;
+  const hasData=sc.some(([,r])=>r.hasData);
+  // recomendaciones
+  const rec=[];const goal=S.goals.weekHours*3600;
+  if(hasData){
+    if(eff<goal*0.8)rec.push(`Has hecho ${hrs(eff)} de ${S.goals.weekHours} h. Reserva desde el lunes ${Math.ceil((goal-eff)/3600/5)} h extra al día de trabajo profundo o ajusta el objetivo a algo realista.`);
+    if(worstF&&worstF.rate<0.7)rec.push(`Tu peor franja es la ${worstF.name.toLowerCase()} (${Math.round(worstF.rate*100)}% de bloques completados). Pon ahí tareas ligeras y mueve lo importante a tu mejor franja.`);
+    if(habits[0]&&habits[0].done/habits[0].due<0.6)rec.push(`«${habits[0].title}» solo ${habits[0].done}/${habits[0].due}. Ponle hora límite para que te avise, o hazla justo después de algo que ya haces cada día.`);
+    if(avgDelay>5)rec.push(`Empiezas los bloques con ${Math.round(avgDelay)} min de retraso medio. Deja preparado el primer bloque la noche anterior y activa los avisos push.`);
+    if(dis>S.goals.maxDistraction*60*5)rec.push(`${dur(dis)} de distracciones en la semana. Deja el móvil fuera de la mesa en los bloques profundos.`);
+    if(tk.pct!=null&&tk.pct>=0.85&&(avg==null||avg>=S.goals.target/100))rec.push('Semana sólida. Mantén lo que te ha funcionado y sube un poco el objetivo de horas.');
+    if(!rec.length)rec.push('Buen equilibrio. Elige una sola cosa que mejorar y apúntala como foco de la semana.');
+  }
+  return {keys,sc,eff,pEff,avg,pAvg,tk,pTk,best,worst,dis,franjas,habits,avgDelay,rec:rec.slice(0,3),hasData};
+}
+function weeklySheet(mon){
+  const w=weeklyData(mon),end=addDays(mon,6),next=addDays(mon,7),delta=(a,b,u,f=1)=>b>0?`${a-b>=0?'+':'−'}${Math.abs((a-b)*f).toLocaleString('es-ES',{maximumFractionDigits:1})}${u} vs anterior`:'';
+  const nm=k=>keyToDate(k).toLocaleDateString('es-ES',{weekday:'long'});
+  return `<span class="over acc">📊 Revisión semanal</span><b style="font-size:20px">${keyToDate(mon).toLocaleDateString('es-ES',{day:'numeric',month:'short'})} – ${keyToDate(end).toLocaleDateString('es-ES',{day:'numeric',month:'short'})}</b>
+  ${!w.hasData?'<p class="muted">No hay registros esta semana. Planifica bloques y tareas y la próxima revisión tendrá datos reales.</p>':`
+  <div class="grid2"><div class="tile"><span class="over">Horas efectivas</span><div class="v">${hrs(w.eff)}</div><div class="f">objetivo ${S.goals.weekHours} h · ${delta(w.eff/3600,w.pEff/3600,' h')}</div></div>
+  <div class="tile"><span class="over">Efectividad media</span><div class="v">${pct(w.avg)}</div><div class="f">${w.avg!=null&&w.pAvg!=null?delta(w.avg,w.pAvg,' pts',100):''}</div></div>
+  <div class="tile"><span class="over">Tareas cumplidas</span><div class="v" style="color:${pctColor(w.tk.pct)}">${w.tk.pct==null?'—':Math.round(w.tk.pct*100)+'%'}</div><div class="f">${w.tk.done}/${w.tk.due}${w.tk.pct!=null&&w.pTk.pct!=null?' · '+delta(w.tk.pct,w.pTk.pct,' pts',100):''}</div></div>
+  <div class="tile"><span class="over">Distracciones</span><div class="v">${dur(w.dis)}</div><div class="f">retraso medio ${Math.round(w.avgDelay)} min</div></div></div>
+  ${w.best?`<p class="muted">🏆 Mejor día: <b>${nm(w.best[0])}</b> (${pct(w.best[1].sc)})${w.worst&&w.worst[0]!==w.best[0]?` · Peor: <b>${nm(w.worst[0])}</b> (${pct(w.worst[1].sc)})`:''}</p>`:''}
+  ${w.franjas.length?`<div class="stack" style="gap:6px"><span class="over">Por franja horaria</span>${w.franjas.map(f=>`<div class="stack" style="gap:4px"><div class="between" style="font-size:13.5px"><span>${f.name}</span><span style="color:${pctColor(f.rate)};font-weight:700">${Math.round(f.rate*100)}% · ${f.n} bloques${f.delay>1?` · +${Math.round(f.delay)} min`:''}</span></div><div class="bar" style="height:5px"><b style="width:${f.rate*100}%;background:${pctColor(f.rate)}"></b></div></div>`).join('')}</div>`:''}
+  ${w.habits.length?`<div class="stack" style="gap:6px"><span class="over">Hábitos</span>${w.habits.map(h=>`<div class="between" style="font-size:13.5px"><span>↻ ${esc(h.title)}</span><span style="color:${pctColor(h.done/h.due)};font-weight:700">${h.done}/${h.due}</span></div>`).join('')}</div>`:''}
+  <div class="stack" style="gap:8px"><span class="over">Para la próxima semana</span>${w.rec.map(r=>`<p class="muted">• ${esc(r)}</p>`).join('')}</div>`}
+  <label class="f" for="wk-focus">🎯 Tu foco para la semana que empieza<input id="wk-focus" value="${esc(S.weekly[next+'-focus']||'')}" placeholder="p. ej. 4 bloques profundos antes de las 11:00"></label>
+  <button class="btn" data-act="wk-save" data-k="${mon}">Guardar revisión</button><button style="color:var(--fg3);font-size:14px" data-act="wk-skip" data-k="${mon}">Ahora no</button>`;
+}
+
+/* Decide qué ritual mostrar al abrir la app. */
+function maybeRituals(){
+  if(overlay||deep||S.rituals===false)return;
+  const now=new Date(),h=now.getHours(),k=dayKey(now),p=plan(k);
+  const mon=reviewWeekStart(),wk=S.weekly[mon]||{};
+  const wd=now.getDay();
+  if(!wk.done&&!wk.skipped&&((wd===0&&h>=18)||wd===1)&&weeklyData(mon).hasData){overlay={type:'weekly',k:mon};return}
+  if(!p.planned&&!p.skipped&&h>=4&&h<20&&!sess()){overlay={type:'morning'};return}
+  const day=S.days[k],lastEnd=day&&day.blocks.length?Math.max(...day.blocks.map(b=>b.end)):null;
+  if(!p.closed&&!p.eveSkipped&&(h>=21||(lastEnd&&Date.now()>lastEnd&&h>=17))&&(day&&(day.blocks.length||(day.tasks||[]).length))&&!sess()){overlay={type:'review',evening:true}}
+}
+
 function boot(){
   ensureDay(dayKey(Date.now()));ensureDay(addDays(dayKey(Date.now()),1));syncTasks(dayKey(Date.now()));syncTasks(addDays(dayKey(Date.now()),1));markMissed();
   const s=sess();if(s&&!overlay&&Date.now()>s.plannedEnd+30*60e3)overlay={type:'recover'};
-  save();render();
+  maybeRituals();
+  save(false);render();
+  if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay)render()})}).catch(()=>{});
 }
 S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
 if(!S.onboarded){S.onboarded=true;if(!S.template){S.template=DEFAULT_TEMPLATE}}

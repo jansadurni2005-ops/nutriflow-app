@@ -1,5 +1,5 @@
 // FOCUS OS service worker: funciona sin conexión y recibe las actualizaciones al volver a tener red.
-var CACHE = 'focusos-v8';
+var CACHE = 'focusos-v9';
 var ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
@@ -45,5 +45,19 @@ self.addEventListener('notificationclick', function (e) {
   e.waitUntil(self.clients.matchAll({ type: 'window' }).then(function (list) {
     for (var i = 0; i < list.length; i++) { if ('focus' in list[i]) return list[i].focus(); }
     return self.clients.openWindow('./');
+  }));
+});
+
+// Avisos push (los envía el servidor aunque la app esté cerrada o el iPhone bloqueado).
+self.addEventListener('push', function (e) {
+  var d = {};
+  try { d = e.data ? e.data.json() : {}; } catch (err) { d = { title: 'FOCUS OS', body: e.data ? e.data.text() : '' }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'FOCUS OS', {
+    body: d.body || '',
+    tag: d.tag || undefined,
+    renotify: !!d.tag,
+    icon: 'icon-192.png',
+    badge: 'icon-192.png',
+    data: { url: './' }
   }));
 });
