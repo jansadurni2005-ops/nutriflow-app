@@ -1,0 +1,20 @@
+# Proyecto generado por XcodeGen
+*.xcodeproj/
+*.xcworkspace/
+FocusOS/Info.plist
+FocusOS/FocusOS.entitlements
+FocusOSWidgets/Info.plist
+FocusOSWidgets/*.entitlements
+FocusOSMonitor/Info.plist
+FocusOSMonitor/*.entitlements
+FocusOSShield/Info.plist
+FocusOSShield/*.entitlements
+FocusOSShieldAction/Info.plist
+FocusOSShieldAction/*.entitlements
+
+# Xcode
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+.DS_Store
