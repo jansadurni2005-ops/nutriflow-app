@@ -216,14 +216,14 @@ function startBlock(id){
   if(S.session){if(S.session.blockId===id){deep=true;render();return}finish('switched',true)}
   const n=Date.now();if(!b.actualStart)b.actualStart=n;b.status='inprogress';
   S.session={blockId:id,day:dayKey(b.start),title:b.title,obj:b.obj,kind:b.kind,startedAt:n,plannedEnd:Math.max(b.end,n+15*60e3),paused:0,pauseAt:null,rest:0,restAt:null,distraction:0,notified:{}};
-  save();vibrate(20);const late=(n-b.start)/1e3;
+  save();vibrate(20);unlockAudio();chime();const late=(n-b.start)/1e3;
   toast(late>60?`Bloque iniciado · retraso registrado: ${dur(late)}`:'Bloque iniciado');deep=true;requestWake();render();
 }
 function startFree(title,obj,min,kind){
   if(S.session)finish('switched',true);
   const n=Date.now();
   S.session={blockId:null,day:dayKey(n),title:title||'Sesión de concentración',obj,kind,startedAt:n,plannedEnd:n+min*60e3,paused:0,pauseAt:null,rest:0,restAt:null,distraction:0,notified:{}};
-  save();vibrate(20);deep=true;requestWake();render();
+  save();vibrate(20);unlockAudio();chime();deep=true;requestWake();render();
 }
 function pause(){const s=sess();if(!s)return;const n=Date.now();if(s.pauseAt){s.paused+=(n-s.pauseAt)/1e3;s.pauseAt=null}else{if(s.restAt){s.rest+=(n-s.restAt)/1e3;s.restAt=null}s.pauseAt=n}save();render()}
 function rest(){const s=sess();if(!s)return;const n=Date.now();if(s.restAt){s.rest+=(n-s.restAt)/1e3;s.restAt=null}else{if(s.pauseAt){s.paused+=(n-s.pauseAt)/1e3;s.pauseAt=null}s.restAt=n}save();render()}
@@ -746,7 +746,8 @@ async function notify(title,body){
    después de que toques la pantalla una vez y mientras la app está abierta. */
 const SOUNDS={pulse:'Pulse',chime:'Chime',rise:'Rise',bell:'Campana'};
 let AC=null,alarmTimer=null,alarmStop=0;
-function audio(){if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state==='suspended')AC.resume();return AC}
+function audio(){try{if(navigator.audioSession&&navigator.audioSession.type!=='playback')navigator.audioSession.type='playback'}catch(e){}
+  if(!AC){const C=window.AudioContext||window.webkitAudioContext;if(!C)return null;AC=new C()}if(AC.state!=='running')AC.resume().catch(()=>{});return AC}
 function unlockAudio(){const a=audio();if(!a)return;const b=a.createBuffer(1,1,22050),src=a.createBufferSource();src.buffer=b;src.connect(a.destination);src.start(0)}
 function tone(a,t,freq,len,vol){const o=a.createOscillator(),g=a.createGain(),o2=a.createOscillator(),g2=a.createGain();
   o.type='sine';o.frequency.value=freq;o2.type='triangle';o2.frequency.value=freq*2;g2.gain.value=.25;
@@ -762,7 +763,7 @@ function chime(){if(!S.alarm.enabled)return;pattern(S.alarm.sound,0,S.alarm.volu
 function startAlarm(){if(!S.alarm.enabled)return;stopAlarm();const a=audio();if(!a)return;alarmStop=Date.now()+60e3;
   const loop=()=>{if(Date.now()>alarmStop){stopAlarm();return}pattern(S.alarm.sound,0,S.alarm.volume/100);vibrate([300,150,300]);alarmTimer=setTimeout(loop,1700)};loop()}
 function stopAlarm(){clearTimeout(alarmTimer);alarmTimer=null}
-document.addEventListener('pointerdown',()=>unlockAudio(),{capture:true,once:false,passive:true});
+document.addEventListener('pointerdown',e=>{unlockAudio();if(overlay&&overlay.type==='alarm'&&!alarmTimer&&!e.target.closest('[data-act^=alarm]'))startAlarm()},{capture:true,once:false,passive:true});
 
 const fired=new Set();
 function checkAlerts(){
@@ -968,8 +969,12 @@ async function cloudPush(){
     if(error)throw error;
     S.syncedAt=S.updatedAt;save(false);cloud={status:'ok',msg:'',last:Date.now()};
     if(S.pushOn)await pushAlerts();
-  }catch(e){cloud={status:'error',msg:e.message||String(e),last:cloud.last}}
+  }catch(e){cloud={status:'error',msg:cloudErr(e),last:cloud.last}}
 }
+function cloudErr(e){const m=(e&&(e.message||e.code))||String(e);
+  if(/schema cache|does not exist|PGRST20|404/i.test(m))return 'El servidor de sincronización aún no está instalado. Pulsa «Reintentar» en unos minutos.';
+  if(/fetch|network|Failed|offline/i.test(m))return 'Sin conexión con el servidor. Comprueba tu internet y pulsa «Reintentar».';
+  return m}
 async function cloudPull(){
   if(!sbUser)return;
   try{
@@ -985,7 +990,7 @@ async function cloudPull(){
     }else if(local>remote)await cloudPush();
     else if(S.pushOn)await pushAlerts();
     cloud={status:'ok',msg:'',last:Date.now()};
-  }catch(e){cloud={status:'error',msg:e.message||String(e),last:cloud.last}}
+  }catch(e){cloud={status:'error',msg:cloudErr(e),last:cloud.last}}
 }
 async function cloudAuth(create){
   const email=$('#cl-e').value.trim(),pass=$('#cl-p').value,err=$('#cl-err');
@@ -999,8 +1004,8 @@ async function cloudAuth(create){
       :await sb.auth.signInWithPassword({email,password:pass});
     if(error)throw error;
     if(create&&!data.session){overlay=null;toast('📧 Te hemos enviado un email. Confírmalo y luego entra aquí con tu contraseña.');render();return}
-    sbUser=data.user;S.cloudOn=true;save(false);overlay=null;toast('☁️ Sesión iniciada. Sincronizando…');render();
-    await cloudPull();render();
+    sbUser=data.user;S.cloudOn=true;save(false);overlay=null;toast(create?'✅ Cuenta creada. Sincronizando…':'☁️ Sesión iniciada. Sincronizando…');render();
+    await cloudPull();if(cloud.status==='error')toast('Cuenta lista, pero la sincronización falló: '+cloud.msg);render();
   }catch(e){
     const m=e.message||String(e);
     fail(/invalid login/i.test(m)?'Email o contraseña incorrectos.':/already registered/i.test(m)?'Ese email ya tiene cuenta: pulsa «Entrar».':/confirm/i.test(m)?'Confirma primero tu email (revisa tu correo).':m);
@@ -1018,7 +1023,7 @@ async function enablePush(){
   const perm=await Notification.requestPermission();
   if(perm!=='granted')throw new Error('Has denegado los avisos. Actívalos en Ajustes del iPhone › Notificaciones › FOCUS OS.');
   const reg=await navigator.serviceWorker.ready;
-  const r=await fetch(PUSH_FN+'?action=vapid');if(!r.ok)throw new Error('El servidor de avisos no responde ('+r.status+').');
+  let r;try{r=await fetch(PUSH_FN+'?action=vapid')}catch(e){throw new Error('Sin conexión con el servidor de avisos. Inténtalo de nuevo.')}if(!r.ok)throw new Error(r.status===404?'El servidor de avisos aún no está instalado. Inténtalo más tarde.':'El servidor de avisos no responde ('+r.status+'). Inténtalo de nuevo.');
   const {publicKey}=await r.json();
   let sub=await reg.pushManager.getSubscription();
   if(sub){const cur=sub.options?.applicationServerKey;if(cur&&btoa(String.fromCharCode(...new Uint8Array(cur)))!==btoa(String.fromCharCode(...b64uToU8(publicKey)))){await sub.unsubscribe();sub=null}}
@@ -1079,8 +1084,8 @@ function cloudCard(){
   const pushSupported='PushManager' in window&&'serviceWorker' in navigator;
   return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este móvil</span>'}</div>
   ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago} min`:''}.</p>
-    ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12px">${esc(cloud.msg)}</p>`:''}
-    <button class="btn2" data-act="cl-sync">↻ Sincronizar ahora</button>
+    ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12.5px">⚠ ${esc(cloud.msg)}</p>`:''}
+    <button class="btn2 ${cloud.status==='error'?'acc':''}" data-act="cl-sync">${cloud.status==='error'?'↻ Reintentar sincronización':'↻ Sincronizar ahora'}</button>
     <div class="stack" style="gap:8px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Avisos con el móvil bloqueado</span>
      ${S.pushOn?`<p class="muted">✅ Activados en este dispositivo. Te llegarán los avisos de bloques, tareas con hora, fin de sesión y rituales aunque la app esté cerrada.</p><div class="grid2"><button class="btn2 acc" data-act="push-test">🔔 Probar</button><button class="btn2" data-act="push-off">Desactivar</button></div>`
       :`<p class="muted">${!pushSupported&&isIOS&&!isStandalone()?'Para activarlos en iPhone: instala la app (Compartir › Añadir a pantalla de inicio), ábrela desde el icono y vuelve aquí.':'Recibe los avisos aunque tengas el iPhone bloqueado o la app cerrada.'}</p><button class="btn" data-act="push-on">🔔 Activar avisos push</button>`}
@@ -1258,7 +1263,7 @@ function boot(){
   const s=sess();if(s&&!overlay&&Date.now()>s.plannedEnd+30*60e3)overlay={type:'recover'};
   maybeRituals();
   save(false);render();
-  if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay)render()})}).catch(()=>{});
+  if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay||tab==='settings')render()})}).catch(e=>{cloud={status:'error',msg:cloudErr(e),last:cloud.last}});
 }
 S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
 if(!S.onboarded){S.onboarded=true;if(!S.template){S.template=DEFAULT_TEMPLATE}}
