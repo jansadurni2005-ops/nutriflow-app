@@ -199,7 +199,7 @@ function newBlock(k,t){return {id:uid(),tplId:t.id||null,title:t.title,kind:t.ki
 function markMissed(){
   const n=Date.now();
   for(const k in S.days)for(const b of S.days[k].blocks){
-    if(b.status==='pending'&&b.end<n&&!(S.session&&S.session.blockId===b.id))b.status=b.kind==='rest'?'completed':(b.worked>=(b.end-b.start)/2e3?'completed':'missed');
+    if(b.status==='pending'&&dayKey(b.start)<dayKey(n)&&!(S.session&&S.session.blockId===b.id))b.status=b.kind==='rest'?'completed':(b.worked>=(b.end-b.start)/2e3?'completed':'missed');
   }
 }
 const findBlock=id=>{for(const k in S.days){const b=S.days[k].blocks.find(x=>x.id===id);if(b)return [b,k]}return [null,null]};
@@ -214,11 +214,21 @@ function sConc(s,n=Date.now()){const f=sFocused(s,n),d=f+s.distraction+sPaused(s
 function startBlock(id){
   const [b]=findBlock(id);if(!b)return;
   if(S.session){if(S.session.blockId===id){deep=true;render();return}finish('switched',true)}
-  const n=Date.now();if(!b.actualStart)b.actualStart=n;b.status='inprogress';
-  S.session={blockId:id,day:dayKey(b.start),title:b.title,obj:b.obj,kind:b.kind,startedAt:n,plannedEnd:Math.max(b.end,n+15*60e3),paused:0,pauseAt:null,rest:0,restAt:null,distraction:0,notified:{}};
+  const n=Date.now(),outside=n<b.start-5*60e3||n>=b.end,len=b.end-b.start;if(outside&&!b.actualStart)b.flex=true;if(!b.actualStart)b.actualStart=n;b.status='inprogress';
+  S.session={blockId:id,day:dayKey(b.start),title:b.title,obj:b.obj,kind:b.kind,startedAt:n,plannedEnd:outside?n+Math.max(len,5*60e3):Math.max(b.end,n+15*60e3),paused:0,pauseAt:null,rest:0,restAt:null,distraction:0,notified:{}};
   save();vibrate(20);unlockAudio();chime();const late=(n-b.start)/1e3;
-  toast(late>60?`Bloque iniciado · retraso registrado: ${dur(late)}`:'Bloque iniciado');deep=true;requestWake();render();
+  toast(outside?`Bloque cambiado de hora: ${dur(len/1e3)} desde ahora`:late>60?`Bloque iniciado · retraso registrado: ${dur(late)}`:'Bloque iniciado');deep=true;requestWake();render();
 }
+function markBlockDone(id,minutes){
+  const [b]=findBlock(id);if(!b)return;const n=Date.now(),sec=Math.max(0,minutes*60);
+  if(S.session&&S.session.blockId===id){finish('completed');return}
+  b.worked=Math.max(b.worked,sec);b.status='completed';b.flex=true;b.manual=true;
+  if(!b.actualStart)b.actualStart=n-sec*1e3;b.actualEnd=n;save();vibrate([20,60,20]);chime();
+  const left=pendingBlocks(dayKey(b.start)).length;
+  toast(`✓ «${b.title}» hecho${left?` · te falta${left>1?'n':''} ${left} bloque${left>1?'s':''}`:' · ¡todos los bloques de hoy hechos! 🔥'}`);
+}
+/* Bloques de trabajo de un día que aún no has hecho (da igual su hora). */
+function pendingBlocks(k){const s=sess();return ensureDay(k).blocks.filter(b=>b.kind!=='rest'&&(b.status==='pending'||b.status==='missed')&&!(s&&s.blockId===b.id))}
 function startFree(title,obj,min,kind){
   if(S.session)finish('switched',true);
   const n=Date.now();
@@ -258,7 +268,7 @@ function score(k,n=Date.now()){
     if(ev>0){pe+=ev;adh+=Math.min(worked,ev)}
     if(b.kind!=='meeting'&&(worked>0||dis>0)){cf+=worked;cd+=dis;cp+=pau}
     if(b.status==='completed'||b.status==='missed'||b.end<=n){due++;if(b.status==='completed'){done++;if(b.kind==='deep')deepDone++;if(b.actualStart&&dis===0&&b.kind!=='meeting')clean++}}
-    if(b.actualStart){const d=(b.actualStart-b.start)/1e3;if(d<=120)ontime++;punct.push(d<=120?1:d>=1800?0:1-(d-120)/1680)}
+    if(b.actualStart&&!b.flex){const d=(b.actualStart-b.start)/1e3;if(d<=120)ontime++;punct.push(d<=120?1:d>=1800?0:1-(d-120)/1680)}
   }
   // Tareas del día: cuentan al marcarlas o cuando vence su hora (o al terminar el día si no tienen hora).
   let tDue=0,tDone=0;const dayEnd=keyToDate(k).getTime()+86400e3;
@@ -357,7 +367,7 @@ function home(){
   const up=day.blocks.filter(b=>b.start>n).slice(0,4);
   let current='';
   if(sess())current=sessionCard();
-  else if(cur){const late=(n-cur.start)/1e3;current=`<div class="card stack" style="border-color:#${cur.color}77"><div class="between"><span class="over" style="color:#${cur.color}">AHORA · ${KINDS[cur.kind].toUpperCase()}</span><span class="num" style="color:var(--fg2)">${hhmm(cur.start)}–${hhmm(cur.end)}</span></div><div style="font-weight:700;font-size:21px">${esc(cur.title)}</div>${cur.obj?`<p class="muted">◎ ${esc(cur.obj)}</p>`:''}${cur.kind==='rest'?`<p class="muted">Descanso programado: no penaliza. Vuelves a las ${hhmm(cur.end)}.</p>`:`${late>60&&!cur.actualStart?`<div style="color:var(--warn);font-size:13px;font-weight:600">Llevas ${dur(late)} de retraso. Se está registrando.</div>`:''}<button class="btn" data-start="${cur.id}">▶ ${cur.actualStart?'Reanudar':'Empezar'} bloque</button>`}</div>`}
+  else if(cur){const late=(n-cur.start)/1e3;current=`<div class="card stack" style="border-color:#${cur.color}77"><div class="between"><span class="over" style="color:#${cur.color}">AHORA · ${KINDS[cur.kind].toUpperCase()}</span><span class="num" style="color:var(--fg2)">${hhmm(cur.start)}–${hhmm(cur.end)}</span></div><div style="font-weight:700;font-size:21px">${esc(cur.title)}</div>${cur.obj?`<p class="muted">◎ ${esc(cur.obj)}</p>`:''}${cur.kind==='rest'?`<p class="muted">Descanso programado: no penaliza. Vuelves a las ${hhmm(cur.end)}.</p>`:`${late>60&&!cur.actualStart?`<div style="color:var(--warn);font-size:13px;font-weight:600">Llevas ${dur(late)} de retraso. Se está registrando.</div>`:''}<button class="btn" data-start="${cur.id}">▶ ${cur.actualStart?'Reanudar':'Empezar'} bloque</button><div class="grid2"><button class="btn2" data-act="switch">⇄ Prefiero hacer otro</button><button class="btn2" data-act="bdone" data-id="${cur.id}">✓ Ya está hecho</button></div>`}</div>`}
   else if(!day.blocks.length)current=`<div class="card stack" style="text-align:center;align-items:center"><div class="round" style="background:var(--accent-soft);color:var(--accent);width:60px;height:60px">＋</div><b style="font-size:17px">Tu día está en blanco</b><p class="muted">Crea bloques en Schedule o carga tu rutina para empezar a medir tu efectividad.</p><button class="btn" data-tab="schedule">Planificar hoy</button></div>`;
   else{const next=day.blocks.find(b=>b.start>n&&b.kind!=='rest');current=next?`<div class="card stack"><span class="over">Sin bloque en curso</span><b style="font-size:19px">Siguiente: ${esc(next.title)}</b><p class="muted">Empieza a las ${hhmm(next.start)} · ${KINDS[next.kind]}</p><button class="btn2" data-start="${next.id}">⏩ Adelantar y empezar ahora</button></div>`:`<div class="card stack"><span class="over">Jornada planificada completada</span><div class="grid2"><button class="btn2" data-act="review">Revisión diaria</button><button class="btn2 acc" data-tab="focus">Sesión libre</button></div></div>`}
   const tl=day.blocks.length?(()=>{const f=day.blocks[0].start,t=Math.max(...day.blocks.map(b=>b.end))-f;return day.blocks.map(b=>`<i style="position:absolute;left:${(b.start-f)/t*100}%;width:calc(${(b.end-b.start)/t*100}% - 2px);height:6px;border-radius:3px;background:#${b.color};opacity:${b.status==='completed'?1:b.status==='missed'?.2:.45}"></i>`).join('')})():'';
@@ -372,7 +382,7 @@ function home(){
   ${current}
   ${tasksCard(k)}
   ${day.blocks.length?`<div class="card stack"><div class="between"><span class="over">Estado del día</span><span class="num" style="font-size:19px">${pct(r.prog)}</span></div><div class="bar" style="height:10px"><b style="width:${r.prog*100}%"></b></div><div style="position:relative;height:6px">${tl}</div><div class="between" style="font-size:11px;color:var(--fg3)"><span>${hhmm(day.blocks[0].start)}</span><span>${hhmm(Math.max(...day.blocks.map(b=>b.end)))}</span></div></div>`:''}
-  <div class="stack" style="gap:8px"><div class="between"><span class="over">Próximos bloques</span><button style="color:var(--accent);font-size:13px;font-weight:600" data-tab="schedule">Ver agenda</button></div>${up.length?up.map(blockRow).join(''):`<div class="card muted">${day.blocks.length?'No quedan más bloques hoy.':'Nada planificado todavía.'}</div>`}</div>`;
+  ${todoCard(k)}`;
 }
 function dayLabel(k){const t=dayKey(Date.now());if(k===t)return 'hoy';if(k===addDays(t,1))return 'mañana';if(k===addDays(t,-1))return 'ayer';return keyToDate(k).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}
 function taskItem(t,k){
@@ -382,6 +392,22 @@ function taskItem(t,k){
     <button data-tedit="${t.id}" data-tk="${k}" style="flex:1;min-width:0;text-align:left"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${t.done?'color:var(--fg3);text-decoration:line-through':''}">${esc(t.title)}</div>${t.time||t.tplId||late||t.top||t.blockId?`<div style="font-size:11.5px;color:${late?'var(--bad)':t.top?'var(--accent)':'var(--fg3)'}">${[t.top?'★ prioridad':'',late?'Vencida':'',t.time?(late?t.time:'Antes de las '+t.time):'',t.blockId?'▦ '+((ensureDay(k).blocks.find(b=>b.id===t.blockId)||{}).title||'bloque'):'',t.tplId?'↻ se repite':'📅 solo este día'].filter(Boolean).join(' · ')}</div>`:''}</button></div>`;
 }
 /* Tarjeta de tareas de un día (HOME usa hoy; SCHEDULE el día elegido). */
+function todoCard(k){
+  const day=ensureDay(k),n=Date.now(),list=pendingBlocks(k).sort((a,b)=>a.start-b.start);
+  const work=day.blocks.filter(b=>b.kind!=='rest'),done=work.filter(b=>b.status==='completed').length;
+  const left=list.reduce((a,b)=>a+(b.end-b.start)/1e3,0);
+  if(!work.length)return '';
+  const row=b=>{const passed=b.end<=n,now=b.start<=n&&n<b.end;return `<div class="row" style="gap:10px;padding:6px 0">
+    <span style="width:4px;height:38px;border-radius:2px;background:#${b.color};flex:none"></span>
+    <button data-edit="${b.id}" style="flex:1;min-width:0;text-align:left"><div style="font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(b.title)}</div>
+      <div style="font-size:11.5px;color:${passed?'var(--warn)':now?'var(--accent)':'var(--fg3)'}">${passed?`Pendiente · era a las ${hhmm(b.start)}`:now?`Toca ahora · hasta las ${hhmm(b.end)}`:`A las ${hhmm(b.start)}`} · ${dur((b.end-b.start)/1e3)}</div></button>
+    <button class="chip acc" data-start="${b.id}" aria-label="Empezar ${esc(b.title)} ahora">▶</button>
+    <button class="chip ok" data-act="bdone" data-id="${b.id}" aria-label="Marcar ${esc(b.title)} como hecho">✓</button></div>`};
+  return `<div class="card stack" style="gap:8px"><div class="between"><span class="over">Falta por hacer hoy</span><span class="num" style="font-size:18px;color:${list.length?'var(--fg)':'var(--ok)'}">${done}/${work.length}</span></div>
+   ${list.length?`<p class="muted" style="font-size:12.5px">${list.length} bloque${list.length>1?'s':''} · ${dur(left)}. Hazlos en el orden que te pida tu energía: ▶ para empezar uno ahora, ✓ si ya lo has hecho.</p>${list.map(row).join('')}`
+     :'<p class="muted">✅ Todos los bloques de hoy hechos.</p>'}
+   <button style="color:var(--accent);font-size:13px;font-weight:600;text-align:left" data-tab="schedule">Ver agenda ›</button></div>`;
+}
 function tasksCard(k){
   const list=dayTasks(k),done=list.filter(t=>t.done).length,isToday=k===dayKey(Date.now()),past=k<dayKey(Date.now());
   const upcoming=isToday?upcomingTasks():[];
@@ -476,7 +502,7 @@ function schedule(){
       const left=`calc(52px + (100% - 54px) * ${col} / ${n})`,width=`calc((100% - 54px) / ${n} - ${n>1?3:0}px)`;
       const bt=blockTasks(k,b.id),badge=bt.length?` <span style="font-size:10.5px;color:var(--fg2)">☐ ${bt.filter(t=>t.done).length}/${bt.length}</span>`:'';
       const label=compact?`<div class="t">${esc(b.title)}${badge} <span style="color:var(--fg2);font-weight:500">· ${hhmm(b.start)}</span></div>`:`<div class="t">${esc(b.title)}${badge}</div><div class="s" data-tltime>${hhmm(b.start)}–${hhmm(b.end)}${n>1?'':' · '+KINDS[b.kind]}</div>`;
-      return `<div class="tl-blk${compact?' compact':''}${n>1?' narrow':''}" id="tl-${b.id}" style="top:${(b.start-start)*px+1}px;height:${h}px;left:${left};width:${width};background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1};${n>1?'box-shadow:inset 0 0 0 1px var(--warn)':''}"><button class="body" data-edit="${b.id}">${label}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`}).join('');
+      return `<div class="tl-blk${compact?' compact':''}${n>1?' narrow':''}" id="tl-${b.id}" style="top:${(b.start-start)*px+1}px;height:${h}px;left:${left};width:${width};background:#${b.color}${b.kind==='rest'?'1f':'38'};border-color:#${b.color};opacity:${b.status==='missed'?.55:1};${n>1?'box-shadow:inset 0 0 0 1px var(--warn)':b.status==='pending'&&b.kind!=='rest'&&b.end<=nowMs?'box-shadow:inset 0 0 0 1px rgba(255,176,32,.6)':''}"><button class="body" data-edit="${b.id}">${label}</button>${b.status==='pending'?`<span class="grip" data-drag="${b.id}" data-mode="move" aria-label="Arrastrar para mover">⋮⋮</span><span class="rs" data-drag="${b.id}" data-mode="resize" aria-label="Arrastrar para cambiar duración"></span>`:''}</div>`}).join('');
     const nowTop=(nowMs-start)*px,showNow=isT&&nowTop>0&&nowTop<endH*PXH;
     body=`${isT?nowCard(day):''}<p class="muted" style="font-size:12px">Toca un bloque para editarlo · arrastra ⋮⋮ para moverlo · arrastra el borde inferior para cambiar su duración.</p><div class="timeline" id="tl" data-origin="${start}">${hours}${bl}${showNow?`<div class="past" id="pastzone" style="height:${nowTop}px"></div><div class="now" id="nowline" style="top:${nowTop}px"><span class="lbl" data-live="now">${hhmm(nowMs)}</span></div>`:''}</div>`;
   }
@@ -599,7 +625,7 @@ function editorSheet(isTpl,obj,isNew){
     ${!isTpl&&!isNew?`<label class="f" for="e-st">Estado<select id="e-st">${[['pending','Pendiente'],['inprogress','En curso'],['completed','Completado'],['missed','No realizado']].map(([v,l])=>`<option value="${v}" ${v===b.status?'selected':''}>${l}</option>`).join('')}</select></label><label class="f" for="e-w">Tiempo trabajado (min)<input id="e-w" type="number" min="0" inputmode="numeric" value="${Math.round(b.worked/60)}"></label>${b.actualStart?`<p class="muted" style="font-size:12px">Inicio real ${hhmm(b.actualStart)}${b.actualStart-b.start>60e3?` · retraso ${dur((b.actualStart-b.start)/1e3)}`:''}${b.actualEnd?` · fin real ${hhmm(b.actualEnd)}`:''}</p>`:''}`:''}
     <p id="e-err" class="muted" style="color:var(--bad)" hidden></p>
     <button class="btn" data-act="${isTpl?'savetpl':'save'}">Guardar</button>
-    ${!isTpl&&!isNew&&b.status!=='completed'&&b.kind!=='rest'?`<button class="btn2 acc" data-start="${b.id}">▶ Empezar ahora</button><button class="btn2" data-act="tomorrow">Mover a mañana</button>`:''}
+    ${!isTpl&&!isNew&&b.status!=='completed'&&b.kind!=='rest'?`<button class="btn2 acc" data-start="${b.id}">▶ Empezar ahora</button><button class="btn2" data-act="bdone" data-id="${b.id}" style="color:var(--ok)">✓ Marcar como hecho</button><button class="btn2" data-act="tomorrow">Mover a mañana</button>`:''}
     ${!isNew?`<button class="btn2 bad" data-act="${isTpl?'deltpl':'del'}">Eliminar</button>`:''}`;
 }
 function overlayView(){
@@ -607,7 +633,7 @@ function overlayView(){
   let body='';const o=overlay;
   if(o.type==='distract')body=`<span class="over" style="color:var(--bad)">Marcar distracción</span><b style="font-size:19px">¿Cuánto tiempo te has desviado?</b><div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">${[1,3,5,10,15,30].map(m=>`<button class="btn2" data-dis="${m}"><b class="num" style="font-size:18px">${m} min</b></button>`).join('')}</div><p class="muted">Se descuenta del tiempo concentrado y reduce tu efectividad. Registrarlo con honestidad es lo que hace que la puntuación sea real.</p>`;
   if(o.type==='breakdown'){const r=score(dayKey(Date.now()));body=`<div class="between"><span class="num" style="font-size:52px;color:${scoreColor(r.sc)}">${pct(r.sc)}</span><span class="chip ${r.conf==='Datos completos'?'ok':'warn'}">${r.conf}</span></div>${r.comps.map(c=>`<div class="card stack" style="padding:14px;gap:8px"><div class="between"><b style="font-size:15px">${c.k}</b><span style="font-size:12px;color:var(--fg3)">peso ${Math.round(c.w/(S.weights.c+S.weights.a+S.weights.t+S.weights.p||1)*100)}% · <b class="num" style="font-size:17px;color:var(--fg)">${pct(c.v)}</b></span></div><div class="bar"><b style="width:${(c.v||0)*100}%"></b></div><span class="muted" style="font-size:12px">${c.d}</span></div>`).join('')}<p class="muted" style="font-size:12px">Descansos programados, «Necesito descansar» y reuniones/llamadas no penalizan. Si un componente no tiene datos se excluye y la puntuación aparece como «Estimada».</p>`}
-  if(o.type==='switch'){const day=ensureDay(dayKey(Date.now()));body=`<span class="over acc">Cambiar tarea</span>${day.blocks.filter(b=>b.status!=='completed'&&b.kind!=='rest'&&b.id!==sess()?.blockId).map(b=>`<div class="row">${blockRow(b)}<button class="round acc" data-start="${b.id}" style="width:44px;height:44px;font-size:15px" aria-label="Cambiar a ${esc(b.title)}">⇄</button></div>`).join('')||'<p class="muted">No hay otros bloques pendientes hoy.</p>'}`}
+  if(o.type==='switch'){const k=dayKey(Date.now()),list=pendingBlocks(k).sort((a,b)=>a.start-b.start);body=`<span class="over acc">¿Qué bloque haces ahora?</span><p class="muted" style="font-size:12.5px">Elige según tu energía. El que dejes queda en «Falta por hacer» para más tarde.</p>${list.map(b=>`<div class="row">${blockRow(b)}<button class="round acc" data-start="${b.id}" style="width:44px;height:44px;font-size:15px;flex:none" aria-label="Empezar ${esc(b.title)}">▶</button></div>`).join('')||'<p class="muted">No quedan bloques pendientes hoy.</p>'}`}
   if(o.type==='finish')body=`<span class="over">¿Finalizar el bloque?</span><p class="muted">Se registrará el tiempo real trabajado.</p><button class="btn" data-act="finish-yes">Finalizar y marcar completado</button><button class="btn2 bad" data-act="abandon">Abandonar (queda pendiente)</button>`;
   if(o.type==='summary')body=`<div style="text-align:center;font-size:40px;color:var(--accent)">✓</div><span class="over acc" style="text-align:center">Bloque terminado</span><b style="font-size:21px;text-align:center">${esc(o.title)}</b><div class="grid2"><div class="tile"><span class="over">Concentrado</span><div class="v">${dur(o.f)}</div></div><div class="tile"><span class="over">Concentración</span><div class="v">${pct(o.c)}</div></div><div class="tile"><span class="over">Distracciones</span><div class="v">${dur(o.d)}</div></div><div class="tile"><span class="over">Pausas + descanso</span><div class="v">${dur(o.p)}</div></div></div>`;
   if(o.type==='recover'){const s=sess();body=`<span class="over" style="color:var(--warn)">Sesión sin cerrar</span><b style="font-size:19px">«${esc(s.title)}» quedó abierta</b><p class="muted">Empezó a las ${hhmm(s.startedAt)} y debía terminar a las ${hhmm(s.plannedEnd)}. ¿Cuándo terminaste? Solo se contará el tiempo que confirmes.</p><button class="btn" data-act="rec-end">A la hora prevista (${hhmm(s.plannedEnd)})</button><button class="btn2" data-act="rec-now">Ahora</button><button class="btn2 bad" data-act="rec-discard">Descartar la sesión</button>`}
@@ -641,6 +667,10 @@ function overlayView(){
     <button class="btn" data-act="cl-in">Entrar</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
     <p class="muted" style="font-size:11.5px">Al entrar por primera vez se suben los datos de este móvil. Si ya tenías datos en la nube, se usa la versión más reciente y se guarda una copia local de la otra.</p>`;
   if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
+  if(o.type==='bdone'){const [b]=findBlock(o.id);const plan=Math.round((b.end-b.start)/60e3);body=`<span class="over" style="color:var(--ok)">✓ Marcar como hecho</span><b style="font-size:19px">${esc(b.title)}</b><p class="muted">¿Cuánto tiempo le has dedicado? Se cuenta como trabajo efectivo y el bloque deja de estar pendiente.</p>
+    <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${[...new Set([plan,15,30,45,60,90])].filter(m=>m>0).slice(0,6).map(m=>`<button class="btn2 ${m===plan?'acc':''}" data-act="bdone-min" data-id="${b.id}" data-m="${m}">${m===plan?'Lo planificado · ':''}${dur(m*60)}</button>`).join('')}</div>
+    <label class="f" for="bd-m">Otro (minutos)<input id="bd-m" type="number" inputmode="numeric" min="1" max="600" placeholder="p. ej. 50"></label>
+    <button class="btn" data-act="bdone-custom" data-id="${b.id}">Guardar</button>`}
   if(o.type==='wipe')body=`<span class="over" style="color:var(--bad)">Borrar todos los datos</span><p class="muted">Se eliminarán tus bloques, rutina y estadísticas de este dispositivo. No se puede deshacer.</p><button class="btn" style="background:var(--bad)" data-act="wipe-yes">Borrar definitivamente</button>`;
   if(o.type==='review'){const r=score(dayKey(Date.now())),day=ensureDay(dayKey(Date.now()));const pend=day.blocks.filter(b=>(b.status==='missed'||b.status==='pending')&&b.kind!=='rest');
     const tips=[];const delays=day.blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/1e3));if(delays.length){const a=delays.reduce((x,y)=>x+y,0)/delays.length;tips.push(a>300?`Empezaste con ${dur(a)} de retraso medio. Deja preparado el primer bloque la noche anterior.`:`Puntualidad sólida: retraso medio de ${dur(a)}.`)}
@@ -844,6 +874,9 @@ document.addEventListener('click',e=>{
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
+    case 'bdone':overlay={type:'bdone',id:d.id};break;
+    case 'bdone-min':overlay=null;markBlockDone(d.id,+d.m);break;
+    case 'bdone-custom':{const m=+($('#bd-m')?.value||0);if(!m){$('#bd-m').focus();return}overlay=null;markBlockDone(d.id,m);break}
     case 'morning':overlay={type:'morning'};break;
     case 'mp-sugg':{const e=[0,1,2].map(i=>$('#mp-'+i)).find(x=>!x.value.trim());if(e)e.value=d.t;return}
     case 'mp-save':saveMorning();return;

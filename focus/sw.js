@@ -1,5 +1,5 @@
 // FOCUS OS service worker: funciona sin conexión y recibe las actualizaciones al volver a tener red.
-var CACHE = 'focusos-v10';
+var CACHE = 'focusos-v11';
 var ASSETS = ['./', './index.html', './manifest.json', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 
 self.addEventListener('install', function (e) {
