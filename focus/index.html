@@ -122,39 +122,56 @@ input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .ach .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--card2);color:var(--fg3);flex:none;font-size:16px}
 .ach.on .ic{background:var(--accent);color:#000}
 .toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:#1d1d1d;border:1px solid var(--stroke);border-radius:16px;padding:12px 16px;font-size:13.5px;z-index:30;width:max-content;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
-/* ───────── Ordenador / tablet ancha ───────── */
+/* ───────── Ordenador: se adapta a cualquier ancho de pantalla ───────── */
 .brand{display:none}
 @media (hover:hover){button:hover{filter:brightness(1.12)}.blk:hover,.card button.between:hover{border-color:rgba(255,101,0,.35)}}
 @media (min-width:900px){
+  :root{--side:84px}
   body{font-size:15px}
-  .tabs{top:0;bottom:0;right:auto;width:232px;padding:28px 14px;border-top:0;border-right:1px solid var(--stroke);background:rgba(12,12,12,.96)}
+  .tabs{top:0;bottom:0;right:auto;width:var(--side);padding:24px 10px;border-top:0;border-right:1px solid var(--stroke);background:rgba(12,12,12,.96)}
   .tabs .in{display:flex;flex-direction:column;gap:6px;max-width:none}
-  .brand{display:flex;align-items:center;gap:10px;font-family:var(--wide);font-weight:800;font-size:16px;letter-spacing:.08em;padding:0 10px 22px;color:var(--fg)}
-  .brand i{width:26px;height:26px;border-radius:50%;border:4px solid var(--accent);border-right-color:rgba(255,255,255,.12);display:block}
-  .tab{flex-direction:row;justify-content:flex-start;gap:12px;font-size:11px;letter-spacing:.1em;padding:6px 8px;border-radius:14px}
-  .tab .ic{width:38px;height:34px;border-radius:11px}
+  .brand{display:flex;justify-content:center;padding:0 0 22px}
+  .brand i{width:28px;height:28px;border-radius:50%;border:4px solid var(--accent);border-right-color:rgba(255,255,255,.12);display:block;flex:none}
+  .brand b{display:none}
+  .tab{font-size:8.5px;padding:6px 0;border-radius:14px}
   .tab.on{background:var(--card)}
-  .app{max-width:1240px;margin:0 0 0 232px;padding:28px 40px 60px!important}
-  .head{padding-top:4px}.h1{font-size:34px}
-  /* HOME, ANALYTICS y SETTINGS: dos columnas que se reparten las tarjetas */
+  .app{max-width:none;margin:0 0 0 var(--side);padding:28px clamp(20px,3vw,56px) 60px!important}
+  .app>.stack{max-width:1880px;margin:0 auto}
+  .head{padding-top:4px}.h1{font-size:clamp(30px,2.4vw,44px)}
+  /* HOME, ANALYTICS, FOCUS y SETTINGS: columnas que se reparten las tarjetas */
   .app[data-tab=home]>.stack,.app[data-tab=analytics]>.stack,.app[data-tab=settings]>.stack,.app[data-tab=focus]>.stack{display:block;column-count:2;column-gap:20px}
   .app[data-tab=home]>.stack>*,.app[data-tab=analytics]>.stack>*,.app[data-tab=settings]>.stack>*,.app[data-tab=focus]>.stack>*{break-inside:avoid;margin-bottom:18px;width:100%}
   .app>.stack>.head{column-span:all}
-  .app[data-tab=analytics]>.stack>.seg{column-span:all}
+  .app[data-tab=analytics]>.stack>.seg{column-span:all;max-width:520px}
   /* SCHEDULE: calendario ancho + tareas a la derecha */
-  .app[data-tab=schedule]>.stack{display:grid;grid-template-columns:minmax(0,1fr) 380px;column-gap:28px;align-items:start}
+  .app[data-tab=schedule]>.stack{display:grid;grid-template-columns:minmax(0,1fr) clamp(300px,26vw,440px);column-gap:28px;align-items:start;max-width:1600px}
   .app[data-tab=schedule]>.stack>*{grid-column:1}
   .app[data-tab=schedule]>.stack>#tasks{grid-column:2;grid-row:1 / span 20;position:sticky;top:24px}
-
-  /* Ventanas: centradas en vez de subir desde abajo */
+  /* Ventanas centradas */
   .modal{align-items:center;padding:24px}
   .sheet{border-radius:24px;max-width:560px;border:1px solid var(--stroke);max-height:86vh;padding:26px}
   .mini{left:auto;right:32px;bottom:24px;width:420px;padding:0}
   .toast{top:24px}
-  .deep .inner{max-width:560px}
+  .deep .inner{max-width:600px}
   .nowcard{top:16px}
 }
-@media (min-width:1400px){.app[data-tab=home]>.stack,.app[data-tab=analytics]>.stack{column-count:3}}
+/* Portátil normal en adelante: menú lateral con nombres */
+@media (min-width:1200px){
+  :root{--side:236px}
+  .tabs{padding:28px 14px}
+  .brand{justify-content:flex-start;gap:10px;padding:0 10px 22px;font-family:var(--wide);font-weight:800;font-size:16px;letter-spacing:.08em;color:var(--fg)}
+  .brand b{display:inline}
+  .tab{flex-direction:row;justify-content:flex-start;gap:12px;font-size:11px;letter-spacing:.1em;padding:6px 8px}
+  .tab .ic{width:38px;height:34px;border-radius:11px}
+}
+/* Monitores grandes: toda la interfaz crece en proporción (mismo aspecto que en un portátil, más grande) */
+@media (min-width:1600px){
+  .app[data-tab=home]>.stack,.app[data-tab=analytics]>.stack,.app[data-tab=settings]>.stack,.app[data-tab=focus]>.stack{column-count:3;column-gap:24px}
+}
+@media (min-width:1900px){html{zoom:1.12}}
+@media (min-width:2300px){html{zoom:1.3}}
+@media (min-width:2900px){html{zoom:1.6}}
+@media (min-width:3600px){html{zoom:2}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -912,7 +929,7 @@ let tt;function toast(m){$('#toast').innerHTML=`<div class="toast" role="status"
 function render(){
   const views={home,schedule,focus:focusView,analytics,settings};
   $('#app').dataset.tab=tab;$('#app').innerHTML=`<div class="stack">${views[tab]()}</div>`;
-  $('#tabs').innerHTML='<div class="brand"><i></i>FOCUS OS</div>'+TABS.map(([k,i,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}" aria-label="${l}"><span class="ic">${i}</span>${l}</button>`).join('');
+  $('#tabs').innerHTML='<div class="brand"><i></i><b>FOCUS OS</b></div>'+TABS.map(([k,i,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}" aria-label="${l}"><span class="ic">${i}</span>${l}</button>`).join('');
   const s=sess();
   $('#mini').innerHTML=s&&!deep&&tab!=='home'&&tab!=='focus'?`<div class="mini"><button data-act="deep"><i style="width:8px;height:8px;border-radius:50%;background:${s.pauseAt?'var(--warn)':'var(--accent)'};display:block;flex:none"></i><span style="flex:1;min-width:0;overflow:hidden"><b style="font-size:14px">${esc(s.title)}</b><br><span style="font-size:12px;color:var(--fg2)">${KINDS[s.kind]}</span></span><span class="num" data-live="rem" style="font-size:21px">${clock(Math.max(0,(s.plannedEnd-Date.now())/1e3))}</span></button></div>`:'';
   $('#overlay').innerHTML=(deep?deepView():'')+overlayView();
@@ -1054,7 +1071,7 @@ document.addEventListener('pointerdown',e=>{
   drag={b,mode:h.dataset.mode,y0:e.clientY,start:b.start,end:b.end,moved:false,el:$('#tl-'+b.id)};drag.el.classList.add('drag');h.setPointerCapture(e.pointerId);
 });
 document.addEventListener('pointermove',e=>{
-  if(!drag)return;const px=PXH/3600e3;const dm=Math.round((e.clientY-drag.y0)/px/300e3)*300e3;if(dm!==0)drag.moved=true;
+  if(!drag)return;const px=PXH/3600e3,zm=parseFloat(getComputedStyle(document.documentElement).zoom)||1;const dm=Math.round((e.clientY-drag.y0)/zm/px/300e3)*300e3;if(dm!==0)drag.moved=true;
   const origin=+$('#tl').dataset.origin;
   if(drag.mode==='move'){drag.ns=drag.start+dm;drag.ne=drag.end+dm}else{drag.ns=drag.start;drag.ne=Math.max(drag.start+5*60e3,drag.end+dm)}
   drag.el.style.top=((drag.ns-origin)*px+1)+'px';drag.el.style.height=Math.max(12,(drag.ne-drag.ns)*px-2)+'px';
