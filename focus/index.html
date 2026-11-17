@@ -122,6 +122,39 @@ input[type=checkbox]{width:20px;height:20px;accent-color:var(--accent)}
 .ach .ic{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;background:var(--card2);color:var(--fg3);flex:none;font-size:16px}
 .ach.on .ic{background:var(--accent);color:#000}
 .toast{position:fixed;top:calc(12px + env(safe-area-inset-top,0px));left:50%;transform:translateX(-50%);background:#1d1d1d;border:1px solid var(--stroke);border-radius:16px;padding:12px 16px;font-size:13.5px;z-index:30;width:max-content;max-width:calc(100% - 32px);box-shadow:0 10px 30px rgba(0,0,0,.5)}
+/* ───────── Ordenador / tablet ancha ───────── */
+.brand{display:none}
+@media (hover:hover){button:hover{filter:brightness(1.12)}.blk:hover,.card button.between:hover{border-color:rgba(255,101,0,.35)}}
+@media (min-width:900px){
+  body{font-size:15px}
+  .tabs{top:0;bottom:0;right:auto;width:232px;padding:28px 14px;border-top:0;border-right:1px solid var(--stroke);background:rgba(12,12,12,.96)}
+  .tabs .in{display:flex;flex-direction:column;gap:6px;max-width:none}
+  .brand{display:flex;align-items:center;gap:10px;font-family:var(--wide);font-weight:800;font-size:16px;letter-spacing:.08em;padding:0 10px 22px;color:var(--fg)}
+  .brand i{width:26px;height:26px;border-radius:50%;border:4px solid var(--accent);border-right-color:rgba(255,255,255,.12);display:block}
+  .tab{flex-direction:row;justify-content:flex-start;gap:12px;font-size:11px;letter-spacing:.1em;padding:6px 8px;border-radius:14px}
+  .tab .ic{width:38px;height:34px;border-radius:11px}
+  .tab.on{background:var(--card)}
+  .app{max-width:1240px;margin:0 0 0 232px;padding:28px 40px 60px!important}
+  .head{padding-top:4px}.h1{font-size:34px}
+  /* HOME, ANALYTICS y SETTINGS: dos columnas que se reparten las tarjetas */
+  .app[data-tab=home]>.stack,.app[data-tab=analytics]>.stack,.app[data-tab=settings]>.stack,.app[data-tab=focus]>.stack{display:block;column-count:2;column-gap:20px}
+  .app[data-tab=home]>.stack>*,.app[data-tab=analytics]>.stack>*,.app[data-tab=settings]>.stack>*,.app[data-tab=focus]>.stack>*{break-inside:avoid;margin-bottom:18px;width:100%}
+  .app>.stack>.head{column-span:all}
+  .app[data-tab=analytics]>.stack>.seg{column-span:all}
+  /* SCHEDULE: calendario ancho + tareas a la derecha */
+  .app[data-tab=schedule]>.stack{display:grid;grid-template-columns:minmax(0,1fr) 380px;column-gap:28px;align-items:start}
+  .app[data-tab=schedule]>.stack>*{grid-column:1}
+  .app[data-tab=schedule]>.stack>#tasks{grid-column:2;grid-row:1 / span 20;position:sticky;top:24px}
+
+  /* Ventanas: centradas en vez de subir desde abajo */
+  .modal{align-items:center;padding:24px}
+  .sheet{border-radius:24px;max-width:560px;border:1px solid var(--stroke);max-height:86vh;padding:26px}
+  .mini{left:auto;right:32px;bottom:24px;width:420px;padding:0}
+  .toast{top:24px}
+  .deep .inner{max-width:560px}
+  .nowcard{top:16px}
+}
+@media (min-width:1400px){.app[data-tab=home]>.stack,.app[data-tab=analytics]>.stack{column-count:3}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
@@ -357,7 +390,7 @@ function sessionCard(){
   <button class="btn2 acc" data-act="deep">Abrir modo DEEP WORK</button></div>`;
 }
 function installCard(){
-  if(isStandalone())return '';
+  if(isStandalone()||window.innerWidth>=900)return '';
   const ios=/iphone|ipad|ipod/i.test(navigator.userAgent);
   return `<div class="card stack" style="border-color:rgba(255,101,0,.35)"><span class="over acc">Instálala en tu iPhone</span><p class="muted">${ios?'Pulsa <b>Compartir</b> (el cuadrado con la flecha) en Safari y elige <b>Añadir a pantalla de inicio</b>. Se abrirá a pantalla completa, como una app.':'En Safari para iPhone: Compartir › Añadir a pantalla de inicio. En Chrome/Android: menú › Instalar aplicación.'}</p></div>`;
 }
@@ -717,7 +750,7 @@ function overlayView(){
     <label class="f" for="cl-p">Contraseña (mín. 8 caracteres)<input id="cl-p" type="password" autocomplete="current-password"></label>
     <p id="cl-err" class="muted" style="color:var(--bad)" hidden></p>
     <button class="btn" data-act="cl-in">Entrar</button><button style="color:var(--accent);font-size:13.5px;font-weight:600" data-act="cl-forgot">¿Has olvidado la contraseña?</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
-    <p class="muted" style="font-size:11.5px">Al entrar por primera vez se suben los datos de este móvil. Si ya tenías datos en la nube, se usa la versión más reciente y se guarda una copia local de la otra.</p>`;
+    <p class="muted" style="font-size:11.5px">Si ya tienes datos en tu cuenta, se cargan en este dispositivo (lo que hubiera aquí se guarda como copia local). Si la cuenta está vacía, se suben los datos de este dispositivo.</p>`;
   if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
   if(o.type==='bdone'){const [b]=findBlock(o.id);const plan=Math.round((b.end-b.start)/60e3);body=`<span class="over" style="color:var(--ok)">✓ Marcar como hecho</span><b style="font-size:19px">${esc(b.title)}</b><p class="muted">¿Cuánto tiempo le has dedicado? Se cuenta como trabajo efectivo y el bloque deja de estar pendiente.</p>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${[...new Set([plan,15,30,45,60,90])].filter(m=>m>0).slice(0,6).map(m=>`<button class="btn2 ${m===plan?'acc':''}" data-act="bdone-min" data-id="${b.id}" data-m="${m}">${m===plan?'Lo planificado · ':''}${dur(m*60)}</button>`).join('')}</div>
@@ -878,8 +911,8 @@ document.addEventListener('visibilitychange',()=>{if(document.visibilityState===
 let tt;function toast(m){$('#toast').innerHTML=`<div class="toast" role="status">${esc(m)}</div>`;clearTimeout(tt);tt=setTimeout(()=>$('#toast').innerHTML='',3200)}
 function render(){
   const views={home,schedule,focus:focusView,analytics,settings};
-  $('#app').innerHTML=`<div class="stack">${views[tab]()}</div>`;
-  $('#tabs').innerHTML=TABS.map(([k,i,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}" aria-label="${l}"><span class="ic">${i}</span>${l}</button>`).join('');
+  $('#app').dataset.tab=tab;$('#app').innerHTML=`<div class="stack">${views[tab]()}</div>`;
+  $('#tabs').innerHTML='<div class="brand"><i></i>FOCUS OS</div>'+TABS.map(([k,i,l])=>`<button class="tab ${tab===k?'on':''}" data-tab="${k}" aria-label="${l}"><span class="ic">${i}</span>${l}</button>`).join('');
   const s=sess();
   $('#mini').innerHTML=s&&!deep&&tab!=='home'&&tab!=='focus'?`<div class="mini"><button data-act="deep"><i style="width:8px;height:8px;border-radius:50%;background:${s.pauseAt?'var(--warn)':'var(--accent)'};display:block;flex:none"></i><span style="flex:1;min-width:0;overflow:hidden"><b style="font-size:14px">${esc(s.title)}</b><br><span style="font-size:12px;color:var(--fg2)">${KINDS[s.kind]}</span></span><span class="num" data-live="rem" style="font-size:21px">${clock(Math.max(0,(s.plannedEnd-Date.now())/1e3))}</span></button></div>`:'';
   $('#overlay').innerHTML=(deep?deepView():'')+overlayView();
@@ -1192,7 +1225,7 @@ async function pushAlerts(){
 function cloudCard(){
   const on=!!sbUser,ago=cloud.last?Math.max(0,Math.round((Date.now()-cloud.last)/60e3)):null;
   const pushSupported='PushManager' in window&&'serviceWorker' in navigator;
-  return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este móvil</span>'}</div>
+  return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este dispositivo</span>'}</div>
   ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago} min`:''}.</p>
     ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12.5px">⚠ ${esc(cloud.msg)}</p>`:''}
     <button class="btn2 ${cloud.status==='error'?'acc':''}" data-act="cl-sync">${cloud.status==='error'?'↻ Reintentar sincronización':'↻ Sincronizar ahora'}</button>
