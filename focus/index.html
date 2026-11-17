@@ -762,11 +762,12 @@ function overlayView(){
   if(o.type==='inbox')body=inboxSheet();
   if(o.type==='pickblock')body=pickBlockSheet(o.id);
   if(o.type==='weekly')body=weeklySheet(o.k);
-  if(o.type==='cloud')body=`<span class="over acc">☁️ Tu cuenta de FOCUS OS</span><p class="muted">Con una cuenta tus datos se guardan en la nube (solo tú puedes verlos) y puedes activar avisos con el móvil bloqueado.</p>
-    <label class="f" for="cl-e">Email<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com"></label>
-    <label class="f" for="cl-p">Contraseña (mín. 8 caracteres)<input id="cl-p" type="password" autocomplete="current-password"></label>
+  if(o.type==='cloud')body=`<span class="over acc">☁️ Entra en FOCUS OS</span><p class="muted">Sin contraseñas: entra con tu cuenta de Google. Tus datos se guardan en la nube (solo tú puedes verlos) y verás lo mismo en el móvil y en el ordenador.</p>
+    <button class="btn2" data-act="cl-google" style="background:#fff;color:#1f1f1f;border:0;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;padding:15px"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>
     <p id="cl-err" class="muted" style="color:var(--bad)" hidden></p>
-    <button class="btn" data-act="cl-in">Entrar</button><button style="color:var(--accent);font-size:13.5px;font-weight:600" data-act="cl-forgot">¿Has olvidado la contraseña?</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
+    <div class="row" style="gap:10px;color:var(--fg3);font-size:12px"><span style="flex:1;height:1px;background:var(--stroke)"></span>o recibe un enlace por email<span style="flex:1;height:1px;background:var(--stroke)"></span></div>
+    <label class="f" for="cl-e">Email<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@gmail.com"></label>
+    <button class="btn2 acc" data-act="cl-link">📧 Enviarme el enlace para entrar</button>
     <p class="muted" style="font-size:11.5px">Si ya tienes datos en tu cuenta, se cargan en este dispositivo (lo que hubiera aquí se guarda como copia local). Si la cuenta está vacía, se suben los datos de este dispositivo.</p>`;
   if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
   if(o.type==='bdone'){const [b]=findBlock(o.id);const plan=Math.round((b.end-b.start)/60e3);body=`<span class="over" style="color:var(--ok)">✓ Marcar como hecho</span><b style="font-size:19px">${esc(b.title)}</b><p class="muted">¿Cuánto tiempo le has dedicado? Se cuenta como trabajo efectivo y el bloque deja de estar pendiente.</p>
@@ -1020,6 +1021,13 @@ document.addEventListener('click',e=>{
     case 'rituals':S.rituals=S.rituals===false;save();break;
     case 'cl-open':overlay={type:'cloud'};break;
     case 'cl-in':cloudAuth(false);return;
+    case 'cl-google':{const err=$('#cl-err');err.hidden=true;S.cloudOn=true;save(false);
+      loadSB().then(()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:'select_account'}}})).then(r=>{if(r&&r.error)throw r.error})
+      .catch(e=>{S.cloudOn=!!sbUser;save(false);const m=e.message||String(e);err.textContent=/provider is not enabled|Unsupported provider/i.test(m)?'El acceso con Google aún no está activado en el servidor. Mientras tanto usa el enlace por email.':m;err.hidden=false});return}
+    case 'cl-link':{const email=$('#cl-e').value.trim(),err=$('#cl-err');if(!/^\S+@\S+\.\S+$/.test(email)){err.textContent='Escribe tu email.';err.hidden=false;return}
+      S.cloudOn=true;save(false);
+      loadSB().then(()=>sb.auth.signInWithOtp({email,options:{emailRedirectTo:location.origin+location.pathname}})).then(r=>{if(r&&r.error)throw r.error;overlay=null;toast('📧 Te hemos enviado un enlace. Ábrelo en este dispositivo para entrar.');render()})
+      .catch(e=>{S.cloudOn=!!sbUser;save(false);const m=e.message||String(e);err.textContent=/rate|limit/i.test(m)?'Has pedido demasiados emails. Espera unos minutos.':m;err.hidden=false});return}
     case 'cl-forgot':{const email=$('#cl-e').value.trim(),err=$('#cl-err');if(!/^\S+@\S+\.\S+$/.test(email)){err.textContent='Escribe arriba tu email y vuelve a pulsar «¿Has olvidado la contraseña?».';err.hidden=false;return}
       loadSB().then(()=>sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname})).then(r=>{if(r&&r.error)throw r.error;overlay=null;toast('📧 Te hemos enviado un email para poner una contraseña nueva. Ábrelo en este dispositivo.');render()}).catch(e=>{err.textContent=/rate|limit/i.test(e.message||'')?'Has pedido demasiados emails. Espera unos minutos.':(e.message||String(e));err.hidden=false});return}
     case 'np-save':{const a=$('#np-1').value,b2=$('#np-2').value,err=$('#np-err');if(a.length<8){err.textContent='Mínimo 8 caracteres.';err.hidden=false;return}if(a!==b2){err.textContent='Las contraseñas no coinciden.';err.hidden=false;return}
@@ -1251,7 +1259,7 @@ function cloudCard(){
       :`<p class="muted">${!pushSupported&&isIOS&&!isStandalone()?'Para activarlos en iPhone: instala la app (Compartir › Añadir a pantalla de inicio), ábrela desde el icono y vuelve aquí.':'Recibe los avisos aunque tengas el iPhone bloqueado o la app cerrada.'}</p><button class="btn" data-act="push-on">🔔 Activar avisos push</button>`}
      <p class="muted" style="font-size:11.5px">Se programan las próximas 72 h cada vez que abres o cambias algo. Si pasas más de 3 días sin abrir la app, ábrela para renovarlos.</p></div>
     <button style="color:var(--fg3);font-size:13px;text-align:left" data-act="cl-out">Cerrar sesión</button>`
-  :`<p class="muted">Crea una cuenta para no perder nunca tus datos, usarlos en varios dispositivos y recibir avisos con el móvil bloqueado.</p><button class="btn" data-act="cl-open">☁️ Crear cuenta o entrar</button>`}</div>`;
+  :`<p class="muted">Entra con tu cuenta de Google para no perder nunca tus datos y ver lo mismo en el móvil y en el ordenador. Sin contraseñas.</p><button class="btn" data-act="cl-open">☁️ Entrar con Google</button>`}</div>`;
 }
 function backupCard(){
   return `<div class="card stack"><span class="over">Copia de seguridad</span><p class="muted">Descarga un archivo con todos tus datos o restaura uno anterior.${S.lastBackup?` Última copia: ${new Date(S.lastBackup).toLocaleDateString('es-ES')}.`:''}</p>
@@ -1423,7 +1431,12 @@ function boot(){
   const s=sess();if(s&&!overlay&&Date.now()>s.plannedEnd+30*60e3)overlay={type:'recover'};
   maybeRituals();
   save(false);render();
-  if(/type=recovery|access_token|[?&]code=/.test(location.hash+location.search))loadSB().catch(()=>{});
+  if(/type=recovery|access_token|error_description|[?&]code=/.test(location.hash+location.search))loadSB().then(async()=>{
+    const q=new URLSearchParams((location.hash||'').slice(1)+'&'+location.search.slice(1));
+    if(q.get('error_description')){toast('No se pudo entrar: '+q.get('error_description').replace(/\+/g,' '));history.replaceState(null,'',location.pathname);return}
+    if(!sbUser){const {data}=await sb.auth.getSession();sbUser=data.session?.user||null}
+    if(sbUser&&!/type=recovery/.test(location.hash)){S.cloudOn=true;save(false);history.replaceState(null,'',location.pathname);toast('✅ Sesión iniciada. Sincronizando…');await cloudPull();render()}
+  }).catch(()=>{});
   if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay||tab==='settings')render()})}).catch(e=>{cloud={status:'error',msg:cloudErr(e),last:cloud.last}});
 }
 S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
