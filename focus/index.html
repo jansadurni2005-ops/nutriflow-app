@@ -716,7 +716,7 @@ function overlayView(){
     <label class="f" for="cl-e">Email<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@email.com"></label>
     <label class="f" for="cl-p">Contraseña (mín. 8 caracteres)<input id="cl-p" type="password" autocomplete="current-password"></label>
     <p id="cl-err" class="muted" style="color:var(--bad)" hidden></p>
-    <button class="btn" data-act="cl-in">Entrar</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
+    <button class="btn" data-act="cl-in">Entrar</button><button style="color:var(--accent);font-size:13.5px;font-weight:600" data-act="cl-forgot">¿Has olvidado la contraseña?</button><button class="btn2 acc" data-act="cl-up">Crear cuenta nueva</button>
     <p class="muted" style="font-size:11.5px">Al entrar por primera vez se suben los datos de este móvil. Si ya tenías datos en la nube, se usa la versión más reciente y se guarda una copia local de la otra.</p>`;
   if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
   if(o.type==='bdone'){const [b]=findBlock(o.id);const plan=Math.round((b.end-b.start)/60e3);body=`<span class="over" style="color:var(--ok)">✓ Marcar como hecho</span><b style="font-size:19px">${esc(b.title)}</b><p class="muted">¿Cuánto tiempo le has dedicado? Se cuenta como trabajo efectivo y el bloque deja de estar pendiente.</p>
@@ -724,6 +724,10 @@ function overlayView(){
     <label class="f" for="bd-m">Otro (minutos)<input id="bd-m" type="number" inputmode="numeric" min="1" max="600" placeholder="p. ej. 50"></label>
     <button class="btn" data-act="bdone-custom" data-id="${b.id}">Guardar</button>`}
   if(o.type==='postpone')body=postponeSheet(o.id,o.k);
+  if(o.type==='newpass')body=`<span class="over acc">🔑 Nueva contraseña</span><p class="muted">Escribe tu nueva contraseña (mínimo 8 caracteres). La usarás para entrar en el móvil y en el ordenador.</p>
+    <label class="f" for="np-1">Nueva contraseña<input id="np-1" type="password" autocomplete="new-password"></label>
+    <label class="f" for="np-2">Repítela<input id="np-2" type="password" autocomplete="new-password"></label>
+    <p id="np-err" class="muted" style="color:var(--bad)" hidden></p><button class="btn" data-act="np-save">Guardar contraseña</button>`;
   if(o.type==='wipe')body=`<span class="over" style="color:var(--bad)">Borrar todos los datos</span><p class="muted">Se eliminarán tus bloques, rutina y estadísticas de este dispositivo. No se puede deshacer.</p><button class="btn" style="background:var(--bad)" data-act="wipe-yes">Borrar definitivamente</button>`;
   if(o.type==='review'){const r=score(dayKey(Date.now())),day=ensureDay(dayKey(Date.now()));const pend=day.blocks.filter(b=>(b.status==='missed'||b.status==='pending')&&b.kind!=='rest');
     const tips=[];const delays=day.blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/1e3));if(delays.length){const a=delays.reduce((x,y)=>x+y,0)/delays.length;tips.push(a>300?`Empezaste con ${dur(a)} de retraso medio. Deja preparado el primer bloque la noche anterior.`:`Puntualidad sólida: retraso medio de ${dur(a)}.`)}
@@ -966,6 +970,10 @@ document.addEventListener('click',e=>{
     case 'rituals':S.rituals=S.rituals===false;save();break;
     case 'cl-open':overlay={type:'cloud'};break;
     case 'cl-in':cloudAuth(false);return;
+    case 'cl-forgot':{const email=$('#cl-e').value.trim(),err=$('#cl-err');if(!/^\S+@\S+\.\S+$/.test(email)){err.textContent='Escribe arriba tu email y vuelve a pulsar «¿Has olvidado la contraseña?».';err.hidden=false;return}
+      loadSB().then(()=>sb.auth.resetPasswordForEmail(email,{redirectTo:location.origin+location.pathname})).then(r=>{if(r&&r.error)throw r.error;overlay=null;toast('📧 Te hemos enviado un email para poner una contraseña nueva. Ábrelo en este dispositivo.');render()}).catch(e=>{err.textContent=/rate|limit/i.test(e.message||'')?'Has pedido demasiados emails. Espera unos minutos.':(e.message||String(e));err.hidden=false});return}
+    case 'np-save':{const a=$('#np-1').value,b2=$('#np-2').value,err=$('#np-err');if(a.length<8){err.textContent='Mínimo 8 caracteres.';err.hidden=false;return}if(a!==b2){err.textContent='Las contraseñas no coinciden.';err.hidden=false;return}
+      sb.auth.updateUser({password:a}).then(({data,error})=>{if(error)throw error;sbUser=data.user;S.cloudOn=true;save(false);overlay=null;history.replaceState(null,'',location.pathname);toast('✅ Contraseña cambiada. Sincronizando…');render();return cloudPull().then(()=>render())}).catch(e=>{err.textContent=e.message||String(e);err.hidden=false});return}
     case 'cl-up':cloudAuth(true);return;
     case 'cl-out':cloudSignOut();return;
     case 'cl-sync':cloud.status='sync';render();cloudPull().then(()=>{toast(cloud.status==='error'?'⚠ '+cloud.msg:'☁️ Sincronizado');render()});return;
@@ -1053,7 +1061,7 @@ function loadSB(){
     const go=async()=>{try{
       sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,storageKey:'focusos-auth'}});
       const {data}=await sb.auth.getSession();sbUser=data.session?.user||null;
-      sb.auth.onAuthStateChange((_e,ses)=>{sbUser=ses?.user||null});
+      sb.auth.onAuthStateChange((ev,ses)=>{sbUser=ses?.user||null;if(ev==='PASSWORD_RECOVERY'){overlay={type:'newpass'};render()}});
       res(sb)}catch(e){rej(e)}};
     if(window.supabase)return go();
     const s=document.createElement('script');s.src='https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js';
@@ -1365,6 +1373,7 @@ function boot(){
   const s=sess();if(s&&!overlay&&Date.now()>s.plannedEnd+30*60e3)overlay={type:'recover'};
   maybeRituals();
   save(false);render();
+  if(/type=recovery|access_token|[?&]code=/.test(location.hash+location.search))loadSB().catch(()=>{});
   if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay||tab==='settings')render()})}).catch(e=>{cloud={status:'error',msg:cloudErr(e),last:cloud.last}});
 }
 S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
