@@ -304,7 +304,7 @@ function streaks(){
 }
 
 /* ───────────────────────── Vistas ───────────────────────── */
-let tab='home',deep=false,overlay=null,period='week',schedDay=dayKey(Date.now()),anaDay=dayKey(Date.now()),drag=null;
+let homeTaskDay=null,tab='home',deep=false,overlay=null,period='week',schedDay=dayKey(Date.now()),anaDay=dayKey(Date.now()),drag=null;
 const TABS=[['home','◉','HOME'],['schedule','▤','SCHEDULE'],['focus','◎','FOCUS'],['analytics','▮▮','ANALYTICS'],['settings','⚙','SETTINGS']];
 const PXH=96; // píxeles por hora en el calendario
 /* Reparte en columnas los bloques que coinciden en el tiempo (solo los que se solapan de verdad). */
@@ -373,6 +373,8 @@ function home(){
   const tl=day.blocks.length?(()=>{const f=day.blocks[0].start,t=Math.max(...day.blocks.map(b=>b.end))-f;return day.blocks.map(b=>`<i style="position:absolute;left:${(b.start-f)/t*100}%;width:calc(${(b.end-b.start)/t*100}% - 2px);height:6px;border-radius:3px;background:#${b.color};opacity:${b.status==='completed'?1:b.status==='missed'?.2:.45}"></i>`).join('')})():'';
   return `<div class="head"><div><div class="over acc">${new Date().toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}</div><div class="h1">${h<13?'Buenos días':h<20?'Buenas tardes':'Buenas noches'}</div></div><div class="row" style="gap:8px"><button class="round" data-act="inbox" aria-label="Bandeja de entrada" style="background:var(--card);position:relative;font-size:17px">📥${S.inbox.length?`<span style="position:absolute;top:-4px;right:-4px;background:var(--accent);color:#000;border-radius:99px;font-size:10px;font-weight:800;min-width:17px;height:17px;display:grid;place-items:center">${S.inbox.length}</span>`:''}</button><button class="round acc" data-act="new" aria-label="Nuevo bloque">+</button></div></div>
   ${installCard()}
+  ${!S.cloudOn?`<button class="card between" data-act="cl-open" style="text-align:left"><span><span class="over acc">☁️ Tu cuenta</span><div style="font-weight:700;font-size:15.5px;margin-top:4px">Inicia sesión para ver lo mismo en el móvil y en el ordenador</div><div class="muted" style="font-size:12.5px">Tus datos se guardan y sincronizan solos</div></span><span style="font-size:20px;color:var(--accent)">›</span></button>`:''}
+  ${leftoversCard()}
   ${weekFocusLine()}
   ${!(S.plans[k]||{}).planned?`<button class="card between" data-act="morning" style="border-color:rgba(255,101,0,.4);text-align:left"><span><span class="over acc">☀️ Plan del día</span><div style="font-weight:700;font-size:16px;margin-top:4px">Elige tus 3 prioridades</div><div class="muted" style="font-size:12.5px">2 minutos · revisa lo pendiente de ayer</div></span><span style="font-size:20px;color:var(--accent)">›</span></button>`:''}
   <div class="card stack"><div class="between"><span class="over">Efectividad</span><span class="chip ${r.conf==='Datos completos'?'ok':r.sc==null?'':'warn'}">${r.conf}</span></div>
@@ -380,18 +382,67 @@ function home(){
   <div class="grid2"><div class="tile"><span class="over" style="color:var(--accent)">⚡ Efectivo</span><div class="v">${dur(r.eff)}</div></div><div class="tile"><span class="over" style="color:var(--info)">Planificado</span><div class="v">${dur(r.planned)}</div></div><div class="tile"><span class="over" style="color:var(--bad)">Distracciones</span><div class="v">${dur(r.dis)}</div><div class="f">registro manual</div></div><div class="tile"><span class="over" style="color:var(--warn)">Restante</span><div class="v">${dur(r.remaining)}</div><div class="f">hasta fin de jornada</div></div></div>
   <div class="between muted"><span>✓ ${r.done}/${r.total} bloques completados</span><span style="font-size:12px;color:var(--fg3)">${r.deepDone}/${S.goals.deepBlocks} profundo</span></div></div>
   ${current}
-  ${tasksCard(k)}
+  ${tasksCard(homeTaskDay&&homeTaskDay!==k?homeTaskDay:k,true)}
   ${day.blocks.length?`<div class="card stack"><div class="between"><span class="over">Estado del día</span><span class="num" style="font-size:19px">${pct(r.prog)}</span></div><div class="bar" style="height:10px"><b style="width:${r.prog*100}%"></b></div><div style="position:relative;height:6px">${tl}</div><div class="between" style="font-size:11px;color:var(--fg3)"><span>${hhmm(day.blocks[0].start)}</span><span>${hhmm(Math.max(...day.blocks.map(b=>b.end)))}</span></div></div>`:''}
   ${todoCard(k)}`;
 }
 function dayLabel(k){const t=dayKey(Date.now());if(k===t)return 'hoy';if(k===addDays(t,1))return 'mañana';if(k===addDays(t,-1))return 'ayer';return keyToDate(k).toLocaleDateString('es-ES',{weekday:'long',day:'numeric',month:'short'})}
 function taskItem(t,k){
-  const n=Date.now(),late=!t.done&&((t.time&&n>=atMin(k,t2m(t.time)))||k<dayKey(n));
+  const n=Date.now(),late=!t.done&&!t.postponedTo&&((t.time&&n>=atMin(k,t2m(t.time)))||k<dayKey(n));
   return `<div class="row" style="gap:12px;padding:4px 0">
     <button data-tcheck="${t.id}" data-tk="${k}" aria-label="${t.done?'Desmarcar':'Completar'} ${esc(t.title)}" style="width:28px;height:28px;border-radius:9px;flex:none;display:grid;place-items:center;font-weight:800;${t.done?'background:var(--accent);color:#000':'border:2px solid '+(late?'var(--bad)':'var(--fg3)')}">${t.done?'✓':''}</button>
-    <button data-tedit="${t.id}" data-tk="${k}" style="flex:1;min-width:0;text-align:left"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${t.done?'color:var(--fg3);text-decoration:line-through':''}">${esc(t.title)}</div>${t.time||t.tplId||late||t.top||t.blockId?`<div style="font-size:11.5px;color:${late?'var(--bad)':t.top?'var(--accent)':'var(--fg3)'}">${[t.top?'★ prioridad':'',late?'Vencida':'',t.time?(late?t.time:'Antes de las '+t.time):'',t.blockId?'▦ '+((ensureDay(k).blocks.find(b=>b.id===t.blockId)||{}).title||'bloque'):'',t.tplId?'↻ se repite':'📅 solo este día'].filter(Boolean).join(' · ')}</div>`:''}</button></div>`;
+    <button data-tedit="${t.id}" data-tk="${k}" style="flex:1;min-width:0;text-align:left"><div style="font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;${t.done?'color:var(--fg3);text-decoration:line-through':''}">${esc(t.title)}</div>${t.time||t.tplId||late||t.top||t.blockId||t.postponedTo||t.postponedFrom?`<div style="font-size:11.5px;color:${late?'var(--bad)':t.top?'var(--accent)':'var(--fg3)'}">${[t.postponedTo?`↪ aplazada a ${dayLabel(t.postponedTo)}`:'',t.postponedFrom?`↩ venía de ${dayLabel(t.postponedFrom)}`:'',t.top?'★ prioridad':'',late?'Vencida':'',t.time?(late?t.time:'Antes de las '+t.time):'',t.blockId?'▦ '+((ensureDay(k).blocks.find(b=>b.id===t.blockId)||{}).title||'bloque'):'',t.tplId?'↻ se repite':'📅 solo este día'].filter(Boolean).join(' · ')}</div>`:''}</button>${!t.done&&!t.postponedTo?`<button class="chip" data-act="postpone" data-id="${t.id}" data-k="${k}" aria-label="Aplazar ${esc(t.title)}" style="flex:none">↪</button>`:''}</div>`;
 }
 /* Tarjeta de tareas de un día (HOME usa hoy; SCHEDULE el día elegido). */
+/* Mueve una tarea a otro día. Si era de un día pasado, allí queda como «aplazada» (historial honesto). */
+function moveTaskTo(id,k,target){
+  const today=dayKey(Date.now());if(target<today)target=today;
+  const d=S.days[k],t=d&&(d.tasks||[]).find(x=>x.id===id);if(!t)return;
+  const nd=ensureDay(target);nd.tasks=nd.tasks||[];
+  nd.tasks.push({id:uid(),tplId:null,title:t.title,time:t.time||'',done:false,doneAt:null,postponedFrom:k});
+  if(k<today){t.handled=true;t.postponedTo=target}
+  else{d.tasks=d.tasks.filter(x=>x.id!==id);if(t.tplId)(d.skipTpl=d.skipTpl||[]).push(t.tplId)}
+  sortTasks(nd);save();toast(`↪ «${t.title}» aplazada a ${dayLabel(target)}`);
+}
+function nextMonday(){const t=dayKey(Date.now()),wd=new Date().getDay();return addDays(t,((8-wd)%7)||7)}
+function postponeSheet(id,k){
+  const t=dayTasks(k).find(x=>x.id===id);if(!t)return '<p class="muted">Tarea no encontrada.</p>';
+  const today=dayKey(Date.now()),opts=[];
+  if(k<today)opts.push([today,'Hoy']);
+  opts.push([addDays(today,1),'Mañana'],[addDays(today,2),keyToDate(addDays(today,2)).toLocaleDateString('es-ES',{weekday:'long'})],[nextMonday(),'El lunes']);
+  const seen=new Set();
+  return `<span class="over acc">↪ Aplazar tarea</span><b style="font-size:19px">${esc(t.title)}</b><p class="muted" style="font-size:12.5px">Era para ${dayLabel(k)}. ¿Cuándo la haces?</p>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">${opts.filter(([d])=>!seen.has(d)&&seen.add(d)).map(([d,l])=>`<button class="btn2 ${d===addDays(today,1)?'acc':''}" data-act="pp-to" data-id="${id}" data-k="${k}" data-t="${d}">${l.charAt(0).toUpperCase()+l.slice(1)}</button>`).join('')}</div>
+  <label class="f" for="pp-date">Otro día<input id="pp-date" type="date" min="${today}" value="${addDays(today,1)}"></label>
+  <button class="btn" data-act="pp-date" data-id="${id}" data-k="${k}">Aplazar a esa fecha</button>
+  <button class="btn2" data-act="pp-inbox" data-id="${id}" data-k="${k}">📥 A la bandeja (sin fecha)</button>`;
+}
+/* Bloques de días anteriores que no hiciste. */
+function pastBlocks(){
+  const today=dayKey(Date.now()),out=[];
+  for(let i=1;i<=7;i++){const k=addDays(today,-i);for(const b of (S.days[k]||{blocks:[]}).blocks)if(b.kind!=='rest'&&(b.status==='missed'||b.status==='pending')&&!b.handled)out.push([k,b])}
+  return out;
+}
+function moveBlockTo(id,k,target){
+  const d=S.days[k],b=d&&d.blocks.find(x=>x.id===id);if(!b)return;
+  const nd=ensureDay(target),st=atMin(target,minOf(b.start));
+  nd.blocks.push({...b,id:uid(),tplId:null,start:st,end:st+(b.end-b.start),status:'pending',actualStart:null,actualEnd:null,worked:0,distraction:0,paused:0,flex:false,handled:false});
+  nd.blocks.sort((a,c)=>a.start-c.start);b.handled=true;b.status=b.status==='completed'?'completed':'missed';
+  const last=nd.blocks[nd.blocks.length-1];settle(target,nd.blocks.find(x=>x.start===st&&x.title===b.title).id);
+  save();toast(`↪ Bloque «${b.title}» pasado a ${dayLabel(target)}`);
+}
+function leftoversCard(){
+  const lt=leftovers(),lb=pastBlocks();if(!lt.length&&!lb.length)return '';
+  const today=dayKey(Date.now()),tom=addDays(today,1);
+  const rowT=([k,t])=>`<div class="stack" style="gap:6px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--stroke)"><span style="min-width:0"><div style="font-weight:600">☐ ${esc(t.title)}</div><div style="font-size:11.5px;color:var(--warn)">tarea de ${dayLabel(k)}</div></span>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip acc" data-act="pp-to" data-id="${t.id}" data-k="${k}" data-t="${today}">Hoy</button><button class="chip" data-act="pp-to" data-id="${t.id}" data-k="${k}" data-t="${tom}">Mañana</button><button class="chip" data-act="postpone" data-id="${t.id}" data-k="${k}" aria-label="Otro día">📅</button><button class="chip ok" data-act="lo-done" data-id="${t.id}" data-k="${k}" aria-label="Ya la hice">✓</button><button class="chip" data-act="lo-drop" data-id="${t.id}" data-k="${k}" aria-label="Descartar">✕</button></div></div>`;
+  const rowB=([k,b])=>`<div class="stack" style="gap:6px;font-size:14px;padding:6px 0;border-bottom:1px solid var(--stroke)"><span class="row" style="gap:8px;min-width:0"><span style="width:4px;height:30px;border-radius:2px;background:#${b.color};flex:none"></span><span style="min-width:0"><div style="font-weight:600">${esc(b.title)}</div><div style="font-size:11.5px;color:var(--warn)">bloque de ${dayLabel(k)} · ${hhmm(b.start)}</div></span></span>
+    <div class="row" style="gap:6px;flex-wrap:wrap"><button class="chip acc" data-act="pb-to" data-id="${b.id}" data-k="${k}" data-t="${today}">Hoy</button><button class="chip" data-act="pb-to" data-id="${b.id}" data-k="${k}" data-t="${tom}">Mañana</button><button class="chip" data-act="pb-drop" data-id="${b.id}" data-k="${k}" aria-label="Descartar">✕</button></div></div>`;
+  return `<div class="card stack" style="gap:6px;border-color:rgba(255,176,32,.35)"><div class="between"><span class="over" style="color:var(--warn)">Pendiente de días anteriores</span><span class="num" style="font-size:18px">${lt.length+lb.length}</span></div>
+   <p class="muted" style="font-size:12.5px">Lo que no hiciste. Aplázalo a hoy, a mañana o a otro día, márcalo como hecho o descártalo.</p>
+   ${lt.map(rowT).join('')}${lb.map(rowB).join('')}
+   ${lt.length+lb.length>1?`<button style="color:var(--accent);font-size:13px;font-weight:600;text-align:left" data-act="lo-all-today">Pasar todo a hoy</button>`:''}</div>`;
+}
 function todoCard(k){
   const day=ensureDay(k),n=Date.now(),list=pendingBlocks(k).sort((a,b)=>a.start-b.start);
   const work=day.blocks.filter(b=>b.kind!=='rest'),done=work.filter(b=>b.status==='completed').length;
@@ -408,11 +459,12 @@ function todoCard(k){
      :'<p class="muted">✅ Todos los bloques de hoy hechos.</p>'}
    <button style="color:var(--accent);font-size:13px;font-weight:600;text-align:left" data-tab="schedule">Ver agenda ›</button></div>`;
 }
-function tasksCard(k){
+function tasksCard(k,nav){
   const list=dayTasks(k),done=list.filter(t=>t.done).length,isToday=k===dayKey(Date.now()),past=k<dayKey(Date.now());
   const upcoming=isToday?upcomingTasks():[];
-  return `<div class="card stack" id="tasks"><div class="between"><span class="over">Tareas de ${dayLabel(k)}</span><span class="num" style="font-size:19px;color:${list.length&&done===list.length?'var(--ok)':'var(--fg)'}">${done}/${list.length}</span></div>
+  return `<div class="card stack" id="tasks"><div class="between"><span class="row" style="gap:6px">${nav?`<button class="chip" data-act="tv-prev" aria-label="Día anterior">‹</button>`:''}<span class="over">Tareas de ${dayLabel(k)}</span>${nav?`<button class="chip" data-act="tv-next" aria-label="Día siguiente">›</button>${k!==dayKey(Date.now())?'<button class="chip acc" data-act="tv-today">Hoy</button>':''}`:''}</span><span class="num" style="font-size:19px;color:${list.length&&done===list.length?'var(--ok)':'var(--fg)'}">${done}/${list.length}</span></div>
   ${list.length?`<div class="bar" style="height:6px"><b style="width:${done/list.length*100}%;${done===list.length?'background:var(--ok)':''}"></b></div><div class="stack" style="gap:2px">${list.map(t=>taskItem(t,k)).join('')}</div>`:`<p class="muted">${past?'No había tareas este día.':isToday?'Añade lo que tienes que hacer hoy sí o sí.':'Sin tareas para este día. Añade las que tengas que hacer ese día.'}</p>`}
+  ${past&&list.some(t=>!t.done&&!t.postponedTo)?`<button class="btn2 acc" data-act="pp-all" data-k="${k}">↪ Aplazar las ${list.filter(t=>!t.done&&!t.postponedTo).length} pendientes a hoy</button>`:''}
   ${past?'':`<div class="row"><input id="t-new" data-tk="${k}" placeholder="Añadir tarea para ${dayLabel(k)}…" aria-label="Nueva tarea" enterkeyhint="done"><button class="round acc" data-act="tadd" data-tk="${k}" aria-label="Añadir tarea" style="width:46px;height:46px">+</button></div>
   <div class="row" style="gap:16px;flex-wrap:wrap"><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewday" data-tk="${k}">📅 Tarea para otro día</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="tnewdaily" data-tk="${k}">↻ Tarea que se repite</button><button style="color:var(--accent);font-size:13px;font-weight:600" data-act="inbox">📥 Bandeja${S.inbox.length?` (${S.inbox.length})`:''}</button></div>`}
   ${isToday?(()=>{const td=keyToDate(k),mon=addDays(k,-((td.getDay()+6)%7)),w=taskPct(taskRange(mon,7)),st=taskStreak();return w.due||st.best?`<button class="between" data-tab="analytics" style="background:var(--card2);border-radius:14px;padding:10px 12px;font-size:12.5px;text-align:left"><span>Semana: <b style="color:${pctColor(w.pct)}">${w.pct==null?'—':Math.round(w.pct*100)+'%'}</b> cumplido (${w.done}/${w.due})</span><span>🔥 ${st.cur} día${st.cur===1?'':'s'} ›</span></button>`:''})():''}
@@ -671,6 +723,7 @@ function overlayView(){
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${[...new Set([plan,15,30,45,60,90])].filter(m=>m>0).slice(0,6).map(m=>`<button class="btn2 ${m===plan?'acc':''}" data-act="bdone-min" data-id="${b.id}" data-m="${m}">${m===plan?'Lo planificado · ':''}${dur(m*60)}</button>`).join('')}</div>
     <label class="f" for="bd-m">Otro (minutos)<input id="bd-m" type="number" inputmode="numeric" min="1" max="600" placeholder="p. ej. 50"></label>
     <button class="btn" data-act="bdone-custom" data-id="${b.id}">Guardar</button>`}
+  if(o.type==='postpone')body=postponeSheet(o.id,o.k);
   if(o.type==='wipe')body=`<span class="over" style="color:var(--bad)">Borrar todos los datos</span><p class="muted">Se eliminarán tus bloques, rutina y estadísticas de este dispositivo. No se puede deshacer.</p><button class="btn" style="background:var(--bad)" data-act="wipe-yes">Borrar definitivamente</button>`;
   if(o.type==='review'){const r=score(dayKey(Date.now())),day=ensureDay(dayKey(Date.now()));const pend=day.blocks.filter(b=>(b.status==='missed'||b.status==='pending')&&b.kind!=='rest');
     const tips=[];const delays=day.blocks.filter(b=>b.actualStart).map(b=>Math.max(0,(b.actualStart-b.start)/1e3));if(delays.length){const a=delays.reduce((x,y)=>x+y,0)/delays.length;tips.push(a>300?`Empezaste con ${dur(a)} de retraso medio. Deja preparado el primer bloque la noche anterior.`:`Puntualidad sólida: retraso medio de ${dur(a)}.`)}
@@ -874,6 +927,18 @@ document.addEventListener('click',e=>{
     case 'resetw':S.weights={c:40,a:25,t:25,p:10};save();break;
     case 'notif':Notification.requestPermission().then(()=>render());return;
     case 'csv':exportCSV();return;
+    case 'postpone':overlay={type:'postpone',id:d.id,k:d.k};break;
+    case 'pp-to':overlay=null;moveTaskTo(d.id,d.k,d.t);break;
+    case 'pp-date':{const v=$('#pp-date').value;if(!v)return;overlay=null;moveTaskTo(d.id,d.k,v);break}
+    case 'pp-inbox':{const dd=S.days[d.k],t=dd&&dd.tasks.find(x=>x.id===d.id);if(t){addToInbox(t.title);if(d.k<dayKey(Date.now())){t.handled=true;t.postponedTo='bandeja'}else dd.tasks=dd.tasks.filter(x=>x.id!==t.id);save();toast('📥 Enviada a la bandeja')}overlay=null;break}
+    case 'pp-all':{const k0=d.k,today=dayKey(Date.now());dayTasks(k0).filter(t=>!t.done&&!t.postponedTo).forEach(t=>moveTaskTo(t.id,k0,today));toast('↪ Pendientes pasadas a hoy');break}
+    case 'lo-done':{const dd=S.days[d.k],t=dd&&dd.tasks.find(x=>x.id===d.id);if(t){t.done=true;t.doneAt=Date.now();t.handled=true;save();toast('✓ Marcada como hecha')}break}
+    case 'lo-all-today':{const today=dayKey(Date.now());leftovers().forEach(([k0,t])=>moveTaskTo(t.id,k0,today));pastBlocks().forEach(([k0,b])=>moveBlockTo(b.id,k0,today));toast('↪ Todo lo pendiente pasado a hoy');break}
+    case 'pb-to':moveBlockTo(d.id,d.k,d.t);break;
+    case 'pb-drop':{const [b]=findBlock(d.id);if(b){b.handled=true;save()}break}
+    case 'tv-prev':homeTaskDay=addDays(homeTaskDay||dayKey(Date.now()),-1);break;
+    case 'tv-next':homeTaskDay=addDays(homeTaskDay||dayKey(Date.now()),1);break;
+    case 'tv-today':homeTaskDay=null;break;
     case 'bdone':overlay={type:'bdone',id:d.id};break;
     case 'bdone-min':overlay=null;markBlockDone(d.id,+d.m);break;
     case 'bdone-custom':{const m=+($('#bd-m')?.value||0);if(!m){$('#bd-m').focus();return}overlay=null;markBlockDone(d.id,m);break}
@@ -882,9 +947,9 @@ document.addEventListener('click',e=>{
     case 'mp-save':saveMorning();return;
     case 'mp-skip':plan(dayKey(Date.now())).skipped=true;save();overlay=null;break;
     case 'plan-go-sched':plan(dayKey(Date.now())).planned=true;save();overlay=null;tab='schedule';schedDay=dayKey(Date.now());break;
-    case 'lo-today':moveLeftover(d.id,d.k,'today');overlay={type:'morning'};break;
-    case 'lo-inbox':moveLeftover(d.id,d.k,'inbox');overlay={type:'morning'};break;
-    case 'lo-drop':moveLeftover(d.id,d.k,'drop');overlay={type:'morning'};break;
+    case 'lo-today':moveLeftover(d.id,d.k,'today');overlay=overlay&&overlay.type==='morning'?{type:'morning'}:null;break;
+    case 'lo-inbox':moveLeftover(d.id,d.k,'inbox');overlay=overlay&&overlay.type==='morning'?{type:'morning'}:null;break;
+    case 'lo-drop':moveLeftover(d.id,d.k,'drop');overlay=overlay&&overlay.type==='morning'?{type:'morning'}:null;break;
     case 'lo-all':leftovers().forEach(([dk,t])=>moveLeftover(t.id,dk,'today'));toast('Pendientes pasados a hoy');overlay={type:'morning'};break;
     case 'rv-close':{const k=dayKey(Date.now());Object.assign(plan(k),{closed:true,closedAt:Date.now(),note:($('#rv-note')?.value||'').trim()});save();overlay=null;toast('🌙 Día cerrado. ¡Buen descanso!');break}
     case 't-inbox':{const k=dayKey(Date.now()),dd=S.days[k],t=dd&&dd.tasks.find(x=>x.id===d.id);if(t){addToInbox(t.title);dd.tasks=dd.tasks.filter(x=>x.id!==t.id);save();toast('Enviada a la bandeja')}overlay={type:'review'};break}
@@ -970,6 +1035,7 @@ setInterval(()=>{
   {const nl=$('#nowline'),tl=$('#tl');if(nl&&tl){const top=(Date.now()-(+tl.dataset.origin))*PXH/3600e3;nl.style.top=top+'px';const pz=$('#pastzone');if(pz)pz.style.height=top+'px'}
    const hm=hhmm(Date.now());document.querySelectorAll('[data-live=now]').forEach(x=>{if(x.textContent!==hm)x.textContent=hm})}
   if(ticks%10===0)checkAlerts();
+  if(ticks%60===0&&sbUser&&!cloudTimer&&document.visibilityState==='visible'&&!overlay&&!drag)cloudPull();
   if(ticks%15===0&&!overlay&&!drag&&!['INPUT','SELECT'].includes(document.activeElement?.tagName)){markMissed();render()}
 },1000);
 
@@ -994,7 +1060,7 @@ function loadSB(){
     s.onload=go;s.onerror=()=>rej(new Error('Sin conexión: no se pudo cargar la nube.'));document.head.appendChild(s);
   });
 }
-function scheduleCloud(){if(!sbUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(cloudPush,1500)}
+function scheduleCloud(){if(!sbUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush()},1500)}
 async function cloudPush(){
   if(!sbUser)return;cloud.status='sync';
   try{
@@ -1015,10 +1081,13 @@ async function cloudPull(){
     if(error)throw error;
     if(!data){await cloudPush();return}
     const remote=+data.client_updated_at||0,local=+S.updatedAt||0;
-    if(remote>local){
+    // Primera vez en este dispositivo: manda la nube (así el ordenador carga lo del móvil y no al revés).
+    const firstTime=!S.syncedAt;
+    if(remote>local||(firstTime&&remote>0)){
       try{localStorage.setItem(KEY+'-antes-de-sincronizar',JSON.stringify(S))}catch(e){}
-      S=normalizeState(data.data);S.updatedAt=remote;S.syncedAt=remote;save(false);
-      if(remote-local>5000)toast('☁️ Datos actualizados desde otro dispositivo');render();
+      const keep={pushOn:S.pushOn,cloudOn:true};
+      S=normalizeState(data.data);Object.assign(S,keep);S.updatedAt=remote;S.syncedAt=remote;save(false);
+      if(firstTime)toast('☁️ Tus datos se han cargado desde tu cuenta');else if(remote-local>5000)toast('☁️ Actualizado con los cambios de tu otro dispositivo');render();
       if(S.pushOn)await pushAlerts();
     }else if(local>remote)await cloudPush();
     else if(S.pushOn)await pushAlerts();
@@ -1151,9 +1220,9 @@ function normalizeState(x){
 
 /* ═════════════════════ 4  RITUALES: PLAN DE LA MAÑANA Y CIERRE DE LA NOCHE ═════════════════════ */
 const plan=k=>(S.plans[k]=S.plans[k]||{});
-function leftovers(){ // tareas de un día sin hacer de los últimos 3 días
+function leftovers(){ // tareas de un día sin hacer de los últimos 7 días
   const today=dayKey(Date.now()),out=[];
-  for(let i=1;i<=3;i++){const k=addDays(today,-i);for(const t of dayTasks(k))if(!t.done&&!t.tplId&&!t.handled)out.push([k,t])}
+  for(let i=1;i<=7;i++){const k=addDays(today,-i);for(const t of dayTasks(k))if(!t.done&&!t.tplId&&!t.handled)out.push([k,t])}
   return out;
 }
 function morningSheet(){
