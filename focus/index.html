@@ -762,13 +762,17 @@ function overlayView(){
   if(o.type==='inbox')body=inboxSheet();
   if(o.type==='pickblock')body=pickBlockSheet(o.id);
   if(o.type==='weekly')body=weeklySheet(o.k);
-  if(o.type==='cloud')body=`<span class="over acc">☁️ Entra en FOCUS OS</span><p class="muted">Sin contraseñas: entra con tu cuenta de Google. Tus datos se guardan en la nube (solo tú puedes verlos) y verás lo mismo en el móvil y en el ordenador.</p>
-    <button class="btn2" data-act="cl-google" style="background:#fff;color:#1f1f1f;border:0;display:flex;align-items:center;justify-content:center;gap:10px;font-weight:700;padding:15px"><svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>Continuar con Google</button>
+  if(o.type==='cloud')body=`<span class="over acc">☁️ Entra en FOCUS OS</span><p class="muted">Tu Gmail y un PIN de 4 cifras. Lo pones una vez en cada dispositivo y ya no te lo vuelve a pedir.</p>
+    <label class="f" for="cl-e">Gmail<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@gmail.com" value="${esc(o.email||'')}"></label>
+    <label class="f" for="cl-pin">PIN (4 cifras)<input id="cl-pin" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" autocomplete="current-password" placeholder="••••" style="letter-spacing:.5em;font-size:22px;text-align:center"></label>
+    ${o.create?`<label class="f" for="cl-pin2">Repite el PIN para crear tu cuenta<input id="cl-pin2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" style="letter-spacing:.5em;font-size:22px;text-align:center"></label>`:''}
     <p id="cl-err" class="muted" style="color:var(--bad)" hidden></p>
-    <div class="row" style="gap:10px;color:var(--fg3);font-size:12px"><span style="flex:1;height:1px;background:var(--stroke)"></span>o recibe un enlace por email<span style="flex:1;height:1px;background:var(--stroke)"></span></div>
-    <label class="f" for="cl-e">Email<input id="cl-e" type="email" autocomplete="email" inputmode="email" placeholder="tu@gmail.com"></label>
-    <button class="btn2 acc" data-act="cl-link">📧 Enviarme el enlace para entrar</button>
-    <p class="muted" style="font-size:11.5px">Si ya tienes datos en tu cuenta, se cargan en este dispositivo (lo que hubiera aquí se guarda como copia local). Si la cuenta está vacía, se suben los datos de este dispositivo.</p>`;
+    <button class="btn" data-act="${o.create?'pin-create':'pin-in'}">${o.create?'Crear cuenta y entrar':'Entrar'}</button>
+    <p class="muted" style="font-size:11.5px">Si ya tienes datos en tu cuenta, se cargan en este dispositivo. Si es una cuenta nueva, se suben los datos de este dispositivo.</p>`;
+  if(o.type==='setpin')body=`<span class="over acc">🔑 Tu PIN</span><p class="muted">Elige un PIN de 4 cifras. Con tu Gmail y este PIN entrarás en el móvil y en el ordenador.</p>
+    <label class="f" for="sp-1">PIN nuevo<input id="sp-1" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" style="letter-spacing:.5em;font-size:22px;text-align:center"></label>
+    <label class="f" for="sp-2">Repítelo<input id="sp-2" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="4" placeholder="••••" style="letter-spacing:.5em;font-size:22px;text-align:center"></label>
+    <p id="sp-err" class="muted" style="color:var(--bad)" hidden></p><button class="btn" data-act="sp-save">Guardar PIN</button>`;
   if(o.type==='restore')body=`<span class="over acc">Restaurar copia</span><p class="muted">Copia${o.exportedAt?` del ${new Date(o.exportedAt).toLocaleString('es-ES')}`:''} con ${o.days} días de datos. Sustituirá todo lo que hay ahora en este dispositivo${sbUser?' y en la nube':''}.</p><button class="btn" data-act="bk-apply">Restaurar</button>`;
   if(o.type==='bdone'){const [b]=findBlock(o.id);const plan=Math.round((b.end-b.start)/60e3);body=`<span class="over" style="color:var(--ok)">✓ Marcar como hecho</span><b style="font-size:19px">${esc(b.title)}</b><p class="muted">¿Cuánto tiempo le has dedicado? Se cuenta como trabajo efectivo y el bloque deja de estar pendiente.</p>
     <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:8px">${[...new Set([plan,15,30,45,60,90])].filter(m=>m>0).slice(0,6).map(m=>`<button class="btn2 ${m===plan?'acc':''}" data-act="bdone-min" data-id="${b.id}" data-m="${m}">${m===plan?'Lo planificado · ':''}${dur(m*60)}</button>`).join('')}</div>
@@ -1021,6 +1025,10 @@ document.addEventListener('click',e=>{
     case 'rituals':S.rituals=S.rituals===false;save();break;
     case 'cl-open':overlay={type:'cloud'};break;
     case 'cl-in':cloudAuth(false);return;
+    case 'pin-in':pinLogin(false);return;
+    case 'pin-create':pinLogin(true);return;
+    case 'setpin':overlay={type:'setpin'};break;
+    case 'sp-save':savePin();return;
     case 'cl-google':{const err=$('#cl-err');err.hidden=true;S.cloudOn=true;save(false);
       loadSB().then(()=>sb.auth.signInWithOAuth({provider:'google',options:{redirectTo:location.origin+location.pathname,queryParams:{prompt:'select_account'}}})).then(r=>{if(r&&r.error)throw r.error})
       .catch(e=>{S.cloudOn=!!sbUser;save(false);const m=e.message||String(e);err.textContent=/provider is not enabled|Unsupported provider/i.test(m)?'El acceso con Google aún no está activado en el servidor. Mientras tanto usa el enlace por email.':m;err.hidden=false});return}
@@ -1067,7 +1075,7 @@ document.addEventListener('input',e=>{
   const t=e.target;
   if(t.dataset.w||t.dataset.g){if(t.dataset.w)S.weights[t.dataset.w]=+t.value;else S.goals[t.dataset.g]=+t.value;save();const y=window.scrollY,id=t.id;render();window.scrollTo(0,y);document.getElementById(id)?.focus()}
 });
-document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='t-new'){e.preventDefault();$('[data-act=tadd]').click()}if(e.target.id==='ib-new'){e.preventDefault();$('[data-act=ib-add]').click()}if(e.target.id==='cl-p'){e.preventDefault();$('[data-act=cl-in]').click()}});
+document.addEventListener('keydown',e=>{if(e.key!=='Enter')return;if(e.target.id==='t-new'){e.preventDefault();$('[data-act=tadd]').click()}if(e.target.id==='ib-new'){e.preventDefault();$('[data-act=ib-add]').click()}if(e.target.id==='cl-p'){e.preventDefault();$('[data-act=cl-in]').click()}if(e.target.id==='cl-pin'||e.target.id==='cl-pin2'){e.preventDefault();($('[data-act=pin-in]')||$('[data-act=pin-create]')).click()}if(e.target.id==='sp-2'){e.preventDefault();$('[data-act=sp-save]').click()}});
 document.addEventListener('change',e=>{if(e.target.id==='bk-file'&&e.target.files[0]){readBackup(e.target.files[0]);e.target.value='';return}if(e.target.id==='ana-d'&&e.target.value){anaDay=e.target.value;render()}
   if(e.target.id==='al-s'){S.alarm.sound=e.target.value;save();unlockAudio();chime()}
   if(e.target.id==='al-v'){S.alarm.volume=+e.target.value;save();const y=window.scrollY;render();window.scrollTo(0,y);chime()}});
@@ -1179,6 +1187,37 @@ async function cloudAuth(create){
     fail(/invalid login/i.test(m)?'Email o contraseña incorrectos.':/already registered/i.test(m)?'Ese email ya tiene cuenta: pulsa «Entrar».':/confirm/i.test(m)?'Confirma primero tu email (revisa tu correo).':m);
   }
 }
+const pinPass=(email,pin)=>'FocusOS#'+pin+'#'+email.trim().toLowerCase();
+const validPin=p=>/^\d{4}$/.test(p);
+async function pinLogin(create){
+  const email=$('#cl-e').value.trim().toLowerCase(),pin=$('#cl-pin').value.trim(),err=$('#cl-err');
+  const fail=m=>{err.textContent=m;err.hidden=false};
+  if(!/^\S+@\S+\.\S+$/.test(email))return fail('Escribe tu Gmail.');
+  if(!validPin(pin))return fail('El PIN son 4 números.');
+  if(create&&$('#cl-pin2').value.trim()!==pin)return fail('Los dos PIN no coinciden.');
+  try{
+    await loadSB();
+    if(!create){
+      const {data,error}=await sb.auth.signInWithPassword({email,password:pinPass(email,pin)});
+      if(error){if(/invalid login/i.test(error.message)){overlay={type:'cloud',create:true,email};render();setTimeout(()=>{$('#cl-pin').value=pin;$('#cl-pin2')?.focus();const e2=$('#cl-err');e2.textContent='No hay ninguna cuenta con este Gmail y PIN. Si es tu primera vez, repite el PIN para crearla. Si ya tenías cuenta, revisa el PIN.';e2.hidden=false;e2.style.color='var(--warn)'},30);return}throw error}
+      sbUser=data.user;
+    }else{
+      const {data,error}=await sb.auth.signUp({email,password:pinPass(email,pin)});
+      if(error){if(/already registered|already exists/i.test(error.message))return fail('Ese Gmail ya tiene cuenta y el PIN no es correcto. Si aún no le has puesto PIN, ábrela en el dispositivo donde ya tienes sesión y ve a Settings › Cuenta › «Crear / cambiar PIN».');throw error}
+      if(!data.session)return fail('Revisa tu correo para confirmar la cuenta y vuelve a entrar.');
+      sbUser=data.user;
+    }
+    S.cloudOn=true;save(false);overlay=null;toast(create?'✅ Cuenta creada. Sincronizando…':'☁️ Dentro. Sincronizando…');render();
+    await cloudPull();if(cloud.status==='error')toast('Has entrado, pero la sincronización falló: '+cloud.msg);render();
+  }catch(e){fail(cloudErr(e))}
+}
+async function savePin(){
+  const a=$('#sp-1').value.trim(),b=$('#sp-2').value.trim(),err=$('#sp-err');
+  const fail=m=>{err.textContent=m;err.hidden=false};
+  if(!validPin(a))return fail('El PIN son 4 números.');if(a!==b)return fail('Los dos PIN no coinciden.');
+  try{await loadSB();const {error}=await sb.auth.updateUser({password:pinPass(sbUser.email,a)});if(error)throw error;
+    S.hasPin=true;save(false);overlay=null;toast('🔑 PIN guardado. Ya puedes entrar en otros dispositivos con tu Gmail y este PIN.');render()}catch(e){fail(cloudErr(e))}
+}
 async function cloudSignOut(){
   try{await disablePush();await sb?.auth.signOut()}catch(e){}
   sbUser=null;S.cloudOn=false;S.pushOn=false;save(false);toast('Sesión cerrada. Tus datos siguen en este dispositivo.');render();
@@ -1253,13 +1292,14 @@ function cloudCard(){
   return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este dispositivo</span>'}</div>
   ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago} min`:''}.</p>
     ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12.5px">⚠ ${esc(cloud.msg)}</p>`:''}
+    <button class="btn2 acc" data-act="setpin">🔑 ${S.hasPin?'Cambiar PIN':'Crear / cambiar PIN'}</button>
     <button class="btn2 ${cloud.status==='error'?'acc':''}" data-act="cl-sync">${cloud.status==='error'?'↻ Reintentar sincronización':'↻ Sincronizar ahora'}</button>
     <div class="stack" style="gap:8px;border-top:1px solid var(--stroke);padding-top:12px"><span class="over">Avisos con el móvil bloqueado</span>
      ${S.pushOn?`<p class="muted">✅ Activados en este dispositivo. Te llegarán los avisos de bloques, tareas con hora, fin de sesión y rituales aunque la app esté cerrada.</p><div class="grid2"><button class="btn2 acc" data-act="push-test">🔔 Probar</button><button class="btn2" data-act="push-off">Desactivar</button></div>`
       :`<p class="muted">${!pushSupported&&isIOS&&!isStandalone()?'Para activarlos en iPhone: instala la app (Compartir › Añadir a pantalla de inicio), ábrela desde el icono y vuelve aquí.':'Recibe los avisos aunque tengas el iPhone bloqueado o la app cerrada.'}</p><button class="btn" data-act="push-on">🔔 Activar avisos push</button>`}
      <p class="muted" style="font-size:11.5px">Se programan las próximas 72 h cada vez que abres o cambias algo. Si pasas más de 3 días sin abrir la app, ábrela para renovarlos.</p></div>
     <button style="color:var(--fg3);font-size:13px;text-align:left" data-act="cl-out">Cerrar sesión</button>`
-  :`<p class="muted">Entra con tu cuenta de Google para no perder nunca tus datos y ver lo mismo en el móvil y en el ordenador. Sin contraseñas.</p><button class="btn" data-act="cl-open">☁️ Entrar con Google</button>`}</div>`;
+  :`<p class="muted">Entra con tu Gmail y un PIN de 4 cifras para no perder nunca tus datos y ver lo mismo en el móvil y en el ordenador.</p><button class="btn" data-act="cl-open">☁️ Entrar con Gmail y PIN</button>`}</div>`;
 }
 function backupCard(){
   return `<div class="card stack"><span class="over">Copia de seguridad</span><p class="muted">Descarga un archivo con todos tus datos o restaura uno anterior.${S.lastBackup?` Última copia: ${new Date(S.lastBackup).toLocaleDateString('es-ES')}.`:''}</p>
