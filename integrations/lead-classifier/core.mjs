@@ -75,7 +75,7 @@ export async function classify(input, {infer, processingApproved=false}={}) {
   } catch { return unknown('uncertain'); } // Never log conversation/provider bodies.
 }
 export const FIELD_TYPES = Object.freeze({
-  'SN Interés':'text', 'SN Motivo':'text', 'SN Confianza':'number',
+  'SN Interés':'text', 'SN Motivo':'text', 'SN Evidencia':'text', 'SN Confianza':'number',
   'SN Revisar':'boolean', 'SN Clasificado':'datetime',
   ...Object.fromEntries(FLAGS.map(f=>[`SN ${f}`,'boolean']))
 });
@@ -85,7 +85,8 @@ export function fieldUpdate(subscriberId, result, at=new Date().toISOString()) {
   // evidence IDs, without exposing conversation text to the metadata writer.
   result=validateResult(result,result.evidence_ids.map(id=>({id,role:'athlete'})));
   const values={'SN Interés':result.interest_level,'SN Motivo':result.reason_code,
-    'SN Confianza':result.confidence,'SN Revisar':result.needs_human_review,'SN Clasificado':at,
+    'SN Evidencia':result.evidence_ids.slice(-1).join(''),'SN Confianza':result.confidence,
+    'SN Revisar':result.needs_human_review,'SN Clasificado':new Date(at).toISOString().replace(/\.\d{3}Z$/,'+00:00'),
     ...Object.fromEntries(FLAGS.map(f=>[`SN ${f}`,result.additional_tags.includes(f)]))};
   return {subscriber_id:subscriberId,fields:Object.entries(values).map(([field_name,field_value])=>({field_name,field_value}))};
 }
