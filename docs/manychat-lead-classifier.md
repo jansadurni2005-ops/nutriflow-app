@@ -1,6 +1,8 @@
 # Clasificación comercial de Manychat — preparación y auditoría, 18/11/2026
 
-## Estado real
+> **Actualización del piloto local:** la auditoría de abajo es la foto inicial. El [código actual, instrucciones de uso y límites](../integrations/lead-classifier/README.md) y los [resultados de inferencia real](../integrations/lead-classifier/resultados.md) la actualizan. No se ha activado en la bandeja de producción.
+
+## Estado en la primera auditoría
 
 Código de preparación, NO sistema instalado. No se ha cambiado Manychat, ni sus
 etiquetas/campos/filtros, ni bienvenida/protocolo/Default Reply, ni se ha procesado

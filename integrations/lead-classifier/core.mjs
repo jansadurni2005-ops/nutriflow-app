@@ -89,30 +89,9 @@ export function fieldUpdate(subscriberId, result, at=new Date().toISOString()) {
     ...Object.fromEntries(FLAGS.map(f=>[`SN ${f}`,result.additional_tags.includes(f)]))};
   return {subscriber_id:subscriberId,fields:Object.entries(values).map(([field_name,field_value])=>({field_name,field_value}))};
 }
-// A deliberately narrow official API writer. Not connected to any event source.
-// Fields must first be inspected/created; use a serialized server-side worker per
-// contact and reject stale revisions before calling this function.
-function validField(name,value) {
-  if (name==='SN Interés') return LEVELS.includes(value);
-  if (name==='SN Motivo') return REASONS.includes(value);
-  if (name==='SN Confianza') return Number.isFinite(value) && value>=0 && value<=1;
-  if (name==='SN Clasificado') return typeof value==='string' && Number.isFinite(Date.parse(value));
-  return FIELD_TYPES[name]==='boolean' && typeof value==='boolean';
-}
-export async function writeFields(payload,{token,fetchImpl=fetch,live=false,gates={}}={}) {
-  if (!live) return {mode:'dry_run',payload};
-  if (!gates.unreadTestPassed || !gates.approvedPilot || !gates.noContactEnforcementVerified || !gates.sideEffectsAudited || !gates.latestRevisionVerified) throw Error('pilot_not_approved');
-  if (typeof token !== 'string' || token.length<20) throw Error('missing_manychat_key');
-  // Rebuild payload to reject arbitrary fields and injected API parameters.
-  const allowed=Object.keys(FIELD_TYPES);
-  if (!Number.isSafeInteger(payload.subscriber_id) || payload.subscriber_id<=0 || !Array.isArray(payload.fields) || payload.fields.length!==allowed.length || new Set(payload.fields.map(f=>f.field_name)).size!==allowed.length || payload.fields.some(f=>!allowed.includes(f.field_name) || !validField(f.field_name,f.field_value))) throw Error('invalid_fields');
-  const safe={subscriber_id:payload.subscriber_id,fields:payload.fields.map(({field_name,field_value})=>({field_name,field_value}))};
-  const response=await fetchImpl('https://api.manychat.com/fb/subscriber/setCustomFields',{
-    method:'POST',redirect:'error',headers:{Authorization:`Bearer ${token}`,'Content-Type':'application/json'},
-    body:JSON.stringify(safe),signal:AbortSignal.timeout(10000)
-  });
-  if (!response.ok) throw Error(`manychat_http_${response.status}`);
-  const data=await response.json();
-  if (data.status!=='success') throw Error('manychat_rejected');
-  return {mode:'live',updated:true};
+// Compatibility interface for the original draft. All writes now pass through the
+// identity-checked single-tester path in pilot.mjs. There is no generic live writer.
+export async function writeFields(payload,{live=false}={}) {
+  if(live)throw Error('pilot_not_approved');
+  return {mode:'dry_run',payload};
 }
