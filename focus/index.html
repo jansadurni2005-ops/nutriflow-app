@@ -230,7 +230,7 @@ function ensureDay(k){
   const day={blocks:[],sessions:[]};
   if(k>=today&&S.template){
     const wd=keyToDate(k).getDay();
-    S.template.filter(t=>t.days.includes(wd)).forEach(t=>day.blocks.push(newBlock(k,t)));
+    S.template.filter(t=>t.days.includes(wd)).forEach(t=>{const nb=newBlock(k,t);if(t.id)nb.id='a'+k.replace(/-/g,'')+t.id;day.blocks.push(nb)});
     day.blocks.sort((a,b)=>a.start-b.start);
   }
   if(k>=today){S.days[k]=day;syncTasks(k)}
@@ -240,7 +240,7 @@ function ensureDay(k){
 function syncTasks(k){
   const d=S.days[k];if(!d||k<dayKey(Date.now()))return;d.tasks=d.tasks||[];
   const wd=keyToDate(k).getDay();
-  for(const t of S.taskTpl||[])if(t.days.includes(wd)&&!d.tasks.some(x=>x.tplId===t.id)&&!(d.skipTpl||[]).includes(t.id))d.tasks.push({id:uid(),tplId:t.id,title:t.title,time:t.time||'',done:false,doneAt:null});
+  for(const t of S.taskTpl||[])if(t.days.includes(wd)&&!d.tasks.some(x=>x.tplId===t.id)&&!(d.skipTpl||[]).includes(t.id))d.tasks.push({id:'a'+k.replace(/-/g,'')+t.id,tplId:t.id,title:t.title,time:t.time||'',done:false,doneAt:null});
   sortTasks(d);
 }
 function sortTasks(d){d.tasks.sort((a,b)=>(a.done-b.done)||((b.top?1:0)-(a.top?1:0))||((a.topOrder??9)-(b.topOrder??9))||((a.time||'99')<(b.time||'99')?-1:(a.time||'99')>(b.time||'99')?1:0))}
@@ -294,7 +294,7 @@ function finish(reason='completed',silent=false,at){
   const f=sFocused(s,n);
   if(s.blockId){const [b]=findBlock(s.blockId);if(b){b.worked+=f;b.distraction+=s.distraction;b.paused+=s.paused;b.actualEnd=n;
     const p=(b.end-b.start)/1e3;b.status=reason==='completed'?'completed':reason==='interrupted'?(b.worked>=p*.5?'completed':'missed'):(b.worked>=p*.8?'completed':(b.end>n?'pending':'missed'))}}
-  else ensureDay(s.day).sessions.push({title:s.title,kind:s.kind,focused:f,distraction:s.distraction,paused:s.paused,start:s.startedAt,end:n});
+  else ensureDay(s.day).sessions.push({id:uid(),title:s.title,kind:s.kind,focused:f,distraction:s.distraction,paused:s.paused,start:s.startedAt,end:n});
   S.session=null;deep=false;releaseWake();save();
   if(!silent){vibrate([20,60,20]);overlay={type:'summary',title:s.title,f,d:s.distraction,p:s.paused+s.rest,c:(f+s.distraction+s.paused)>=60?f/(f+s.distraction+s.paused):null}}
   render();
@@ -927,6 +927,8 @@ function checkAlerts(){
 let wake=null;
 async function requestWake(){try{wake=await navigator.wakeLock?.request('screen')}catch(e){}}
 function releaseWake(){try{wake?.release()}catch(e){}wake=null}
+window.addEventListener('online',()=>{if(sbUser)cloudSync()});
+window.addEventListener('focus',()=>{if(sbUser&&!overlay)cloudSync()});
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'){if(deep&&sess())requestWake();boot()}});
 
 /* ───────────────────────── Render y eventos ───────────────────────── */
@@ -1109,7 +1111,7 @@ setInterval(()=>{
   {const nl=$('#nowline'),tl=$('#tl');if(nl&&tl){const top=(Date.now()-(+tl.dataset.origin))*PXH/3600e3;nl.style.top=top+'px';const pz=$('#pastzone');if(pz)pz.style.height=top+'px'}
    const hm=hhmm(Date.now());document.querySelectorAll('[data-live=now]').forEach(x=>{if(x.textContent!==hm)x.textContent=hm})}
   if(ticks%10===0)checkAlerts();
-  if(ticks%60===0&&sbUser&&!cloudTimer&&document.visibilityState==='visible'&&!overlay&&!drag)cloudPull();
+  if(ticks%15===0&&sbUser&&!cloudTimer&&document.visibilityState==='visible'&&(!overlay||overlay.type==='cloud')&&!drag)cloudPull();
   if(ticks%15===0&&!overlay&&!drag&&!['INPUT','SELECT'].includes(document.activeElement?.tagName)){markMissed();render()}
 },1000);
 
@@ -1134,40 +1136,98 @@ function loadSB(){
     s.onload=go;s.onerror=()=>rej(new Error('Sin conexión: no se pudo cargar la nube.'));document.head.appendChild(s);
   });
 }
-function scheduleCloud(){if(!sbUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudPush()},1500)}
-async function cloudPush(){
-  if(!sbUser)return;cloud.status='sync';
+function scheduleCloud(){if(!sbUser)return;clearTimeout(cloudTimer);cloudTimer=setTimeout(()=>{cloudTimer=null;cloudSync()},1200)}
+/* Sincronización por fusión: cada dispositivo guarda la última versión común («base»). Al sincronizar se
+   combinan los cambios de los dos lados campo a campo (bloques, tareas, días… por id), así lo que haces en el
+   móvil y lo que haces en el ordenador se suman en vez de pisarse. Solo si los dos cambian exactamente lo
+   mismo gana el cambio más reciente. Las escrituras son condicionales: si otro dispositivo escribió justo a la
+   vez, se vuelve a leer y a fusionar. */
+const LOCAL_ONLY=['updatedAt','syncedAt','pushOn','cloudOn','syncRev'];
+const BASE_KEY=KEY+'-base';
+const stable=v=>v===undefined?undefined:JSON.stringify(v,(k,x)=>x&&typeof x==='object'&&!Array.isArray(x)?Object.keys(x).sort().reduce((o,kk)=>(o[kk]=x[kk],o),{}):x);
+const same=(a,b)=>stable(a)===stable(b);
+const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const syncData=x=>{const c=JSON.parse(JSON.stringify(x||{}));LOCAL_ONLY.forEach(k=>delete c[k]);return c};
+function merge3(b,l,r,preferR){
+  if(same(l,r))return l;
+  if(b!==undefined&&same(b,l))return r;
+  if(b!==undefined&&same(b,r))return l;
+  if(l===undefined)return r;               // borrado en un lado y cambiado en el otro: se conserva el cambio
+  if(r===undefined)return l;
+  if(isObj(l)&&isObj(r)){const bo=isObj(b)?b:undefined,out={};
+    for(const k of new Set([...Object.keys(l),...Object.keys(r)])){const v=merge3(bo?bo[k]:undefined,l[k],r[k],preferR);if(v!==undefined)out[k]=v}
+    return out}
+  if(Array.isArray(l)&&Array.isArray(r)&&l.length+r.length>0&&[...l,...r].every(isObj)){
+    const key=o=>o.id!=null?'i'+o.id:'j'+stable(o),toMap=a=>new Map((Array.isArray(a)?a:[]).filter(isObj).map(o=>[key(o),o]));
+    const bm=toMap(b),lm=toMap(l),rm=toMap(r),out=[];
+    for(const k of new Set([...lm.keys(),...rm.keys()])){const v=merge3(bm.get(k),lm.get(k),rm.get(k),preferR);if(v!==undefined)out.push(v)}
+    return out}
+  return preferR?r:l;
+}
+const loadBase=()=>{try{const t=localStorage.getItem(BASE_KEY+'-'+sbUser.id);return t?JSON.parse(t):undefined}catch(e){return undefined}};
+const saveBase=x=>{try{localStorage.setItem(BASE_KEY+'-'+sbUser.id,JSON.stringify(x))}catch(e){}};
+let syncing=null,syncAgain=false;
+function cloudSync(){
+  if(!sbUser)return Promise.resolve();
+  if(syncing){syncAgain=true;return syncing}
+  syncing=(async()=>{
+    do{syncAgain=false;await syncOnce()}while(syncAgain&&sbUser);
+  })().finally(()=>{syncing=null});
+  return syncing;
+}
+async function syncOnce(){
+  cloud.status='sync';
   try{
-    const {error}=await sb.from('focus_state').upsert({user_id:sbUser.id,data:S,client_updated_at:S.updatedAt||Date.now(),device:navigator.userAgent.slice(0,100),updated_at:new Date().toISOString()});
-    if(error)throw error;
-    S.syncedAt=S.updatedAt;save(false);cloud={status:'ok',msg:'',last:Date.now()};
-    if(S.pushOn)await pushAlerts();
+    for(let attempt=0;attempt<4;attempt++){
+      const snap=syncData(S);
+      const {data:row,error}=await sb.from('focus_state').select('data,client_updated_at').eq('user_id',sbUser.id).maybeSingle();
+      if(error)throw error;
+      let merged,rev=Date.now(),applied=false;
+      if(!row){
+        merged=normalizeState(snap);
+        const {error:e2}=await sb.from('focus_state').insert({user_id:sbUser.id,data:merged,client_updated_at:rev,device:navigator.userAgent.slice(0,100),updated_at:new Date().toISOString()});
+        if(e2){if(/duplicate|23505|conflict/i.test(e2.message||e2.code||''))continue;throw e2}
+      }else{
+        const rv=+row.client_updated_at||0,remote=syncData(normalizeState(row.data));
+        const base=loadBase();
+        if(base===undefined){
+          // Primera vez en este dispositivo con esta cuenta: manda la plantilla y ajustes de la cuenta, y los
+          // bloques/tareas automáticos que este dispositivo generó solo (sin tocar) se descartan para no duplicar.
+          for(const f of ['template','taskTpl','weights','goals','alarm'])if(remote[f]!=null)snap[f]=JSON.parse(JSON.stringify(remote[f]));
+          for(const k in snap.days){if(!remote.days[k])continue;const d=snap.days[k];
+            d.blocks=(d.blocks||[]).filter(b=>!(b.tplId&&b.status==='pending'&&!b.actualStart&&!b.worked));
+            if(d.tasks)d.tasks=d.tasks.filter(t=>!(t.tplId&&!t.done))}
+        }
+        merged=syncData(normalizeState(merge3(base,snap,remote,rv>(+S.updatedAt||0))));
+        if(!same(merged,remote)){
+          const {data:upd,error:e3}=await sb.from('focus_state').update({data:merged,client_updated_at:rev,device:navigator.userAgent.slice(0,100),updated_at:new Date().toISOString()}).eq('user_id',sbUser.id).eq('client_updated_at',rv).select('user_id');
+          if(e3)throw e3;
+          if(!upd||!upd.length)continue;     // otro dispositivo escribió justo ahora: leer y fusionar otra vez
+        }else rev=rv;
+        applied=!same(merged,snap);
+      }
+      saveBase(merged);
+      // Si mientras tanto has tocado algo aquí, se conserva encima de lo fusionado.
+      const now=syncData(S),fin=same(now,snap)?merged:merge3(snap,now,merged,false);
+      const keep={};LOCAL_ONLY.forEach(k=>keep[k]=S[k]);
+      if(!same(fin,now)){
+        try{if(!loadBase())localStorage.setItem(KEY+'-antes-de-sincronizar',JSON.stringify(S))}catch(e){}
+        S=normalizeState(JSON.parse(JSON.stringify(fin)));Object.assign(S,keep);
+      }
+      S.cloudOn=true;S.syncRev=rev;S.syncedAt=Date.now();if(!same(fin,merged))syncAgain=true;
+      save(false);cloud={status:'ok',msg:'',last:Date.now()};
+      if(applied){if(!overlay&&!drag&&!['INPUT','SELECT','TEXTAREA'].includes(document.activeElement?.tagName))render();if(S.pushOn)await pushAlerts()}
+      else if(!row||rev!==+row.client_updated_at){if(S.pushOn)await pushAlerts()}
+      return;
+    }
+    throw new Error('Demasiados cambios a la vez. Vuelve a intentarlo.');
   }catch(e){cloud={status:'error',msg:cloudErr(e),last:cloud.last}}
 }
+const cloudPush=()=>cloudSync(),cloudPull=()=>cloudSync();
 function cloudErr(e){const m=(e&&(e.message||e.code))||String(e);
   if(/schema cache|does not exist|PGRST20|404/i.test(m))return 'El servidor de sincronización aún no está instalado. Pulsa «Reintentar» en unos minutos.';
   if(/fetch|network|Failed|offline/i.test(m))return 'Sin conexión con el servidor. Comprueba tu internet y pulsa «Reintentar».';
   return m}
-async function cloudPull(){
-  if(!sbUser)return;
-  try{
-    const {data,error}=await sb.from('focus_state').select('data,client_updated_at').eq('user_id',sbUser.id).maybeSingle();
-    if(error)throw error;
-    if(!data){await cloudPush();return}
-    const remote=+data.client_updated_at||0,local=+S.updatedAt||0;
-    // Primera vez en este dispositivo: manda la nube (así el ordenador carga lo del móvil y no al revés).
-    const firstTime=!S.syncedAt;
-    if(remote>local||(firstTime&&remote>0)){
-      try{localStorage.setItem(KEY+'-antes-de-sincronizar',JSON.stringify(S))}catch(e){}
-      const keep={pushOn:S.pushOn,cloudOn:true};
-      S=normalizeState(data.data);Object.assign(S,keep);S.updatedAt=remote;S.syncedAt=remote;save(false);
-      if(firstTime)toast('☁️ Tus datos se han cargado desde tu cuenta');else if(remote-local>5000)toast('☁️ Actualizado con los cambios de tu otro dispositivo');render();
-      if(S.pushOn)await pushAlerts();
-    }else if(local>remote)await cloudPush();
-    else if(S.pushOn)await pushAlerts();
-    cloud={status:'ok',msg:'',last:Date.now()};
-  }catch(e){cloud={status:'error',msg:cloudErr(e),last:cloud.last}}
-}
 async function cloudAuth(create){
   const email=$('#cl-e').value.trim(),pass=$('#cl-p').value,err=$('#cl-err');
   const fail=m=>{err.textContent=m;err.hidden=false};
@@ -1287,10 +1347,10 @@ async function pushAlerts(){
   if(error)cloud={status:'error',msg:'Avisos: '+error.message,last:cloud.last};
 }
 function cloudCard(){
-  const on=!!sbUser,ago=cloud.last?Math.max(0,Math.round((Date.now()-cloud.last)/60e3)):null;
+  const on=!!sbUser,secs=cloud.last?Math.max(0,Math.round((Date.now()-cloud.last)/1e3)):null,ago=secs==null?null:secs<60?'unos segundos':Math.round(secs/60)+' min';
   const pushSupported='PushManager' in window&&'serviceWorker' in navigator;
   return `<div class="card stack"><div class="between"><span class="over">Cuenta y nube</span>${on?`<span class="chip ${cloud.status==='error'?'warn':'ok'}">${cloud.status==='error'?'⚠ Error':cloud.status==='sync'?'Sincronizando…':'☁️ Sincronizado'}</span>`:'<span class="chip">Solo en este dispositivo</span>'}</div>
-  ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago} min`:''}.</p>
+  ${on?`<p class="muted">Conectado como <b>${esc(sbUser.email)}</b>. Tus datos se guardan en la nube y en este dispositivo${ago!=null?` · última sincronización hace ${ago}`:''}.</p>
     ${cloud.status==='error'?`<p class="muted" style="color:var(--warn);font-size:12.5px">⚠ ${esc(cloud.msg)}</p>`:''}
     <button class="btn2 acc" data-act="setpin">🔑 ${S.hasPin?'Cambiar PIN':'Crear / cambiar PIN'}</button>
     <button class="btn2 ${cloud.status==='error'?'acc':''}" data-act="cl-sync">${cloud.status==='error'?'↻ Reintentar sincronización':'↻ Sincronizar ahora'}</button>
@@ -1321,6 +1381,21 @@ function normalizeState(x){
   x.goals=Object.assign({weekHours:35,target:90,deepBlocks:4,maxDistraction:30},x.goals||{});
   x.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},x.alarm||{});
   x.inbox=x.inbox||[];x.plans=x.plans||{};x.weekly=x.weekly||{};x.taskTpl=x.taskTpl||[];
+  // Si dos dispositivos generaron el mismo bloque/tarea automática del mismo día, quedarse con uno (siempre el mismo en ambos).
+  const rank={completed:4,inprogress:3,missed:2,pending:1};
+  for(const k in x.days){const d=x.days[k];if(!d)continue;d.blocks=d.blocks||[];d.sessions=d.sessions||[];
+    if(d.blocks.length>1){const seen=new Map();
+      const bk=b=>b.title+'|'+b.start+'|'+b.end;
+      for(const b of d.blocks){const key=bk(b),o=seen.get(key);
+        if(!o){seen.set(key,b);continue}
+        const better=((rank[b.status]||0)-(rank[o.status]||0))||((b.worked||0)-(o.worked||0))||(String(b.id)<String(o.id)?1:-1);
+        if(better>0){if(!(x.session&&x.session.blockId===o.id))seen.set(key,b)}}
+      d.blocks=d.blocks.filter(b=>seen.get(bk(b))===b||(x.session&&x.session.blockId===b.id));
+      d.blocks.sort((a,b)=>a.start-b.start)}
+    if(d.tasks&&d.tasks.length>1){const seen=new Map();
+      for(const t of d.tasks){if(!t.tplId)continue;const o=seen.get(t.tplId);
+        if(!o||(t.done&&!o.done)||(t.done===o.done&&String(t.id)<String(o.id)))seen.set(t.tplId,t)}
+      d.tasks=d.tasks.filter(t=>!t.tplId||seen.get(t.tplId)===t)}}
   return x;
 }
 
@@ -1477,7 +1552,7 @@ function boot(){
     if(!sbUser){const {data}=await sb.auth.getSession();sbUser=data.session?.user||null}
     if(sbUser&&!/type=recovery/.test(location.hash)){S.cloudOn=true;save(false);history.replaceState(null,'',location.pathname);toast('✅ Sesión iniciada. Sincronizando…');await cloudPull();render()}
   }).catch(()=>{});
-  if(S.cloudOn)loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay||tab==='settings')render()})}).catch(e=>{cloud={status:'error',msg:cloudErr(e),last:cloud.last}});
+  if(S.cloudOn||localStorage.getItem('focusos-auth'))loadSB().then(()=>{if(sbUser)return cloudPull().then(()=>{if(!overlay||tab==='settings')render()})}).catch(e=>{cloud={status:'error',msg:cloudErr(e),last:cloud.last}});
 }
 S.alarm=Object.assign({enabled:true,onEnd:true,onStart:true,sound:'pulse',volume:90},S.alarm||{});
 if(!S.onboarded){S.onboarded=true;if(!S.template){S.template=DEFAULT_TEMPLATE}}
