@@ -1,0 +1,194 @@
+[
+  {
+    "id": "es-precio",
+    "pair": "precio",
+    "lang": "es",
+    "conversation": [
+      [
+        "jan",
+        "Te cuento sobre mis asesorías si quieres."
+      ],
+      [
+        "athlete",
+        "Va, ¿a cuánto sale el seguimiento?"
+      ]
+    ],
+    "expected_level": "hot",
+    "expected_flags": []
+  },
+  {
+    "id": "ca-precio",
+    "pair": "precio",
+    "lang": "ca",
+    "conversation": [
+      [
+        "jan",
+        "Et puc explicar el meu assessorament si vols."
+      ],
+      [
+        "athlete",
+        "Va, a quant surt el seguiment?"
+      ]
+    ],
+    "expected_level": "hot",
+    "expected_flags": []
+  },
+  {
+    "id": "es-esperar",
+    "pair": "esperar",
+    "lang": "es",
+    "conversation": [
+      [
+        "athlete",
+        "Me gustaría hacerlo, pero este mes no me lo puedo permitir."
+      ]
+    ],
+    "expected_level": "warm",
+    "expected_flags": [
+      "price_objection"
+    ]
+  },
+  {
+    "id": "ca-esperar",
+    "pair": "esperar",
+    "lang": "ca",
+    "conversation": [
+      [
+        "athlete",
+        "M’agradaria fer-ho, però aquest mes no m’ho puc permetre."
+      ]
+    ],
+    "expected_level": "warm",
+    "expected_flags": [
+      "price_objection"
+    ]
+  },
+  {
+    "id": "es-no-mensajes",
+    "pair": "no-mensajes",
+    "lang": "es",
+    "conversation": [
+      [
+        "athlete",
+        "Bórrame de los mensajes comerciales, por favor."
+      ]
+    ],
+    "expected_level": "cold",
+    "expected_flags": [
+      "do_not_contact"
+    ]
+  },
+  {
+    "id": "ca-no-mensajes",
+    "pair": "no-mensajes",
+    "lang": "ca",
+    "conversation": [
+      [
+        "athlete",
+        "Treu-me dels missatges comercials, si us plau."
+      ]
+    ],
+    "expected_level": "cold",
+    "expected_flags": [
+      "do_not_contact"
+    ]
+  },
+  {
+    "id": "es-pauta",
+    "pair": "pauta",
+    "lang": "es",
+    "conversation": [
+      [
+        "jan",
+        "¿Te paso la lista gratuita para comprar antes de competir?"
+      ],
+      [
+        "athlete",
+        "Venga, pásamela."
+      ]
+    ],
+    "expected_level": "neutral",
+    "expected_flags": []
+  },
+  {
+    "id": "ca-pauta",
+    "pair": "pauta",
+    "lang": "ca",
+    "conversation": [
+      [
+        "jan",
+        "Et passo la llista de la compra gratuïta per abans de competir?"
+      ],
+      [
+        "athlete",
+        "Vinga, passa-me-la."
+      ]
+    ],
+    "expected_level": "neutral",
+    "expected_flags": []
+  },
+  {
+    "id": "es-reservada",
+    "pair": "reservada",
+    "lang": "es",
+    "conversation": [
+      [
+        "jan",
+        "¿Llegaste a reservar la videollamada?"
+      ],
+      [
+        "athlete",
+        "Hecho, el miércoles a las 19 h."
+      ]
+    ],
+    "expected_level": "hot",
+    "expected_flags": [
+      "call_scheduled"
+    ]
+  },
+  {
+    "id": "ca-reservada",
+    "pair": "reservada",
+    "lang": "ca",
+    "conversation": [
+      [
+        "jan",
+        "Has pogut reservar la videotrucada?"
+      ],
+      [
+        "athlete",
+        "Fet, dimecres a les 19 h."
+      ]
+    ],
+    "expected_level": "hot",
+    "expected_flags": [
+      "call_scheduled"
+    ]
+  },
+  {
+    "id": "es-sin-contexto",
+    "pair": "sin-contexto",
+    "lang": "es",
+    "conversation": [
+      [
+        "athlete",
+        "Perfecto"
+      ]
+    ],
+    "expected_level": "unknown",
+    "expected_flags": []
+  },
+  {
+    "id": "ca-sin-contexto",
+    "pair": "sin-contexto",
+    "lang": "ca",
+    "conversation": [
+      [
+        "athlete",
+        "Perfecte"
+      ]
+    ],
+    "expected_level": "unknown",
+    "expected_flags": []
+  }
+]

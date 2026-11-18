@@ -1,0 +1,18 @@
+[
+  {"id":"yes-call","conversation":[["jan","¿Te gustaría que lo habláramos en una llamada?"],["athlete","Sí, perfecto"]],"expected_level":"hot","expected_flags":["call_accepted"]},
+  {"id":"yes-resource","conversation":[["jan","¿Quieres que te envíe mi protocolo gratuito?"],["athlete","Sí, perfecto"]],"expected_level":"neutral","expected_flags":[]},
+  {"id":"yes-goal","conversation":[["jan","¿Te gustaría mejorar tu alimentación?"],["athlete","Sí, bastante"]],"expected_level":"warm","expected_flags":[]},
+  {"id":"service-how","conversation":[["jan","Ofrezco asesoramiento nutricional individualizado"],["athlete","Vale, ¿y cómo lo haces?"]],"expected_level":"hot","expected_flags":[]},
+  {"id":"recipe-how","conversation":[["jan","Te paso mi receta de tortitas"],["athlete","¿Y cómo lo haces?"]],"expected_level":"neutral","expected_flags":[]},
+  {"id":"nutritionist-interest","conversation":[["athlete","Tengo nutricionista, pero me gustaría saber cómo trabajas"]],"expected_level":"hot","expected_flags":["has_nutritionist"]},
+  {"id":"nutritionist-decline","conversation":[["athlete","Ya tengo nutricionista y estoy muy contento, no quiero cambiar"]],"expected_level":"cold","expected_flags":["has_nutritionist"]},
+  {"id":"budget","conversation":[["athlete","Ahora no puedo pagarlo, pero más adelante me gustaría"]],"expected_level":"warm","expected_flags":["price_objection"]},
+  {"id":"catalan-interest","conversation":[["athlete","M'ho hauria de comentar amb l'entrenador, però m'interessa"]],"expected_level":"warm","expected_flags":[]},
+  {"id":"catalan-price","conversation":[["jan","Faig assessorament nutricional individualitzat"],["athlete","Quant val i com funciona?"]],"expected_level":"hot","expected_flags":[]},
+  {"id":"catalan-stop","conversation":[["athlete","No em tornis a escriure"]],"expected_level":"cold","expected_flags":["do_not_contact"]},
+  {"id":"social","conversation":[["athlete","Corro 800 metres, entreno quatre dies"]],"expected_level":"neutral","expected_flags":[]},
+  {"id":"missing-context","conversation":[["athlete","Sí, perfecto"]],"expected_level":"unknown","expected_flags":[]},
+  {"id":"recent-rejection","conversation":[["athlete","Quiero empezar contigo"],["jan","¿Agendamos?"],["athlete","Lo he pensado mejor, no quiero contratar"]],"expected_level":"cold","expected_flags":[]},
+  {"id":"recent-interest","conversation":[["athlete","No sé si me interesa"],["jan","Cuando quieras"],["athlete","Lo he pensado, quiero saber cómo trabajas"]],"expected_level":"hot","expected_flags":[]},
+  {"id":"booked","conversation":[["jan","¿Agendamos?"],["athlete","Sí"],["jan","¿Ya tienes la reserva?"],["athlete","Sí, he reservado para el martes a las 10"]],"expected_level":"hot","expected_flags":["call_scheduled"]}
+]

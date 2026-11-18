@@ -1,0 +1,10 @@
+[
+ {"id":"ca-trucada","conversation":[["jan","Et va bé comentar-ho deu minuts per telèfon?"],["athlete","I tant, fem-ho!"]],"expected_level":"hot","expected_flags":["call_accepted"]},
+ {"id":"ca-regal","conversation":[["jan","Et passo gratis la fitxa de recuperació?"],["athlete","I tant, fem-ho!"]],"expected_level":"neutral","expected_flags":[]},
+ {"id":"es-registro","conversation":[["jan","El enlace es para descargar las recetas"],["athlete","¿Cómo me apunto para recibirlas?"]],"expected_level":"neutral","expected_flags":[]},
+ {"id":"es-plaza","conversation":[["athlete","¿Te queda hueco para llevarme la temporada de pista?"]],"expected_level":"hot","expected_flags":[]},
+ {"id":"ca-nutri","conversation":[["athlete","Ja em porta una dietista però em pots explicar què inclou el teu pla?"]],"expected_level":"hot","expected_flags":["has_nutritionist"]},
+ {"id":"es-baja","conversation":[["athlete","Prefiero que no me mandes más propuestas, gracias."]],"expected_level":"cold","expected_flags":["do_not_contact"]},
+ {"id":"ca-goal","conversation":[["athlete","M'aniria bé aprendre a menjar millor abans de les sèries."]],"expected_level":"warm","expected_flags":[]},
+ {"id":"short","conversation":[["athlete","Eso mismo"]],"expected_level":"unknown","expected_flags":[]}
+]
