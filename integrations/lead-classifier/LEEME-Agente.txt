@@ -1,0 +1,9 @@
+Agente de Instagram de Sadurní Nutrition para Windows
+
+1. Extrae todo el ZIP. Abre Activar-en-Windows.cmd en el ordenador donde instalaste Node.js y Ollama.
+2. Se abrirá el panel privado de Instagram de tu CRM. Si hace falta, usa «Abrir mi CRM» para iniciar sesión en ese navegador. Vuelve al panel y pulsa «Actualizar estado».
+3. Compara los ocho caracteres que ves en Windows con los del panel y pulsa «Vincular este ordenador». Si la cuenta aún está pendiente, pulsa «Conectar Instagram» y acepta el permiso de @jansadurnii.
+4. El panel muestra la última lectura de Instagram y la última conexión de Windows por separado. Deja Ollama y el agente abiertos para clasificar las conversaciones en castellano o catalán. El agente arranca cuando inicias sesión en Windows. No vuelvas a descargar el modelo si ya lo tienes.
+
+La regla del CRM cuenta cinco turnos alternos. Si Instagram no confirma qué mensajes escribiste tú, puedes marcarlos en el panel. Las respuestas automáticas no cuentan. El agente no envía mensajes ni guarda copias de las conversaciones en el disco.
+Para pausarlo, cierra la ventana. «Desactivar-en-Windows.cmd» quita el inicio automático. En el panel puedes desvincular el ordenador.
