@@ -58,3 +58,13 @@ Son ejemplos ficticios; los ejemplos de desarrollo sirvieron para ajustar el cla
 En la ejecución local comunicada desde Windows no hubo errores de inferencia. La tanda general tuvo un falso prioritario (15/16 niveles y 16/16 indicadores). La tanda adicional acertó los ocho ejemplos. Las dos consultas de precio del bloque bilingüe quedaron en el nivel correcto, pero recibieron una etiqueta económica indebida (12/12 niveles, 10/12 indicadores). La captura no identifica el falso prioritario de la tanda general.
 
 Esta revisión distingue una pregunta de precio de una barrera económica, contrasta las consultas comerciales ambiguas con el turno del atleta y su antecedente, e informa de los identificadores sintéticos que fallen. No se han cambiado los casos, los resultados esperados ni los umbrales. Se debe volver a pasar la prueba en el PC de destino.
+
+La revisión del 19/11 se verificó con el modelo Qwen3 indicado, ejecutado en Ollama 0.11.10 sobre CPU Linux. Generamos respuestas reales para las 36 conversaciones ficticias; para agilizar la evaluación se agruparon peticiones con el mismo prefijo. Se volvió a pasar el lanzador de calidad sobre esas mismas respuestas, reutilizadas únicamente en el entorno de verificación. El programa distribuido no incluye esa caché y en Windows ejecuta su propia inferencia local.
+
+| Bloque | Nivel | Etiquetas exactas | Falsos muy interesados |
+|---|---:|---:|---:|
+| General | 16/16 | 16/16 | 0 |
+| Adicional | 8/8 | 8/8 | 0 |
+| Parejas de castellano y catalán | 12/12 | 12/12 | 0 |
+
+Además pasaron 31 pruebas de código. Los resultados son de ejemplos ficticios, no de una instalación en Windows ni de una bandeja real. El ZIP no contiene resultados del equipo de Jan, claves, modelos ni permisos de activación.

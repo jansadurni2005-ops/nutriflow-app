@@ -34,7 +34,7 @@ test('a quote attributed only to Jan cannot become an athlete budget objection',
  assert.equal(r.interest_level,'hot');assert.deepEqual(r.additional_tags,[]);
 });
 test('a prior affordability issue is evaluated rather than erased by a later fee question',async()=>{
- const [r]=await classify([['athlete','No me llega el sueldo.'],['jan','Hay otro plan'],['athlete','¿Cuánto cuesta?']],{quote:'No me llega el sueldo'});
+ const [r]=await classify([['athlete','No me llega el sueldo.'],['jan','Hay otro servicio'],['athlete','¿Cuánto cuesta?']],{quote:'No me llega el sueldo'});
  assert.deepEqual(r.additional_tags,['price_objection']);
 });
 test('an erroneous commercial prediction for tentative interest stays warm in either language',async()=>{
@@ -54,4 +54,26 @@ test('ambiguous reference to a personal service stays under review',async()=>{
 test('ordinary background cannot reach hot after independent review finds no sales enquiry',async()=>{
  const [r]=await classify([['athlete','Compito en pista cuatro días al mes.']],{meaning:{budget:false},decision:'social_reply'});
  assert.equal(r.interest_level,'neutral');
+});
+
+test('explicit coaching enquiries stay commercial even when the first model mistakes them for an ordinary goal',async()=>{
+ const rows=[
+  [['jan','Et parlo del meu assessorament.'],['athlete','I com ho fas?']],
+  [['athlete','Tengo una dietista, pero me gustaría saber cómo trabajas.']],
+  [['athlete','Et puc preguntar què inclou el teu seguiment?']],
+  [['athlete','¿Tienes algún hueco para trabajar contigo la próxima temporada?']]
+ ];
+ for(const turns of rows){
+  const [r]=await classify(turns,{meaning:{meaning:'nutrition_goal',budget:false},accepted:'other'});
+  assert.equal(r.interest_level,'hot');assert.deepEqual(r.additional_tags,[]);
+ }
+});
+test('a declined offer or a request to explain a free recipe is never promoted by explicit method wording',async()=>{
+ const [a]=await classify([['athlete','No quiero saber cómo trabajas.']],{meaning:{meaning:'explicit_decline',budget:false}});
+ const [b]=await classify([['jan','Te explico la receta de arroz gratis.'],['athlete','¿Y cómo lo haces?']],{meaning:{meaning:'resource_only',budget:false},accepted:'other'});
+ assert.equal(a.interest_level,'cold');assert.equal(b.interest_level,'neutral');
+});
+
+test('a clear commercial phrase cannot legitimize invalid base-model evidence',async()=>{
+ await assert.rejects(classify([['athlete','¿Cómo trabajas?']],{meaning:{evidence:'t999',budget:false}}),/invalid_semantics/);
 });

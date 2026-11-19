@@ -29,9 +29,10 @@ async function run(){
    const p=spawn(process.execPath,[script,'ollama',...args],{stdio:['ignore','pipe','inherit'],shell:false});
    const done=new Promise((resolve,reject)=>{p.once('error',reject);p.once('close',resolve);});
    const lines=createInterface({input:p.stdout,crlfDelay:Infinity});
-   let summary;
+   let summary,completed=0;
    for await(const line of lines){
      const row=JSON.parse(line);
+     if(row.id&&++completed%4===0)console.log('  '+completed+' conversaciones comprobadas.');
      if(row.id && (!row.match||!row.exactTags)){
        const flags=f=>f.join(', ')||'ninguna';
        issues.push('REVISAR '+name+' / '+row.id+': nivel esperado '+row.expected+', obtenido '+row.got+'; etiquetas esperadas: '+flags(row.expectedFlags)+'; obtenidas: '+flags(row.flags)+'.');

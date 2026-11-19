@@ -33,13 +33,25 @@ export async function groundCommercial(result,turns,generate){
      result.meaning=feeQuestion?'service_question':'context_missing'; result.evidence=latest.id;
    }
  }
- if(result.meaning!=='service_question')return;
- // Catch confusion between a recipe/free resource and Jan's individual service.
  const referringHow=/^(?:(?:vale|va|ok|perfect[eo]|gracias|gracies)[,.! ]*)*[¿]?(?:y |i )?(?:como (?:lo haces|se hace|funciona)|com (?:ho fas|es fa|funciona))\s*[?.!]*$/.test(txt);
+ const asksMethod=/\b(?:como (?:trabajas|lo organizas)|com (?:treballes|ho organitzes))\b/.test(txt);
+ const asksInclusions=/\b(?:(?:que|què) (?:incluye|inclou|entra en)|en (?:que|què) consist(?:e|eix))\b/.test(txt)&&/\b(?:tu|tus|teu|teva|teus|teves|vuestro|vostre) (?:plan|pla|programa|asesoria|assessorament|seguimiento|seguiment|servicio|servei)\b/.test(txt);
+ const asksAvailability=/\b(?:(?:te queda(?:n)?|tienes|hay|tens|et queda|hi ha) (?:algun[as]? |encara |alguna )?(?:hueco|plazas?|disponibilidad|lloc|places?|disponibilitat))\b/.test(txt)&&(/\b(?:llevarme|portar-me|treballar amb tu|trabajar contigo|empezar contigo|comencar amb tu)\b/.test(txt)||service.test(txt+' '+prev));
+ const asksDirectly=/[¿?]/.test(txt)||/\b(?:saber|explicar(?:me|-me)?|explicas|expliques|informacion|informacio)\b/.test(txt);
+ const negative=/\b(?:no (?:quiero|vull|necesito|necessito|m'interessa|me interesa)|no (?:me |em )?(?:preguntes|preguntis)|olvidalo|oblida-ho)\b/.test(txt);
+ // Leave mixed/negated or competing references to the contextual verifier. A clear
+ // enquiry remains commercial even if the athlete already works with a nutritionist.
+ const strong=asksDirectly&&!negative&&!free.test(txt)&&
+   ((referringHow&&service.test(prev)&&!free.test(prev))||asksInclusions||asksAvailability||(asksMethod&&!free.test(prev)));
+ const positiveCandidates=['service_question','social_reply','nutrition_goal','resource_only','context_missing'];
+ if(strong&&positiveCandidates.includes(result.meaning)){
+   result.meaning='service_question';result.evidence=latest.id;result.certainty='clear';return;
+ }
+ if(result.meaning!=='service_question')return;
  let meaning;
  if(referringHow&&free.test(prev)&&!service.test(prev))meaning='resource_only';
  else if(qualification.test(txt)&&postpones.test(txt)&&interest.test(txt)&&!/[?¿]/.test(txt)&&!feeQuestion&&!service.test(txt))meaning='nutrition_goal';
- else if(bareFee && !free.test(prev))meaning='service_question';
+ else if(bareFee && !free.test(prev) && (service.test(txt)||service.test(prev)))meaning='service_question';
  else {
    const values=['service_question','resource_only','nutrition_goal','social_reply','budget_objection','explicit_decline','context_missing'];
    const g=await generate(checkChat('Verify what the LAST athlete contribution actually asks for or decides. service_question ONLY for an enquiry about the individual coaching service (price, terms, method, availability), or a clear request to start it. Generic "how?" follows its immediate referent: preparation or a free document is resource_only; Jan describing his paid coaching is service_question. Wanting to consult someone first or general interest is nutrition_goal, not a purchase. Merely naming a sport or schedule is social_reply. Declining is explicit_decline. budget_objection requires a stated financial barrier; if context is insufficient choose context_missing. Return JSON key decision.',turns.slice(0,ai+1)),enumFormat('decision',values));
