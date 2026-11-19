@@ -1,0 +1,7 @@
+# Instagram: acceso a conversaciones y altas en el CRM
+
+La URL de producción para el titular de @jansadurnii es `https://nrxltxmbpkplhgycodob.supabase.co/functions/v1/ig-auth-start?mensajes=1`. Este modo solicita solamente el perfil básico y acceso a mensajes. La ruta sin ese parámetro continúa siendo la de estadísticas. Ambos usan la URL de retorno ya registrada en Instagram.
+
+Para la conexión de mensajes, el callback consume un estado de un solo uso con caducidad, comprueba que Instagram devuelve el identificador de la cuenta esperada y verifica el acceso a la lista de conversaciones antes de guardar el token de larga duración. El token queda separado del de estadísticas en una tabla sin acceso de cliente. No se envía ningún mensaje ni se solicita marcar conversaciones como leídas.
+
+La función de base de datos `nf_record_instagram_turn` recibe metadatos exclusivamente del servidor. Agrupa los mensajes consecutivos del mismo emisor, descarta salientes sin acreditación manual y evita duplicados antes de registrar el quinto turno como Instagram / En conversación. El despliegue de esa función por sí solo no suministra eventos ni clasifica con el modelo del PC. No contar como manual un mensaje solo porque el remitente sea la cuenta profesional. El registro de eventos de la cuenta, la procedencia de los salientes y el proceso local de clasificación deben comprobarse separadamente de la concesión de acceso. No se deben anular automatizaciones de Manychat para obtener este permiso.
