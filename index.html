@@ -5638,5 +5638,49 @@ CÓMO RESPONDER (PRIORITARIO)
   setInterval(tick,400);
 })();
 </script>
+<script>
+/* __nf_renewal_heal_v1 : red de seguridad. Si existe un pago de "Renovacion" (del botón verde) pero la ficha del
+   cliente no avanzó (inicio anterior al día de la renovación), se vuelve a aplicar esa renovación y se sube.
+   Así una renovación nunca puede "desaparecer" aunque algo falle por el camino. */
+(function(){
+  if(window.__nf_renewal_heal_v1)return; window.__nf_renewal_heal_v1=true;
+  function em(){try{return JSON.parse(localStorage.getItem('nf_session')||'{}').email||'';}catch(e){return '';}}
+  function bm(b){return b==='quarterly'?3:b==='semiannual'?6:b==='annual'?12:b==='monthly'?1:0;}
+  function addMonths(s,n){var p=String(s).split('-');var d=new Date(Date.UTC(+p[0],+p[1]-1+n,+p[2]));return d.toISOString().slice(0,10);}
+  function ymd(s){s=String(s||'').slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(s)?s:'';}
+  var NOTES={'Renovacion':1,'Renovacion (fraccionado)':1};
+  function heal(){
+    var e=em();if(!e)return;
+    if(window._nf_syncing||window._nf_pullWriting)return;
+    var P='nf_'+e+'_',cl,pays;
+    try{cl=JSON.parse(localStorage.getItem(P+'clients')||'[]');pays=JSON.parse(localStorage.getItem(P+'payments')||'[]');}catch(_){return;}
+    if(!cl.length||!pays.length)return;
+    var limit=new Date(Date.now()-120*864e5).toISOString().slice(0,10);
+    var last={}; // clientId -> {cyc,total}
+    pays.forEach(function(p){
+      if(!p||!NOTES[p.notes]||!p.clientId)return;
+      var cyc=ymd(p.cycleStart);if(!cyc||cyc<limit)return;
+      var cur=last[p.clientId];
+      if(!cur||cyc>cur.cyc)last[p.clientId]={cyc:cyc,total:0};
+      if(last[p.clientId].cyc===cyc)last[p.clientId].total+=parseFloat(p.amount)||0;
+    });
+    var fixed=[];
+    var out=cl.map(function(c){
+      var r=c&&last[c.id];if(!r)return c;
+      var m=bm(c.billing);if(!m)return c;
+      var sd=ymd(c.startDate);
+      if(sd&&sd>=r.cyc)return c;               // la ficha ya está al día
+      fixed.push(c.name);
+      return Object.assign({},c,{startDate:r.cyc,renewalDate:addMonths(r.cyc,m),price:+(r.total/m).toFixed(2),paidDate:c.paidDate||r.cyc,active:true});
+    });
+    if(!fixed.length)return;
+    try{console.warn('[NF] Renovación re-aplicada (la ficha no había avanzado): '+fixed.join(', '));}catch(_){}
+    localStorage.setItem(P+'clients',JSON.stringify(out));   // → la sincronización sube solo estos clientes
+    if(window._nf_setClients){try{window._nf_setClients(out.slice());}catch(_){}}
+  }
+  setTimeout(heal,4000);
+  setInterval(heal,15000);
+})();
+</script>
 </body>
 </html>
