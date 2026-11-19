@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-import {grantRow,includesMessages} from "./grant.mjs";
+import {grantRow,includesMessages,hasScope,exchangeIssue} from "./grant.mjs";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_ROLE = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -36,9 +36,16 @@ Deno.serve(async (req) => {
   const { data: st } = await supa.from("ge_oauth_state").delete().eq("state",state)
     .gte("created_at",new Date(Date.now()-15*60_000).toISOString()).select("state").maybeSingle();
   if (!st) return failPage("Autorización caducada o ya utilizada. Abre el enlace de conexión otra vez.");
-  function issue(stage:string,http=0,code?:number){
-    console.warn(JSON.stringify({event:"ig_dm_authorization",stage,http,meta_code:typeof code==="number"?code:undefined}));
+  function issue(stage:string,http=0,code?:number,subcode?:number){
+    console.warn(JSON.stringify({event:"ig_dm_authorization",stage,http,meta_code:Number.isSafeInteger(code)?code:undefined,meta_subcode:Number.isSafeInteger(subcode)?subcode:undefined}));
     const text:Record<string,string>={intercambio:"Instagram no ha podido canjear esta autorización.",permiso:"No se ha concedido el permiso de mensajes.",duracion:"Meta no ha emitido un permiso de larga duración.",perfil:"Meta no ha devuelto el perfil autorizado.",cuenta:"La cuenta elegida no corresponde a @jansadurnii.",conversaciones:"Meta no permite leer la lista de conversaciones de @jansadurnii.",guardar:"El CRM no ha podido guardar el permiso.",red:"No se pudo completar la petición a Instagram."};
+    Object.assign(text,{
+      permisos_meta:"Meta denegó el permiso de la aplicación. Abre Meta for Developers con la cuenta que administra la app y revisa el acceso de @jansadurnii a Instagram. Repetir el mismo enlace sin cambiar los permisos no resolverá este rechazo.",
+      rol_app:"Meta pide revisar el rol de la cuenta en la aplicación y aceptar su invitación, si está pendiente.",
+      permiso_basico:"Falta el permiso básico de la cuenta profesional (instagram_business_basic). Revisa los permisos en el panel de Meta.",
+      permiso_mensajes:"Falta el permiso de mensajes (instagram_business_manage_messages). Revisa los permisos en el panel de Meta.",
+      autorizacion_caducada:"Meta indica que la autorización inicial ha caducado o ya no es válida. Inicia una conexión nueva desde el CRM."
+    });
     return page("Conexión de mensajes pendiente. "+text[stage]+" Referencia: "+stage+".");
   }
   try {
@@ -52,6 +59,7 @@ Deno.serve(async (req) => {
     const tJson = grantRow(await tRes.json());
     if (!tRes.ok || !tJson) return dm ? issue("intercambio",tRes.status) : failPage("Instagram no ha completado el intercambio del permiso.");
     if(dm && includesMessages(tJson.permissions)===false) return issue("permiso",tRes.status);
+    if(dm && hasScope(tJson.permissions,"instagram_business_basic")===false)return issue("permiso_basico",tRes.status);
     const shortToken = tJson.access_token as string;
     const igUserId = String(tJson.user_id ?? "");
     const grantUrl=new URL("https://graph.instagram.com/access_token");grantUrl.search=new URLSearchParams({grant_type:"ig_exchange_token",client_secret:IG_APP_SECRET,access_token:shortToken}).toString();
@@ -60,7 +68,7 @@ Deno.serve(async (req) => {
     const longToken = (llJson.access_token as string) ?? shortToken;
     const expiresIn = Number(llJson.expires_in ?? 5184000);
     const fields=dm?"user_id,username":"user_id,username,account_type,followers_count,follows_count,media_count,profile_picture_url";
-    if(dm && (!llRes.ok || !llJson.access_token || !Number.isFinite(Number(llJson.expires_in)) || Number(llJson.expires_in)<=0))return issue("duracion",llRes.status,llJson.error?.code);
+    if(dm && (!llRes.ok || !llJson.access_token || !Number.isFinite(Number(llJson.expires_in)) || Number(llJson.expires_in)<=0))return issue(exchangeIssue(llRes.status,llJson.error),llRes.status,llJson.error?.code,llJson.error?.error_subcode);
     const pRes = await fetch("https://graph.instagram.com/me?fields="+fields,{headers:{Authorization:"Bearer "+longToken},redirect:"error",signal:AbortSignal.timeout(15000)});
     const p = await pRes.json();
     if(dm){
