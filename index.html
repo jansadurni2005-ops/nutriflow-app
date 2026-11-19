@@ -183,32 +183,121 @@ function collectExtras(){
   o.__ts=Date.now();
   return o;
 }
-function applyExtras(ex){
-  if(!ex||typeof ex!=='object')return;
-  window._nf_applyingExtras=true;
-  try{
-    EXTRA_SUF.forEach(function(s){
-      if(ex[s]!=null){
-        try{localStorage.setItem(PRE+s,ex[s]);}catch(e){}
-      }
-    });
-  }finally{window._nf_applyingExtras=false;}
+// ── 3-WAY MERGE (2026-11-19) ── base = last copy confirmed in the cloud. A device only uploads the parts IT
+// changed, merged on top of the current cloud copy, so a device with old data can never erase a payment or a
+// renewal made on another device (before, the whole blob was overwritten: last writer wins).
+function _exSnapKey(){return '_nf_exsnap_'+(EM||'');}
+function loadExSnap(){try{var v=localStorage.getItem(_exSnapKey());return v?JSON.parse(v):null;}catch(e){return null;}}
+function saveExSnap(m){try{localStorage.setItem(_exSnapKey(),JSON.stringify(m||{}));}catch(e){}}
+function _eqJ(a,b){return JSON.stringify(a)===JSON.stringify(b);}
+function _idArr(a){return Array.isArray(a)&&a.length>0&&a.every(function(x){return x&&typeof x==='object'&&x.id!=null;});}
+function merge3(base,local,cloud){
+  if(_eqJ(local,base))return cloud;   // not changed here → the cloud copy wins
+  if(_eqJ(cloud,base))return local;   // not changed elsewhere → mine wins
+  var isA=function(x){return x===undefined||Array.isArray(x);};
+  if((_idArr(local)||_idArr(cloud)||_idArr(base))&&isA(local)&&isA(cloud)&&isA(base)){
+    // lists of {id,…} (payments, gastos, weights…): merge item by item
+    var B={},L={},C={},order=[],seen={};
+    (base||[]).forEach(function(x){if(x&&x.id!=null)B[x.id]=x;});
+    (local||[]).forEach(function(x){if(x&&x.id!=null)L[x.id]=x;});
+    (cloud||[]).forEach(function(x){if(x&&x.id!=null){C[x.id]=x;if(!seen[x.id]){seen[x.id]=1;order.push(x.id);}}});
+    (local||[]).forEach(function(x){if(x&&x.id!=null&&!seen[x.id]){seen[x.id]=1;order.push(x.id);}});
+    var out=[];order.forEach(function(id){var v=merge3(B[id],L[id],C[id]);if(v!==undefined)out.push(v);});
+    return out;
+  }
+  var isO=function(x){return x&&typeof x==='object'&&!Array.isArray(x);};
+  if(isO(local)&&isO(cloud)){
+    // maps keyed by client id (paiddates, paused, cmethod…): merge key by key
+    var b=isO(base)?base:{},o={},ks={};
+    [b,local,cloud].forEach(function(m){Object.keys(m).forEach(function(k){ks[k]=1;});});
+    Object.keys(ks).forEach(function(k){var v=_eqJ(local[k],b[k])?cloud[k]:local[k];if(v!==undefined)o[k]=v;});
+    return o;
+  }
+  return local;
+}
+function _pj(v){if(v==null)return{ok:true,v:undefined};try{return{ok:true,v:JSON.parse(v)};}catch(e){return{ok:false,v:v};}}
+function mergeStr(baseS,localS,cloudS){
+  var b=_pj(baseS),l=_pj(localS),c=_pj(cloudS);
+  if(!(b.ok&&l.ok&&c.ok))return localS;
+  var m=merge3(b.v,l.v,c.v);
+  return m===undefined?localS:JSON.stringify(m);
+}
+function _refreshBillingUI(){
   try{window._nf_paidMap=JSON.parse(localStorage.getItem(PRE+'paiddates')||'{}');}catch(e){}
   try{if(window._nf_setClients){window._nf_syncing=true;var _cl=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');window._nf_setClients(_cl.slice());setTimeout(function(){window._nf_syncing=false;},200);}}catch(e){window._nf_syncing=false;}
 }
-var _extrasTimer=null;
+function applyExtras(ex){
+  if(!ex||typeof ex!=='object')return;
+  var snap=loadExSnap(),first=!snap,mine=false;snap=snap||{};
+  window._nf_applyingExtras=true;
+  try{
+    EXTRA_SUF.forEach(function(s){
+      if(ex[s]==null)return;
+      var cur=null;try{cur=localStorage.getItem(PRE+s);}catch(e){}
+      // a change made on THIS device that the cloud doesn't have yet is kept (merged), never overwritten
+      var dirty=!first&&cur!=null&&cur!==ex[s]&&(snap[s]===undefined||cur!==snap[s]);
+      var val=dirty?mergeStr(snap[s],cur,ex[s]):ex[s];
+      if(dirty&&val!==ex[s])mine=true;
+      if(val!==cur){try{localStorage.setItem(PRE+s,val);}catch(e){}}
+      snap[s]=ex[s];
+    });
+  }finally{window._nf_applyingExtras=false;}
+  saveExSnap(snap);
+  _refreshBillingUI();
+  if(mine&&_pullReady){getToken().then(function(t){if(t)pushExtrasNow(t);});}
+}
+var _extrasTimer=null,_exPushing=false,_exAgain=false,_exRetry=null,_exFails=0,_exLastPushOk=0;
 function pushExtras(token){
   clearTimeout(_extrasTimer);
-  _extrasTimer=setTimeout(function(){
-    if(!token)return;
-    fetch2('/auth/v1/user','PUT',token,{data:{nf_extras:collectExtras()}}).catch(function(){});
-  },500);
+  _extrasTimer=setTimeout(function(){getToken().then(function(t){t=t||token;if(t)pushExtrasNow(t);});},500);
+}
+function pushExtrasNow(token,keepalive){
+  if(!PRE||!token)return;
+  var snap=loadExSnap();
+  if(!snap)return; // the cloud copy hasn't been pulled yet → never upload blind
+  var local={};EXTRA_SUF.forEach(function(s){var v=null;try{v=localStorage.getItem(PRE+s);}catch(e){}if(v!=null)local[s]=v;});
+  var changed=EXTRA_SUF.filter(function(s){return local[s]!==undefined&&local[s]!==snap[s];});
+  if(!changed.length)return;
+  if(_exPushing){_exAgain=true;return;}
+  _exPushing=true;
+  fetch(SB+'/auth/v1/user',{headers:{apikey:KEY,Authorization:'Bearer '+token},keepalive:!!keepalive}).then(function(r){
+    if(!r.ok)throw new Error('get '+r.status);return r.json();
+  }).then(function(u){
+    var meta=(u&&(u.user_metadata||(u.user&&u.user.user_metadata)))||{};
+    var cloud=meta.nf_extras||{},out={};
+    Object.keys(cloud).forEach(function(k){out[k]=cloud[k];});
+    changed.forEach(function(s){out[s]=mergeStr(snap[s],local[s],cloud[s]);});
+    out.__ts=Date.now();
+    return fetch(SB+'/auth/v1/user',{method:'PUT',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json'},body:JSON.stringify({data:{nf_extras:out}}),keepalive:!!keepalive}).then(function(r){if(!r.ok)throw new Error('put '+r.status);return out;});
+  }).then(function(out){
+    var sn=loadExSnap()||{},wrote=false;
+    window._nf_applyingExtras=true;
+    try{
+      changed.forEach(function(s){
+        sn[s]=out[s];
+        var now=null;try{now=localStorage.getItem(PRE+s);}catch(e){}
+        if(now===local[s]&&out[s]!==local[s]){try{localStorage.setItem(PRE+s,out[s]);wrote=true;}catch(e){}}
+      });
+    }finally{window._nf_applyingExtras=false;}
+    saveExSnap(sn);
+    _exLastPushOk=Date.now();_exFails=0;_exPushing=false;
+    if(wrote)_refreshBillingUI();
+    if(_exAgain){_exAgain=false;getToken().then(function(t){if(t)pushExtrasNow(t);});}
+  }).catch(function(err){
+    _exPushing=false;_exFails++;
+    console.warn('[NF] No se han podido guardar pagos/extras en la nube ('+(err&&err.message)+'). Reintentando…');
+    if(/ 401/.test(String(err&&err.message))){try{var ct=getCachedTok(EM);if(ct){ct.exp=0;localStorage.setItem(tokKey(EM),JSON.stringify(ct));}}catch(e){}}
+    clearTimeout(_exRetry);
+    _exRetry=setTimeout(function(){getToken().then(function(t){if(t)pushExtrasNow(t);});},Math.min(60000,3000*Math.pow(2,Math.min(_exFails-1,4))));
+  });
 }
 function pullExtras(token){
+  var t0=Date.now();
   return fetch2('/auth/v1/user','GET',token).then(function(u){
     var meta=u&&(u.user_metadata||(u.user&&u.user.user_metadata));
     var ex=meta&&meta.nf_extras;
-    if(ex)applyExtras(ex);
+    // if one of our uploads landed while this copy was travelling, the copy is already old: skip it this round
+    if(ex&&!_exPushing&&!(_exLastPushOk>t0))applyExtras(ex);
     return ex;
   }).catch(function(){return null;});
 }
@@ -372,8 +461,9 @@ function syncRead(token){
       }
     }
 
-    localStorage.setItem(PRE+'clients',JSON.stringify(active));
-    localStorage.setItem(PRE+'lostClients',JSON.stringify(lost));
+    var _mg0=mergeCloudClients(clients);
+    localStorage.setItem(PRE+'clients',JSON.stringify(_mg0.active));
+    localStorage.setItem(PRE+'lostClients',JSON.stringify(_mg0.lost));
     localStorage.setItem(PRE+'leads',JSON.stringify(fmtLeads));
     localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
     localStorage.setItem(PRE+'seeded','1');
@@ -403,6 +493,7 @@ function refreshFromCloud(){
   _refreshing=true;
   pt.then(function(token){
     if(!token){_refreshing=false;return;}
+    var _clT0=Date.now();
     return Promise.all([
       fetch2('/rest/v1/clients?user_id=eq.'+UID+'&select=*&order=start_date.desc','GET',token),
       fetch2('/rest/v1/leads?user_id=eq.'+UID+'&select=*&order=date.desc','GET',token),
@@ -419,18 +510,19 @@ function refreshFromCloud(){
       // auth/network error — do nothing (never wipe local data on a glitch).
       if(!clientsOk&&!leadsOk&&!antropOk){window._nf_syncing=false;return pullExtras(token);}
       // Block interceptor only during the synchronous writes (tiny window)
-      window._nf_syncing=true;
+      window._nf_syncing=true;window._nf_pullWriting=true;
       try{
-        // CLIENTS: only overwrite when cloud actually returned some
-        if(clientsOk&&clients.length&&!(window._nf_lastLocalWrite&&Date.now()-window._nf_lastLocalWrite<12000)){
-          var fmt=clients.map(function(c){return{id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,startDate:c.start_date,renewalDate:c.renewal_date,active:c.active};});
-          var active=fmt.filter(function(c){return c.active;});
-          var lost=fmt.filter(function(c){return !c.active;});
-          localStorage.setItem(PRE+'clients',JSON.stringify(active));
-          localStorage.setItem(PRE+'lostClients',JSON.stringify(lost));
-          setSyncedIds('clients',active.concat(lost));
-          if(window._nf_setClients){try{window._nf_setClients(active.slice());}catch(e){}}
-          if(window._nf_setLostClients){try{window._nf_setLostClients(lost.slice());}catch(e){}}
+        // CLIENTS (2026-11-19): MERGE instead of overwrite. Clients changed on this device that the cloud doesn't
+        // have yet are kept; everything else comes from the cloud. Skipped if one of our uploads landed meanwhile.
+        if(clientsOk&&!(_clLastPushOk>_clT0)){
+          if(clients.length){
+            var _mg=mergeCloudClients(clients);
+            localStorage.setItem(PRE+'clients',JSON.stringify(_mg.active));
+            localStorage.setItem(PRE+'lostClients',JSON.stringify(_mg.lost));
+            setSyncedIds('clients',clients);
+            if(window._nf_setClients){try{window._nf_setClients(_mg.active.slice());}catch(e){}}
+            if(window._nf_setLostClients){try{window._nf_setLostClients(_mg.lost.slice());}catch(e){}}
+          }else if(!loadClSnap()){saveClSnap({});}
         }
         // LEADS: only overwrite when cloud returned some (never wipe on empty/error)
         if(leadsOk){
@@ -445,11 +537,11 @@ function refreshFromCloud(){
           localStorage.setItem(PRE+'antrop',JSON.stringify(fmtAntrop));
           setSyncedIds('antrop',fmtAntrop);
         }
-      }finally{window._nf_syncing=false;}
+      }finally{window._nf_syncing=false;window._nf_pullWriting=false;}
       return pullExtras(token);
     });
   }).then(function(){_refreshing=false;_pullReady=true;try{flushPending();}catch(e){}})
-   .catch(function(){window._nf_syncing=false;_refreshing=false;});
+   .catch(function(){window._nf_syncing=false;window._nf_pullWriting=false;_refreshing=false;});
 }
 window._nf_refreshFromCloud=refreshFromCloud;
 window._nf_getToken=getToken;
@@ -473,6 +565,82 @@ window._nf_addReminder=function(rem){
     fetch(SB+'/rest/v1/reminders',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal'},body:JSON.stringify(row)}).catch(function(){});
   });
 };
+
+// ── DIRTY-ROW CLIENT SYNC (2026-11-19) ──
+// Each device remembers, per client, the last version confirmed in the cloud. It uploads ONLY the clients it
+// really changed, checks the server answer and retries until it is saved. A device with old data has changed
+// nothing → uploads nothing → can never undo a renewal made on another device. (Before: every upload sent the
+// whole list, failures were ignored, and reload / going to background pushed the whole stale list.)
+function _clSnapKey(){return '_nf_clsnap_'+(EM||'');}
+function loadClSnap(){try{var v=localStorage.getItem(_clSnapKey());return v?JSON.parse(v):null;}catch(e){return null;}}
+function saveClSnap(m){try{localStorage.setItem(_clSnapKey(),JSON.stringify(m||{}));}catch(e){}}
+function _d10(x){x=x==null?'':String(x).slice(0,10);return /^\d{4}-\d{2}-\d{2}$/.test(x)?x:null;}
+function _p2(x){var n=parseFloat(x);return isNaN(n)?null:Math.round(n*100)/100;}
+function clientRow(c,act){return{id:c.id,user_id:UID,name:c.name==null?'':String(c.name),price:_p2(c.price),billing:c.billing||null,source:c.source==null?null:c.source,start_date:_d10(c.startDate!==undefined?c.startDate:c.start_date),renewal_date:_d10(c.renewalDate!==undefined?c.renewalDate:c.renewal_date),active:!!act};}
+function rowCanon(r){return JSON.stringify([r.name,r.price,r.billing,r.source,r.start_date,r.renewal_date,!!r.active]);}
+function _localClientObjs(){
+  var o={};
+  ['clients','lostClients'].forEach(function(k){var a=[];try{a=JSON.parse(localStorage.getItem(PRE+k)||'[]');}catch(e){}(a||[]).forEach(function(c){if(c&&c.id)o[c.id]={c:c,act:k==='clients'?c.active!==false:false};});});
+  return o;
+}
+function localClientRows(){var o=_localClientObjs(),r={};Object.keys(o).forEach(function(id){r[id]=clientRow(o[id].c,o[id].act);});return r;}
+// Combine the cloud list with this device's list. Returns {active,lost}.
+function mergeCloudClients(clients){
+  var snap=loadClSnap(),first=!snap;snap=snap||{};
+  var lo=_localClientObjs(),lr=localClientRows();
+  var synced=[];try{synced=JSON.parse(localStorage.getItem(syncedIdsKey('clients'))||'[]');}catch(e){}
+  var inCloud={},out=[];
+  (clients||[]).forEach(function(c){
+    if(!c||!c.id)return;inCloud[c.id]=1;
+    var cc=rowCanon(clientRow(c,c.active!==false)),l=lr[c.id],lc=l?rowCanon(l):null;
+    var dirty=!first&&l&&lc!==cc&&(snap[c.id]===undefined||lc!==snap[c.id]);
+    if(dirty){out.push(Object.assign({},lo[c.id].c,{active:l.active}));}
+    else{out.push({id:c.id,name:c.name,price:c.price,billing:c.billing,source:c.source,startDate:c.start_date,renewalDate:c.renewal_date,active:c.active});snap[c.id]=cc;}
+  });
+  Object.keys(lr).forEach(function(id){
+    if(inCloud[id])return;
+    var known=first?synced.indexOf(id)>=0:snap[id]!==undefined;
+    if(known&&(first||rowCanon(lr[id])===snap[id])){delete snap[id];return;} // deleted on another device
+    out.push(Object.assign({},lo[id].c,{active:lr[id].active}));              // created here, not uploaded yet
+  });
+  saveClSnap(snap);
+  return{active:out.filter(function(c){return c.active!==false;}),lost:out.filter(function(c){return c.active===false;})};
+}
+var _clPushing=false,_clAgain=false,_clRetry=null,_clFails=0,_clLastPushOk=0;
+function pushClientsDirty(token,keepalive){
+  if(!UID||!PRE||!token)return;
+  var snap=loadClSnap();
+  if(!snap)return; // the cloud list hasn't been pulled yet → never upload blind
+  var local=localClientRows(),ids=Object.keys(local);
+  if(!ids.length)return; // never wipe the cloud from an empty device
+  var dirty=ids.filter(function(id){return snap[id]!==rowCanon(local[id]);}).map(function(id){return local[id];});
+  var removed=Object.keys(snap).filter(function(id){return !local[id];});
+  if(removed.length>3){console.warn('[NF] '+removed.length+' clientes han desaparecido de este dispositivo: por seguridad no borro nada en la nube');removed=[];}
+  if(!dirty.length&&!removed.length)return;
+  if(_clPushing){_clAgain=true;return;}
+  _clPushing=true;
+  var p=dirty.length?fetch(SB+'/rest/v1/clients',{method:'POST',headers:{apikey:KEY,Authorization:'Bearer '+token,'Content-Type':'application/json','Prefer':'return=minimal,resolution=merge-duplicates'},body:JSON.stringify(dirty),keepalive:!!keepalive}).then(function(r){if(!r.ok)throw new Error('upsert '+r.status);}):Promise.resolve();
+  p.then(function(){
+    if(!removed.length)return;
+    var idList=removed.map(function(id){return '"'+String(id).replace(/"/g,'')+'"';}).join(',');
+    return fetch(SB+'/rest/v1/clients?user_id=eq.'+UID+'&id=in.('+idList+')',{method:'DELETE',headers:{apikey:KEY,Authorization:'Bearer '+token},keepalive:!!keepalive}).then(function(r){if(!r.ok)throw new Error('delete '+r.status);});
+  }).then(function(){
+    var sn=loadClSnap()||{};
+    dirty.forEach(function(r){sn[r.id]=rowCanon(r);});
+    removed.forEach(function(id){delete sn[id];});
+    saveClSnap(sn);
+    try{localStorage.setItem(syncedIdsKey('clients'),JSON.stringify(Object.keys(localClientRows())));}catch(e){}
+    _clLastPushOk=Date.now();_clFails=0;_clPushing=false;
+    try{backupClients();}catch(e){}
+    if(_clAgain){_clAgain=false;getToken().then(function(t){if(t)pushClientsDirty(t);});}
+  }).catch(function(err){
+    _clPushing=false;_clFails++;
+    console.warn('[NF] No se han podido guardar clientes en la nube ('+(err&&err.message)+'). Reintentando…');
+    if(/ 401/.test(String(err&&err.message))){try{var ct=getCachedTok(EM);if(ct){ct.exp=0;localStorage.setItem(tokKey(EM),JSON.stringify(ct));}}catch(e){}}
+    clearTimeout(_clRetry);
+    _clRetry=setTimeout(function(){getToken().then(function(t){if(t)pushClientsDirty(t);});},Math.min(60000,3000*Math.pow(2,Math.min(_clFails-1,4))));
+  });
+}
 
 var _syncClientsTimer=null;
 // Remember which ids are currently in the cloud, so targeted deletes are precise.
@@ -531,28 +699,9 @@ function syncTable(table,records,storageKey,token){
 
 function saveClients(token){
   clearTimeout(_syncClientsTimer);
+  if(!_pullReady){window._nf_pendingCore=true;return;}
   _syncClientsTimer=setTimeout(function(){
-    var active=[],lost=[];
-    try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}
-    try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}
-    // De-dupe by id. lostClients is authoritative for "baja" (inactive).
-    var byId={};
-    active.forEach(function(c){
-      if(!c||!c.id)return;
-      byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
-                  source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,
-                  active:c.active!==false};
-    });
-    lost.forEach(function(c){
-      if(!c||!c.id)return;
-      byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,
-                  source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,
-                  active:false};
-    });
-    var all=Object.keys(byId).map(function(k){return byId[k];});
-    if(!all.length){console.warn('[NF] saveClients: empty – skipping to avoid wiping cloud');return;}
-    backupClients();
-    syncTable('clients',all,'clients',token);
+    getToken().then(function(t){t=t||token;if(t)pushClientsDirty(t);});
   },300);
 }
 
@@ -620,35 +769,36 @@ function setupInterceptor(){
     orig.call(this,key,value);
     // Not authenticated yet → never sync (avoids saving to the wrong/no account)
     if(!EM||!UID||!PRE)return;
-    var isCore=(key===PRE+'clients'||key===PRE+'lostClients'||key===PRE+'leads'||key===PRE+'antrop');
+    var isClients=(key===PRE+'clients'||key===PRE+'lostClients');
+    var isCore=(isClients||key===PRE+'leads'||key===PRE+'antrop');
     var isExtra=isExtraKey(key);
     if(!isCore&&!isExtra)return;
-    // Don't push while the initial sync is writing to localStorage
-    if(window._nf_syncing)return;
-    // Don't re-push extras while we're applying remote extras (avoids loops)
+    // The sync's own writes (cloud data being applied) are never pushed back.
     if(isExtra&&window._nf_applyingExtras)return;
-    // Never push until we've pulled the latest cloud data at least once this session,
-    // so an app opened with stale local data can't overwrite a newer change from another device.
+    if(window._nf_pullWriting){if(isClients)saveClients();return;}
+    // Inside a sync window, clients/extras writes are NOT discarded any more (that is how a renewal got lost):
+    // uploads only send real differences, so scheduling one is always safe.
+    if(window._nf_syncing){
+      if(isClients)saveClients();
+      if(!isExtra)return;
+    }
     window._nf_lastLocalWrite=Date.now();
-    // Don't push until the first pull completes, but DON'T drop your change: remember it and push right after.
     if(!_pullReady){if(isCore)window._nf_pendingCore=true;if(isExtra)window._nf_pendingExtras=true;return;}
+    if(isClients){saveClients();return;}
+    if(isExtra){pushExtras();return;}
     var tokData=getCachedTok(EM);
     var tok=tokData&&tokData.exp>Date.now()?tokData.tok:null;
     if(!tok){
       // token expired/missing — refresh then retry
       getToken().then(function(newTok){
         if(!newTok)return;
-        if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(newTok);
-        else if(key===PRE+'leads')saveLeads(value,newTok);
+        if(key===PRE+'leads')saveLeads(value,newTok);
         else if(key===PRE+'antrop')saveAntrop(value,newTok);
-        else if(isExtra)pushExtras(newTok);
       });
       return;
     }
-    if(key===PRE+'clients'||key===PRE+'lostClients')saveClients(tok);
-    else if(key===PRE+'leads')saveLeads(value,tok);
+    if(key===PRE+'leads')saveLeads(value,tok);
     else if(key===PRE+'antrop')saveAntrop(value,tok);
-    else if(isExtra)pushExtras(tok);
   };
 }
 
@@ -778,9 +928,10 @@ function safeRefresh(){if(window._nf_lastLocalWrite&&Date.now()-window._nf_lastL
 document.addEventListener('visibilitychange',function(){if(!document.hidden)safeRefresh();});
 window.addEventListener('focus',safeRefresh);
 // Flush unsaved changes to the cloud NOW (skip the 300ms debounce) so a renovation made right before you leave always reaches the cloud (fixes the revert).
-function _nfPushNow(tok){try{var active=[],lost=[];try{active=JSON.parse(localStorage.getItem(PRE+'clients')||'[]');}catch(e){}try{lost=JSON.parse(localStorage.getItem(PRE+'lostClients')||'[]');}catch(e){}var byId={};active.forEach(function(c){if(!c||!c.id)return;byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:c.active!==false};});lost.forEach(function(c){if(!c||!c.id)return;byId[c.id]={id:c.id,user_id:UID,name:c.name,price:c.price,billing:c.billing,source:c.source,start_date:c.startDate,renewal_date:c.renewalDate,active:false};});var all=Object.keys(byId).map(function(k){return byId[k];});if(all.length)syncTable('clients',all,'clients',tok);}catch(e){}try{pushExtras(tok);}catch(e){}}
-function flushPending(){try{if(!window._nf_pendingCore&&!window._nf_pendingExtras)return;var td=getCachedTok(EM);var t=td&&td.exp>Date.now()?td.tok:null;window._nf_pendingCore=false;window._nf_pendingExtras=false;if(t){_nfPushNow(t);}else{getToken().then(function(nt){if(nt)_nfPushNow(nt);});}}catch(e){}}
-function nfFlushNow(){try{if(!_pullReady)return;var td=getCachedTok(EM);var t=td&&td.exp>Date.now()?td.tok:null;if(!t)return;clearTimeout(_syncClientsTimer);_nfPushNow(t);}catch(e){}}
+function _nfPushNow(tok,keep){try{clearTimeout(_syncClientsTimer);pushClientsDirty(tok,keep);}catch(e){}try{clearTimeout(_extrasTimer);pushExtrasNow(tok,keep);}catch(e){}}
+// After every pull: upload whatever this device changed and the cloud still doesn't have (also acts as retry).
+function flushPending(){try{window._nf_pendingCore=false;window._nf_pendingExtras=false;if(!_pullReady||!EM||!UID)return;getToken().then(function(t){if(t)_nfPushNow(t);});}catch(e){}}
+function nfFlushNow(){try{if(!_pullReady)return;var td=getCachedTok(EM);var t=td&&td.exp>Date.now()?td.tok:null;if(!t)return;_nfPushNow(t,true);}catch(e){}}
 document.addEventListener('visibilitychange',function(){if(document.hidden)nfFlushNow();});
 window.addEventListener('pagehide',nfFlushNow);
 // Near-real-time sync: re-pull cloud data every 5s while the app is visible (was 45s).
