@@ -11,7 +11,7 @@ for(const c of cases){
  correct+=match; flags+=exactTags;
  if(r.interest_level==='hot'){pred++; if(match)tp++;}else if(c.expected_level==='hot')miss++;
  if(['yes-call','yes-resource','yes-goal','catalan-stop','recent-rejection','missing-context'].includes(c.id)&&(!match||!exactTags))critical++;
- console.log(JSON.stringify({id:c.id,expected:c.expected_level,got:r.interest_level,flags:r.additional_tags,match,exactTags}));
+ console.log(JSON.stringify({id:c.id,expected:c.expected_level,got:r.interest_level,expectedFlags:c.expected_flags,flags:r.additional_tags,match,exactTags}));
 }
 console.log(JSON.stringify({cases:cases.length,levelCorrect:correct,flagsCorrect:flags,hotTrue:tp,hotFalse:pred-tp,hotMissed:miss,inferenceErrors:fail,criticalFailures:critical}));
 if((process.argv[3]==='bilingual' && correct!==cases.length)||fail||critical||tp===0||pred!==tp||correct/cases.length<0.875||flags!==cases.length) process.exitCode=1;

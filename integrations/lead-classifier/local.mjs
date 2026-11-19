@@ -1,3 +1,4 @@
+import {groundCommercial} from './grounding.mjs';
 // Closed set: the caller cannot choose an external URL, hosted model or payment fallback.
 const decisions={
   service_question:'hot',call_accepted:'hot',call_scheduled:'hot',nutrition_goal:'warm',
@@ -66,6 +67,7 @@ export function localInference(engine='ollama',fetchImpl=fetch) {
       const m={booked_meeting:'call_scheduled',phone_meeting:'call_accepted',free_material:'resource_only',nutrition_goal:'nutrition_goal'}[follow.accepted];
       if(m){result.meaning=m;result.evidence=last.id;result.certainty='clear';}
     }
+    await groundCommercial(result,turns,generate);
     const i=turns.findIndex(turn=>turn.id===result.evidence && turn.speaker==='athlete');
     if(i<0 || !Object.hasOwn(decisions,result.meaning) || !['clear','ambiguous'].includes(result.certainty) ||
        ['nutritionist','budget','already_client','opt_out'].some(k=>typeof result[k]!=='boolean'))throw Error('invalid_semantics');
