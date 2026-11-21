@@ -5376,7 +5376,7 @@ CÓMO RESPONDER (PRIORITARIO)
       function renderPreview(){var box=P('_nf_rn_preview');var cs=cuotas();box.innerHTML=cs.map(function(c,i){return '<div>Cuota '+(i+1)+': <b style="color:var(--text)">'+eur(c.amount)+'</b> · '+fmtD(c.date)+'</div>';}).join('');}
       function upd(){var t=total(),h=P('_nf_rn_hint'),pd=P('_nf_rn_paid').value||today();
         if(mode==='split'){P('_nf_rn_ncuotas').textContent=N;renderPreview();h.innerHTML='Reparto <b style="color:var(--text)">'+eur(t)+'</b> en '+N+' cuotas (una al mes). Cada una cuenta en su mes.';}
-        else{h.innerHTML='Se registra <b style="color:var(--text)">'+eur(t)+'</b> cobrado en el mes del '+fmtD(pd)+'.';}
+        else{h.innerHTML='Se registra <b style="color:var(--text)">'+eur(t)+'</b> cobrado en el mes del '+fmtD(pd)+'.';}/*nf-rn-hint*/try{var _b=P('_nf_rn_bill').value,_m=bm(_b);if(_b!=='onetime'&&_m>0&&t>0){var _pm=t/_m,_old=parseFloat(client&&client.price)||0;h.innerHTML+='<div style="margin-top:8px;padding-top:8px;border-top:1px solid var(--bg4,#2a2d35)">Plan <b style="color:var(--text)">'+bl(_b)+'</b>: '+eur(t)+' = <b style="color:var(--text)">'+eur(_pm)+'/mes</b> · renueva el <b style="color:var(--text)">'+fmtD(addMonthsStr(pd,_m))+'</b></div>'+((_old>0&&Math.abs(_pm-_old)/_old>0.25)?'<div style="margin-top:6px;color:#fbbf24;font-weight:600">⚠️ Antes pagaba '+eur(_old)+'/mes y así saldría a '+eur(_pm)+'/mes. Si ha cambiado de plan, elígelo arriba en «Plan».</div>':'');}}catch(_){}
       }
       function setMode(m){mode=m;P('_nf_rn_mfull').className='_nf_seg'+(m==='full'?' _nf_seg_on':'');P('_nf_rn_msplit').className='_nf_seg'+(m==='split'?' _nf_seg_on':'');P('_nf_rn_splitbox').style.display=(m==='split')?'block':'none';upd();}
 
